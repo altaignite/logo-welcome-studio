@@ -191,12 +191,12 @@ export const collectionAction = createServerFn({ method: "POST" })
 /** Opens Stripe's hosted billing portal for the signed-in client (update card, see receipts). */
 export const billingPortal = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) => z.object({ returnUrl: z.string().url().max(500) }).parse(d))
-  .handler(async ({ data, context }) => {
+  .handler(async ({ context }) => {
     const { getAdmin } = await import("@/lib/billing.server");
     const { stripe, ensureCustomer } = await import("@/lib/stripe.server");
     const admin = await getAdmin();
-    const origin = new URL(data.returnUrl).origin;
+    const { getRequest } = await import("@tanstack/react-start/server");
+    const origin = new URL(getRequest().url).origin;
     const customer = await ensureCustomer(admin, context.userId);
     const s = await stripe("POST", "billing_portal/sessions", { customer, return_url: `${origin}/dashboard` });
     return { url: s.url as string };

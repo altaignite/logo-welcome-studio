@@ -82,7 +82,7 @@ function Dashboard() {
     fields: [{ name: "reason", label: "Reason", type: "textarea", required: true }],
     onSubmit: async (v) => { try { await fnSub({ data: { subscriptionId: s.id, action, reason: v.reason } }); await refresh(); return null; } catch (e) { return (e as Error).message; } },
   });
-  const openPortal = async () => { try { const r = await fnPortal({ data: { returnUrl: window.location.href } }); window.location.href = r.url; } catch (e) { fail(e); } };
+  const openPortal = async () => { try { const r = await fnPortal(); window.location.href = r.url; } catch (e) { fail(e); } };
   const newTicket = () => setModal({
     title: "New support request", submitLabel: "Send",
     fields: [{ name: "subject", label: "Subject", required: true }, { name: "category", label: "Topic", type: "select", options: ["general", "billing", "project", "technical"] }, { name: "body", label: "Message", type: "textarea", required: true }],
