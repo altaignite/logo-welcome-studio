@@ -239,7 +239,7 @@ function AccountDetail() {
       <Link to="/admin/accounts" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="size-4" />Accounts</Link>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2"><h1 className="truncate text-2xl font-extrabold sm:text-3xl">{p.first_name} {p.last_name}</h1><StatusBadge status={p.status === "active" ? "active" : p.status === "suspended" ? "pending" : "rejected"} label={p.status} /></div>
+          <div className="flex flex-wrap items-center gap-2"><h1 className="truncate text-2xl font-extrabold sm:text-3xl">{p.first_name} {p.last_name}</h1><StatusBadge status={p.status === "active" ? "active" : "suspended"} label={p.status} /></div>
           <p className="mt-1 font-mono text-sm text-muted-foreground">{formatAccount(p.account_number)} · {p.company}</p>
           {p.status !== "active" && p.status_reason && <p className="mt-2 rounded-lg bg-secondary px-3 py-2 text-sm">Reason: {p.status_reason}</p>}
         </div>
@@ -265,7 +265,7 @@ function AccountDetail() {
 
       {tab === "Overview" && <div className="space-y-4">
         <div className="grid gap-px overflow-hidden rounded-2xl border bg-border sm:grid-cols-2 lg:grid-cols-3">
-          {info.map(([k, v]) => <div key={k} className="bg-card p-4"><p className="text-xs text-muted-foreground">{k}</p><p className="mt-1 break-words text-sm font-medium capitalize-first">{v}</p></div>)}
+          {info.map(([k, v]) => <div key={k} className="bg-card p-4"><p className="text-xs text-muted-foreground">{k}</p><p className="mt-1 break-words text-sm font-medium">{v}</p></div>)}
         </div>
         <div className="flex flex-wrap gap-2">
           {p.status !== "closed" && <Btn icon={X} danger onClick={() => statusAction("closed", "Close")}>Close account</Btn>}
