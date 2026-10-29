@@ -19,6 +19,9 @@ export const Route = createFileRoute("/")({
   component: Login,
 });
 
+const input =
+  "h-14 w-full rounded-2xl border border-transparent bg-secondary pl-14 pr-5 text-base text-foreground outline-none transition placeholder:text-muted-foreground hover:border-input focus:border-foreground focus:bg-background focus:ring-4 focus:ring-foreground/5";
+
 function Login() {
   const [remember, setRemember] = useState(false);
   const [show, setShow] = useState(false);
