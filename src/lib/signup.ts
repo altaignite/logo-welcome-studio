@@ -9,6 +9,17 @@ export const subscription = {
   advertisingBudgetIncluded: false,
 };
 
+export const plans = [
+  { id: "starter", name: "Starter", monthlyFee: 199, monthlyHours: 5, description: "A focused start for your brand." },
+  { id: "growth", name: "Growth", monthlyFee: 499, monthlyHours: 15, description: "More room for your next move." },
+  { id: "scale", name: "Scale", monthlyFee: 999, monthlyHours: 35, description: "Build momentum across channels." },
+] as const;
+export type Plan = (typeof plans)[number];
+
+export function planTerms(plan: Plan) {
+  return `${plan.name} — $${plan.monthlyFee} / month\n${plan.monthlyHours} assigned service hours per month, shared across marketing, design and development. Services are not unlimited. Advertising budgets are separate and excluded.\n90-day money-back guarantee if no sales are received, on service fees only.`;
+}
+
 const countryNames = new Intl.DisplayNames(["en"], { type: "region" });
 export const countries = getCountries().map((code) => ({
   code, name: countryNames.of(code) ?? code, dial: `+${getCountryCallingCode(code)}`,
