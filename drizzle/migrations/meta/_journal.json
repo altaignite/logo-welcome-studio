@@ -50,6 +50,13 @@
       "when": 1793288888004,
       "tag": "0006_client_ticket_scope",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793289218392,
+      "tag": "0007_billing_settings_staff_read",
+      "breakpoints": true
     }
   ]
 }
