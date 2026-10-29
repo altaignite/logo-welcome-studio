@@ -1,7 +1,7 @@
 import { createFileRoute, Link, getRouteApi, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { approveOverage, billOverage, collectionAction, sendFirstInvoice, subscriptionAction } from "@/lib/billing.functions";
+import { approveOverage, billOverage, collectionAction, createInvoice, guaranteeRefund, sendFirstInvoice, subscriptionAction } from "@/lib/billing.functions";
 import { stageLabel, unbilledOverage, type CollectionStage } from "@/lib/billing";
 import { useState } from "react";
 import { Archive, ArchiveRestore, Ban, Clock, CreditCard, MessageSquare, Pencil, Plus, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
@@ -26,7 +26,7 @@ function RecordPage() {
   const popup = usePopup();
   const [modal, setModal] = useState<Modal | null>(null);
   const cfg = isRecordKind(kind) ? recordKinds[kind] : null;
-  const fnFirst = useServerFn(sendFirstInvoice), fnSub = useServerFn(subscriptionAction), fnOver = useServerFn(billOverage), fnColl = useServerFn(collectionAction), fnApprove = useServerFn(approveOverage);
+  const fnFirst = useServerFn(sendFirstInvoice), fnSub = useServerFn(subscriptionAction), fnOver = useServerFn(billOverage), fnColl = useServerFn(collectionAction), fnApprove = useServerFn(approveOverage), fnInvoice = useServerFn(createInvoice), fnRefund = useServerFn(guaranteeRefund);
 
   const { data, isLoading, error } = useQuery({
     enabled: !!cfg,
@@ -100,57 +100,30 @@ function RecordPage() {
       return done((await db.from("time_entries").insert({ project_id: pid, user_id: row.user_id, hours: h, description: v.description, worked_on: v.worked_on || today(), ...actor })).error);
     },
   });
-  const renew = () => popup({
-    type: "info", title: "Start a new billing period?", description: `Resets used hours to 0, moves the renewal date by one month and issues a ${money(Number(row.monthly_fee))} invoice.`,
-    primaryLabel: "Renew", secondaryLabel: "Cancel",
-    onPrimary: async () => {
-      const base = row.renews_at ? new Date(String(row.renews_at)) : new Date(); base.setMonth(base.getMonth() + 1);
-      const up = await db.from("subscriptions").update({ hours_used: 0, renews_at: base.toISOString(), status: "active" }).eq("id", id);
-      if (!up.error) await db.from("invoices").insert({ user_id: row.user_id, subscription_id: id, number: `INV-${today().replaceAll("-", "")}-${rand()}`, amount: row.monthly_fee, description: `${row.plan_name} service fee`, due_at: new Date(Date.now() + 14 * 864e5).toISOString().slice(0, 10) });
-      await refresh();
-    },
-  });
-  const activate = () => popup({
-    type: "info", title: "Activate subscription?", description: "Starts the billing period, the project and the 90-day money-back guarantee window.", primaryLabel: "Activate", secondaryLabel: "Cancel",
-    onPrimary: async () => {
-      const now = new Date(); const renew = new Date(now); renew.setMonth(renew.getMonth() + 1);
-      await db.from("subscriptions").update({ status: "active", started_at: now.toISOString(), renews_at: renew.toISOString(), guarantee_ends_at: guaranteeEnd(now).toISOString(), guarantee_status: "running" }).eq("id", id);
-      await db.from("projects").update({ status: "active", started_at: today() }).eq("subscription_id", id).eq("status", "planned");
-      await refresh();
-    },
-  });
   const newChild = (childKind: "projects" | "invoices" | "tasks") => {
     const fields: FieldDef[] = childKind === "projects" ? recordKinds.projects.edit : childKind === "tasks" ? recordKinds.tasks.edit
-      : [{ name: "description", label: "Description", required: true, defaultValue: `${row.plan_name} service fee` }, { name: "amount", label: "Amount (USD)", type: "number", required: true, defaultValue: String(row.monthly_fee) }, { name: "due_at", label: "Due date", type: "date" }];
+      : [{ name: "description", label: "Description", required: true, defaultValue: `${row.plan_name} service fee` }, { name: "amount", label: "Amount (USD)", type: "number", required: true, defaultValue: String(row.monthly_fee) }];
     setModal({
       title: `New ${recordKinds[childKind].singular.toLowerCase()}`, submitLabel: "Create", fields: fields.map((f) => f.name === "assigned_to" ? { ...f, defaultValue: adminEmail } : f),
       onSubmit: async (v) => {
         const base = { user_id: row.user_id, ...(kind === "projects" ? { project_id: id, subscription_id: row.subscription_id ?? null } : { subscription_id: id }) };
         const patch = toPatch(fields, v);
-        if (childKind === "invoices") { if (!(Number(v.amount) > 0)) return "Enter an amount above 0."; Object.assign(patch, { number: `INV-${today().replaceAll("-", "")}-${rand()}` }); }
+        if (childKind === "invoices") {
+          if (!(Number(v.amount) > 0)) return "Enter an amount above 0.";
+          try { await fnInvoice({ data: { subscriptionId: id, description: v.description, amount: Number(v.amount) } }); await refresh(); return null; } catch (e) { return (e as Error).message; }
+        }
         if (childKind === "tasks") Object.assign(patch, { actor_label: adminEmail });
         const ins = childKind === "projects" ? { user_id: row.user_id, subscription_id: id, ...patch } : childKind === "invoices" ? { user_id: row.user_id, subscription_id: id, ...patch } : { ...base, ...patch };
         return done((await db.from(childKind).insert(ins).select("id").single()).error);
       },
     });
   };
-  const recordPayment = () => setModal({
-    title: "Record payment", submitLabel: "Record payment", description: `${money(Number(row.amount))} for ${row.number}`,
-    fields: [{ name: "method", label: "Payment method", type: "select", options: ["bank_transfer", "card", "ach", "check", "other"] }],
-    onSubmit: async (v) => {
-      const t = await db.from("transactions").insert({ user_id: row.user_id, invoice_id: id, subscription_id: row.subscription_id ?? null, reference: `TX-${rand()}${rand()}`, description: `Payment for ${row.number}`, amount: row.amount, method: v.method, status: "completed" });
-      if (t.error) return t.error.message;
-      return done((await db.from("invoices").update({ status: "paid", paid_at: new Date().toISOString() }).eq("id", id)).error);
-    },
-  });
   const refund = () => setModal({
-    title: "Refund under the guarantee", submitLabel: "Record refund", description: "Only service fees are refundable. Advertising budgets are excluded.",
-    fields: [{ name: "amount", label: "Amount (USD)", type: "number", required: true }, { name: "method", label: "Method", type: "select", options: ["bank_transfer", "card", "ach", "check"] }, { name: "reason", label: "Reason", type: "textarea", required: true }],
+    title: "Refund under the guarantee", submitLabel: "Refund through Stripe", description: "Only service fees are refunded. Advertising budgets are excluded. The refund goes back to the client's original payment method.",
+    fields: [{ name: "amount", label: "Amount (USD)", type: "number", required: true }, { name: "reason", label: "Reason", type: "textarea", required: true }],
     onSubmit: async (v) => {
       const a = Number(v.amount); if (!(a > 0)) return "Enter an amount above 0.";
-      const t = await db.from("transactions").insert({ user_id: row.user_id, subscription_id: id, reference: `RF-${rand()}${rand()}`, description: `Guarantee refund: ${v.reason}`, amount: -a, method: v.method, status: "completed" });
-      if (t.error) return t.error.message;
-      return done((await db.from("subscriptions").update({ guarantee_status: "refunded" }).eq("id", id)).error);
+      try { await fnRefund({ data: { subscriptionId: id, amount: a, reason: v.reason } }); await refresh(); return null; } catch (e) { return (e as Error).message; }
     },
   });
   const reply = () => setModal({

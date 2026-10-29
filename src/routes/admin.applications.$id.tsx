@@ -1,6 +1,8 @@
 import { createFileRoute, Link, getRouteApi, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { sendFirstInvoice } from "@/lib/billing.functions";
 import { Archive, ArchiveRestore, ArrowLeft, Check, Circle, MessageSquare, Pencil, UserCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { DataTable, StatusBadge } from "@/components/admin/data-table";
@@ -9,7 +11,7 @@ import { Btn, ClientBar, FieldGrid, Section, fmtText } from "@/components/admin/
 import { usePopup } from "@/components/popup";
 import { plans } from "@/lib/signup";
 import type { Vals } from "@/lib/records";
-import { formatAccount, formatDate, guaranteeEnd, money, statusLabel, workflowActions, workflowStages, type WorkflowAction, type AppStatus } from "@/lib/admin";
+import { formatAccount, formatDate, money, statusLabel, workflowActions, workflowStages, type WorkflowAction, type AppStatus } from "@/lib/admin";
 
 export const Route = createFileRoute("/admin/applications/$id")({ component: ApplicationDetail });
 const adminRoute = getRouteApi("/admin");
@@ -18,6 +20,7 @@ type Modal = { title: string; fields: FieldDef[]; submitLabel: string; onSubmit:
 function ApplicationDetail() {
   const { id } = Route.useParams();
   const { adminEmail, adminId } = adminRoute.useRouteContext();
+  const sendFirst = useServerFn(sendFirstInvoice);
   const navigate = useNavigate();
   const qc = useQueryClient();
   const popup = usePopup();
@@ -74,9 +77,11 @@ function ApplicationDetail() {
           await log(a.label, { from_status: app.status, to_status: a.to, note: note.trim() || null });
           const subIds = data.subs.map((s) => s.id);
           if (a.to === "approved" && subIds.length) {
-            const renew = new Date(now); renew.setMonth(renew.getMonth() + 1);
-            await supabase.from("subscriptions").update({ status: "active", started_at: now.toISOString(), renews_at: renew.toISOString(), guarantee_ends_at: guaranteeEnd(now).toISOString(), guarantee_status: "running" }).in("id", subIds).eq("status", "pending");
-            await supabase.from("projects").update({ status: "active", started_at: now.toISOString().slice(0, 10) }).in("subscription_id", subIds).eq("status", "planned");
+            // Activation happens when the client pays the Stripe invoice.
+            for (const sid of data.subs.filter((s) => s.status === "pending").map((s) => s.id)) {
+              try { await sendFirst({ data: { subscriptionId: sid } }); }
+              catch (e) { popup({ type: "error", title: "Approved, but the invoice wasn't sent", description: (e as Error).message, primaryLabel: "Close", secondaryLabel: null }); }
+            }
             if (profile && (profile.status === "onboarding" || profile.status === "prospect")) await supabase.from("profiles").update({ status: "active", status_changed_at: now.toISOString() }).eq("id", app.user_id);
           }
           if (a.to === "rejected" && subIds.length) {
