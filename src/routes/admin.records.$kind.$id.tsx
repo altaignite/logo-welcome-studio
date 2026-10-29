@@ -11,7 +11,7 @@ import { formDefaults, isRecordKind, recordKinds, toPatch, type Row, type Vals }
 
 export const Route = createFileRoute("/admin/records/$kind/$id")({ component: RecordPage });
 const adminRoute = getRouteApi("/admin");
-type Modal = { title: string; description?: string; fields: FieldDef[]; submitLabel: string; onSubmit: (v: Vals) => Promise<string | null> };
+type Modal = { title: string; description?: string | undefined; fields: FieldDef[]; submitLabel: string; onSubmit: (v: Vals) => Promise<string | null> };
 const rand = () => Math.floor(Math.random() * 1e6).toString().padStart(6, "0");
 const today = () => new Date().toISOString().slice(0, 10);
 

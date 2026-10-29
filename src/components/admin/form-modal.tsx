@@ -7,7 +7,7 @@ export type FieldDef = {
 
 /** Compact form dialog in the shared app-modal style. */
 export function FormModal({ title, description, fields, submitLabel, onSubmit, onClose }: {
-  title: string; description?: ReactNode; fields: FieldDef[]; submitLabel: string;
+  title: string; description?: ReactNode | undefined; fields: FieldDef[]; submitLabel: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onSubmit: (v: any) => Promise<string | null>; onClose: () => void;
 }) {

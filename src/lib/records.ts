@@ -136,8 +136,8 @@ export function formDefaults(fields: FieldDef[], row: Row): FieldDef[] {
 }
 
 /** Converts form strings back into column values. */
-export function toPatch(fields: FieldDef[], values: Record<string, string>): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
+export function toPatch(fields: FieldDef[], values: Record<string, string>): Row {
+  const out: Row = {};
   for (const f of fields) {
     const v = values[f.name] ?? "";
     if (f.options?.join() === "no,yes") out[f.name] = v === "yes";

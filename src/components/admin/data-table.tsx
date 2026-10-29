@@ -6,7 +6,7 @@ export type Column<T> = { key: string; label: string; value: (row: T) => string 
 export type BulkAction<T> = { label: string; danger?: boolean; run: (rows: T[]) => void | Promise<void> };
 
 export function DataTable<T>({ rows, columns, onRowClick, empty = "Nothing here yet.", toolbar, searchable = true, title, getId, bulkActions = [] }: {
-  rows: T[]; columns: Column<T>[]; onRowClick?: (row: T) => void; empty?: string; toolbar?: ReactNode; searchable?: boolean; title?: string;
+  rows: T[]; columns: Column<T>[]; onRowClick?: ((row: T) => void) | undefined; empty?: string; toolbar?: ReactNode; searchable?: boolean; title?: string;
   getId?: (row: T) => string; bulkActions?: BulkAction<T>[];
 }) {
   const [sort, setSort] = useState<{ key: string; dir: 1 | -1 } | null>(null);
@@ -95,6 +95,6 @@ export function DataTable<T>({ rows, columns, onRowClick, empty = "Nothing here 
   );
 }
 
-export function StatusBadge({ status, label }: { status: string; label?: string }) {
+export function StatusBadge({ status, label }: { status: string; label?: string | undefined }) {
   return <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium capitalize ring-1 ring-inset ${statusTone(status)}`}>{label ?? status.replaceAll("_", " ")}</span>;
 }

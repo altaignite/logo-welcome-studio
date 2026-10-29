@@ -17,7 +17,7 @@ export const Route = createFileRoute("/admin/accounts/$id")({ component: Account
 const adminRoute = getRouteApi("/admin");
 
 const tabs = ["Overview", "Contacts", "Applications", "Subscriptions", "Projects", "Invoices", "Transactions", "Support tickets", "Activities", "Tasks", "Privacy", "Audit log"] as const;
-type Modal = { title: string; description?: string; fields: FieldDef[]; submitLabel: string; onSubmit: (v: Vals) => Promise<string | null> };
+type Modal = { title: string; description?: string | undefined; fields: FieldDef[]; submitLabel: string; onSubmit: (v: Vals) => Promise<string | null> };
 const rand = () => Math.floor(Math.random() * 1e6).toString().padStart(6, "0");
 const today = () => new Date().toISOString().slice(0, 10);
 type R = Row;
@@ -157,7 +157,7 @@ function AccountDetail() {
   const col = (key: string, label: string, f: Parameters<typeof fmtText>[1] = "text"): Column<R> => ({
     key, label, value: (r) => fmtText(r[key], f), ...(f === "status" ? { render: (r: R) => r[key] ? <StatusBadge status={String(r[key])} /> : "—" } : {}),
   });
-  const cards: [string, string, string?][] = [
+  const cards: [string, string, (string | undefined)?][] = [
     ["Active subscriptions", String(live.length), `${data.subscriptions.length} in total`],
     ["Monthly fees", money(mrr), "active plans"],
     ["Hours this period", `${hoursUsed} of ${hoursTotal} h`, hoursTotal && hoursUsed > hoursTotal ? "over allowance" : undefined],
