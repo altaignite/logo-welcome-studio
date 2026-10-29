@@ -18,6 +18,7 @@ import { Route as AdminAccountsIndexRouteImport } from './routes/admin.accounts.
 import { Route as AdminAccountsIdRouteImport } from './routes/admin.accounts.$id'
 import { Route as AdminApplicationsIndexRouteImport } from './routes/admin.applications.index'
 import { Route as AdminApplicationsIdRouteImport } from './routes/admin.applications.$id'
+import { Route as AdminRecordsKindIdRouteImport } from './routes/admin.records.$kind.$id'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -64,6 +65,11 @@ const AdminApplicationsIdRoute = AdminApplicationsIdRouteImport.update({
   path: '/applications/$id',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminRecordsKindIdRoute = AdminRecordsKindIdRouteImport.update({
+  id: '/records/$kind/$id',
+  path: '/records/$kind/$id',
+  getParentRoute: () => AdminRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -75,6 +81,7 @@ export interface FileRoutesByFullPath {
   '/admin/applications/$id': typeof AdminApplicationsIdRoute
   '/admin/accounts/': typeof AdminAccountsIndexRoute
   '/admin/applications/': typeof AdminApplicationsIndexRoute
+  '/admin/records/$kind/$id': typeof AdminRecordsKindIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -85,6 +92,7 @@ export interface FileRoutesByTo {
   '/admin/applications/$id': typeof AdminApplicationsIdRoute
   '/admin/accounts': typeof AdminAccountsIndexRoute
   '/admin/applications': typeof AdminApplicationsIndexRoute
+  '/admin/records/$kind/$id': typeof AdminRecordsKindIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -97,6 +105,7 @@ export interface FileRoutesById {
   '/admin/applications/$id': typeof AdminApplicationsIdRoute
   '/admin/accounts/': typeof AdminAccountsIndexRoute
   '/admin/applications/': typeof AdminApplicationsIndexRoute
+  '/admin/records/$kind/$id': typeof AdminRecordsKindIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -110,6 +119,7 @@ export interface FileRouteTypes {
     | '/admin/applications/$id'
     | '/admin/accounts/'
     | '/admin/applications/'
+    | '/admin/records/$kind/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -120,6 +130,7 @@ export interface FileRouteTypes {
     | '/admin/applications/$id'
     | '/admin/accounts'
     | '/admin/applications'
+    | '/admin/records/$kind/$id'
   id:
     | '__root__'
     | '/'
@@ -131,6 +142,7 @@ export interface FileRouteTypes {
     | '/admin/applications/$id'
     | '/admin/accounts/'
     | '/admin/applications/'
+    | '/admin/records/$kind/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -205,6 +217,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminApplicationsIdRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/records/$kind/$id': {
+      id: '/admin/records/$kind/$id'
+      path: '/records/$kind/$id'
+      fullPath: '/admin/records/$kind/$id'
+      preLoaderRoute: typeof AdminRecordsKindIdRouteImport
+      parentRoute: typeof AdminRoute
+    }
   }
 }
 
@@ -214,6 +233,7 @@ interface AdminRouteChildren {
   AdminApplicationsIdRoute: typeof AdminApplicationsIdRoute
   AdminAccountsIndexRoute: typeof AdminAccountsIndexRoute
   AdminApplicationsIndexRoute: typeof AdminApplicationsIndexRoute
+  AdminRecordsKindIdRoute: typeof AdminRecordsKindIdRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
@@ -222,6 +242,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminApplicationsIdRoute: AdminApplicationsIdRoute,
   AdminAccountsIndexRoute: AdminAccountsIndexRoute,
   AdminApplicationsIndexRoute: AdminApplicationsIndexRoute,
+  AdminRecordsKindIdRoute: AdminRecordsKindIdRoute,
 }
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
