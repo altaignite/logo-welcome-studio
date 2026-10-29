@@ -22,7 +22,6 @@ export const setAccountStatus = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const ban = await supabaseAdmin.auth.admin.updateUserById(data.userId, { ban_duration: data.status === "active" ? "none" : "876000h" });
     if (ban.error) throw new Error("Couldn't update sign-in access.");
-    if (data.status !== "active") await supabaseAdmin.auth.admin.signOut(data.userId).catch(() => undefined);
 
     // Update through the staff session so the audit log records who did it.
     const up = await context.supabase.from("profiles").update({ status: data.status, status_reason: data.reason, status_changed_at: new Date().toISOString() }).eq("id", data.userId);
