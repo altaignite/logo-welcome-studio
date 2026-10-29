@@ -8,11 +8,12 @@ import { FormModal, type FieldDef } from "@/components/admin/form-modal";
 import { Btn, ClientBar, FieldGrid, Section, fmtText } from "@/components/admin/record-bits";
 import { usePopup } from "@/components/popup";
 import { plans } from "@/lib/signup";
+import type { Vals } from "@/lib/records";
 import { formatAccount, formatDate, guaranteeEnd, money, statusLabel, workflowActions, workflowStages, type WorkflowAction, type AppStatus } from "@/lib/admin";
 
 export const Route = createFileRoute("/admin/applications/$id")({ component: ApplicationDetail });
 const adminRoute = getRouteApi("/admin");
-type Modal = { title: string; fields: FieldDef[]; submitLabel: string; onSubmit: (v: Record<string, string>) => Promise<string | null> };
+type Modal = { title: string; fields: FieldDef[]; submitLabel: string; onSubmit: (v: Vals) => Promise<string | null> };
 
 function ApplicationDetail() {
   const { id } = Route.useParams();

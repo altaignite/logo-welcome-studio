@@ -8,7 +8,8 @@ export type FieldDef = {
 /** Compact form dialog in the shared app-modal style. */
 export function FormModal({ title, description, fields, submitLabel, onSubmit, onClose }: {
   title: string; description?: ReactNode; fields: FieldDef[]; submitLabel: string;
-  onSubmit: (v: Record<string, string>) => Promise<string | null>; onClose: () => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onSubmit: (v: any) => Promise<string | null>; onClose: () => void;
 }) {
   const [values, setValues] = useState<Record<string, string>>(() => Object.fromEntries(fields.map((f) => [f.name, f.defaultValue ?? (f.type === "select" ? f.options?.[0] ?? "" : "")])));
   const [err, setErr] = useState<string | null>(null);

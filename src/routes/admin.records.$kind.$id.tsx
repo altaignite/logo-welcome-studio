@@ -7,11 +7,11 @@ import { FormModal, type FieldDef } from "@/components/admin/form-modal";
 import { usePopup } from "@/components/popup";
 import { AuditList, Btn, ClientBar, FieldGrid, FieldValue, Section, db, fmtText } from "@/components/admin/record-bits";
 import { canDelete, guaranteeEligible, guaranteeEnd, money } from "@/lib/admin";
-import { formDefaults, isRecordKind, recordKinds, toPatch, type Row } from "@/lib/records";
+import { formDefaults, isRecordKind, recordKinds, toPatch, type Row, type Vals } from "@/lib/records";
 
 export const Route = createFileRoute("/admin/records/$kind/$id")({ component: RecordPage });
 const adminRoute = getRouteApi("/admin");
-type Modal = { title: string; description?: string; fields: FieldDef[]; submitLabel: string; onSubmit: (v: Record<string, string>) => Promise<string | null> };
+type Modal = { title: string; description?: string; fields: FieldDef[]; submitLabel: string; onSubmit: (v: Vals) => Promise<string | null> };
 const rand = () => Math.floor(Math.random() * 1e6).toString().padStart(6, "0");
 const today = () => new Date().toISOString().slice(0, 10);
 

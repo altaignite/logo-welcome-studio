@@ -11,16 +11,16 @@ import { AuditList, Btn, FieldGrid, Section, db, fmtText } from "@/components/ad
 import { setAccountStatus } from "@/lib/crm.functions";
 import { accountStatusLabel, accountStatuses, complianceKinds, formatAccount, formatDate, formatDay, humanize, lifecycleStages, money, statusLabel, type AccountStatus } from "@/lib/admin";
 import { plans } from "@/lib/signup";
-import { recordKinds, toPatch, type RecordKind } from "@/lib/records";
+import { recordKinds, toPatch, type RecordKind, type Row, type Vals } from "@/lib/records";
 
 export const Route = createFileRoute("/admin/accounts/$id")({ component: AccountDetail });
 const adminRoute = getRouteApi("/admin");
 
 const tabs = ["Overview", "Contacts", "Applications", "Subscriptions", "Projects", "Invoices", "Transactions", "Support tickets", "Activities", "Tasks", "Privacy", "Audit log"] as const;
-type Modal = { title: string; description?: string; fields: FieldDef[]; submitLabel: string; onSubmit: (v: Record<string, string>) => Promise<string | null> };
+type Modal = { title: string; description?: string; fields: FieldDef[]; submitLabel: string; onSubmit: (v: Vals) => Promise<string | null> };
 const rand = () => Math.floor(Math.random() * 1e6).toString().padStart(6, "0");
 const today = () => new Date().toISOString().slice(0, 10);
-type R = { id: string } & Record<string, unknown>;
+type R = Row;
 
 function AccountDetail() {
   const { id } = Route.useParams();
@@ -155,7 +155,7 @@ function AccountDetail() {
 
   // ---------- columns ----------
   const col = (key: string, label: string, f: Parameters<typeof fmtText>[1] = "text"): Column<R> => ({
-    key, label, value: (r) => fmtText(r[key], f), render: f === "status" ? (r) => r[key] ? <StatusBadge status={String(r[key])} /> : "—" : undefined,
+    key, label, value: (r) => fmtText(r[key], f), ...(f === "status" ? { render: (r: R) => r[key] ? <StatusBadge status={String(r[key])} /> : "—" } : {}),
   });
   const cards: [string, string, string?][] = [
     ["Active subscriptions", String(live.length), `${data.subscriptions.length} in total`],

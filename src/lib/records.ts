@@ -19,7 +19,11 @@ export type KindConfig = {
   voidable?: boolean;
   archivable?: boolean;
 };
-export type Row = Record<string, unknown> & { id: string; user_id: string };
+/** Generic record rows and form values: columns vary per table, so they are loosely typed here. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type Row = any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type Vals = any;
 
 const s = (v: unknown) => (v == null ? "" : String(v));
 const sel = (name: string, label: string, options: string[]): FieldDef => ({ name, label, type: "select", options });
