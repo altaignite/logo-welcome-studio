@@ -952,6 +952,7 @@ export type Database = {
           reference: string
           status: string
           stripe_id: string | null
+          stripe_payment_intent: string | null
           subscription_id: string | null
           user_id: string
           void_reason: string | null
@@ -966,6 +967,7 @@ export type Database = {
           reference: string
           status?: string
           stripe_id?: string | null
+          stripe_payment_intent?: string | null
           subscription_id?: string | null
           user_id: string
           void_reason?: string | null
@@ -980,6 +982,7 @@ export type Database = {
           reference?: string
           status?: string
           stripe_id?: string | null
+          stripe_payment_intent?: string | null
           subscription_id?: string | null
           user_id?: string
           void_reason?: string | null

@@ -36,10 +36,9 @@ export const recordKinds: Record<RecordKind, KindConfig> = {
       ["Hours used this period", "hours_used", "hours"], ["Started", "started_at", "date"], ["Renews", "renews_at", "date"], ["Cancelled", "cancelled_at", "date"],
       ["Guarantee ends", "guarantee_ends_at", "date"], ["Guarantee", "guarantee_status", "status"], ["Guarantee void reason", "guarantee_void_reason", "long"], ["Sales received", "sales_received", "bool"],
       ["Extra hours billed", "overage_billed_hours", "hours"], ["Payment warning", "payment_warning", "long"], ["Notes", "notes", "long"]],
-    edit: [{ name: "plan_name", label: "Plan name", required: true }, { name: "monthly_fee", label: "Monthly fee (USD)", type: "number", required: true },
-      { name: "monthly_hours", label: "Monthly hours", type: "number", required: true }, sel("status", "Status", ["pending", "active", "paused", "cancelled"]),
-      sel("sales_received", "Sales received", ["no", "yes"]), sel("guarantee_status", "Guarantee", ["not_started", "running", "claimed", "refunded", "expired", "denied"]),
-      { name: "renews_at", label: "Renews", type: "date" }, { name: "guarantee_ends_at", label: "Guarantee ends", type: "date" }, { name: "notes", label: "Notes", type: "textarea" }],
+    // Plan, price, status and renewal mirror Stripe and change through the billing actions, not this form.
+    edit: [sel("sales_received", "Sales received", ["no", "yes"]), sel("guarantee_status", "Guarantee", ["not_started", "running", "claimed", "refunded", "expired", "denied"]),
+      { name: "guarantee_ends_at", label: "Guarantee ends", type: "date" }, { name: "notes", label: "Notes", type: "textarea" }],
     parents: [{ label: "Application", kind: "applications", fk: "application_id" }],
     children: [
       { label: "Projects", kind: "projects", fk: "subscription_id", columns: [["Project", "name", "text"], ["Status", "status", "status"], ["Hours", "hours", "hours"], ["Due", "due_at", "day"]] },

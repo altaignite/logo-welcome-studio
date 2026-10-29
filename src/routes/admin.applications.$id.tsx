@@ -72,8 +72,10 @@ function ApplicationDetail() {
         setBusy(true);
         const now = new Date();
         const final = a.to === "approved" || a.to === "rejected";
-        const up = await supabase.from("applications").update({ status: a.to, updated_at: now.toISOString(), ...(final ? { decided_at: now.toISOString() } : {}), assigned_to: app.assigned_to ?? adminEmail }).eq("id", id);
-        if (!up.error) {
+        const up = await supabase.from("applications").update({ status: a.to, updated_at: now.toISOString(), ...(final ? { decided_at: now.toISOString() } : {}), assigned_to: app.assigned_to ?? adminEmail }).eq("id", id).eq("status", app.status).select("id");
+        // Matching the current status stops two staff members applying the same decision twice.
+        const changed = !up.error && !!up.data?.length;
+        if (changed) {
           await log(a.label, { from_status: app.status, to_status: a.to, note: note.trim() || null });
           const subIds = data.subs.map((s) => s.id);
           if (a.to === "approved" && subIds.length) {
@@ -90,7 +92,7 @@ function ApplicationDetail() {
           }
         }
         setBusy(false); setNote("");
-        if (up.error) popup({ type: "error", title: "Couldn't update the application", description: up.error.message });
+        if (!changed) popup({ type: "error", title: "Couldn't update the application", description: up.error?.message ?? "Someone else changed this application. Refresh to see the latest." });
         refresh();
       },
     });

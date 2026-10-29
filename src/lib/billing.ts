@@ -67,3 +67,45 @@ export function pauseVoidsGuarantee(startedAt: string | null, now = new Date()) 
 }
 /** A failed payment after the first successful one voids the guarantee. */
 export const failedPaymentVoidsGuarantee = (firstPaidAt: string | null) => !!firstPaidAt;
+
+type StripeInvoiceLike = {
+  metadata?: Record<string, string> | null;
+  billing_reason?: string | null;
+  lines?: { data?: { period?: { end?: number } }[] } | null;
+};
+/** Local kind of a Stripe invoice: our own metadata first, then Stripe's billing reason. Only "renewal" starts a new hours period. */
+export function invoiceKind(o: StripeInvoiceLike): string {
+  const own = o.metadata?.["kind"];
+  if (own) return own;
+  if (o.billing_reason === "subscription_cycle") return "renewal";
+  if (o.billing_reason === "subscription_update") return "plan_change";
+  return "service";
+}
+/** Next renewal after a paid renewal invoice: the end of the period it bills, or one month from now. */
+export function nextRenewalAt(o: StripeInvoiceLike, now = new Date()) {
+  const end = o.lines?.data?.[0]?.period?.end;
+  if (end && end * 1000 > now.getTime()) return new Date(end * 1000);
+  const d = new Date(now); d.setMonth(d.getMonth() + 1); return d;
+}
+
+/** New refund to record for a charge: Stripe reports the running total refunded (cents), so subtract refunds already recorded. */
+export const refundDelta = (amountRefundedCents: number, recorded: number[]) =>
+  round2(Math.max(0, amountRefundedCents / 100 - recorded.reduce((s, a) => s + Math.abs(a), 0)));
+
+/** Splits a refund (cents) across payments by what each still has refundable. Null when they can't cover it. */
+export function planRefund(amountCents: number, sources: { pi: string; refundable: number; refunded: number }[]) {
+  const plan: { pi: string; amount: number; refunded: number }[] = [];
+  let left = amountCents;
+  for (const s of sources) {
+    if (left <= 0) break;
+    const amount = Math.min(left, s.refundable);
+    if (amount > 0) { plan.push({ pi: s.pi, amount, refunded: s.refunded }); left -= amount; }
+  }
+  return left > 0 ? null : plan;
+}
+
+/** Collection actions that move an invoice's debt need it to still be unpaid. */
+export function collectionActionAllowed(action: string, status: string) {
+  const unpaid = status === "open" || status === "overdue";
+  return unpaid || !["flag", "court", "settle", "write_off"].includes(action);
+}
