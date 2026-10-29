@@ -99,7 +99,7 @@ function Signup() {
     event.preventDefault();
     const result = step === 1 ? personalSchema.safeParse(personal) : step === 2 ? accountSchema.safeParse(account) : null;
     if (result && !result.success) {
-      popup({ type: "error", title: "Let's check your details", description: result.error.issues[0]?.message, primaryLabel: "Try again", secondaryLabel: null });
+      popup({ type: "error", title: "Let's check your details", description: result.error.issues[0]?.message ?? "Please check your information.", primaryLabel: "Try again", secondaryLabel: null });
       return;
     }
     setStep((s) => s + 1);
