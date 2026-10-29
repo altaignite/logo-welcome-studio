@@ -1,9 +1,10 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
 import { Lock, Mail, ShieldCheck } from "lucide-react";
 import logo from "@/assets/logo.png.asset.json";
 import { supabase } from "@/integrations/supabase/client";
 import { usePopup } from "@/components/popup";
+import { passwordIssue } from "@/lib/client";
 
 export const Route = createFileRoute("/admin-login")({
   head: () => ({
@@ -36,8 +37,8 @@ function AdminLogin() {
       popup({ type: "error", title: "Staff email required", description: `Use your ${DOMAIN} email address.`, primaryLabel: "Try again", secondaryLabel: null });
       return;
     }
-    if (password.length < 8) {
-      popup({ type: "error", title: "Password too short", description: "Use at least 8 characters.", primaryLabel: "Try again", secondaryLabel: null });
+    if (mode === "up" && passwordIssue(password)) {
+      popup({ type: "error", title: "Choose a stronger password", description: passwordIssue(password)!, primaryLabel: "Try again", secondaryLabel: null });
       return;
     }
     setBusy(true);
@@ -75,6 +76,7 @@ function AdminLogin() {
             <span className="relative block"><Lock className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><input name="password" type="password" autoComplete={mode === "in" ? "current-password" : "new-password"} className="signup-input pl-10" /></span></label>
           <button type="submit" disabled={busy} className="signup-primary inline-flex items-center justify-center gap-2"><ShieldCheck className="size-4" />{busy ? "Please wait…" : mode === "in" ? "Sign in" : "Create account"}</button>
         </form>
+        {mode === "in" && <Link to="/forgot-password" className="mt-4 block text-center text-sm font-semibold hover:text-primary">Forgot password?</Link>}
         <button type="button" onClick={() => setMode(mode === "in" ? "up" : "in")} className="mt-4 w-full text-center text-sm text-muted-foreground hover:text-foreground">
           {mode === "in" ? "New staff member? Create an account" : "Already have an account? Sign in"}
         </button>

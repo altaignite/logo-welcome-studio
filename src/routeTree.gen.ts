@@ -13,15 +13,20 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AdminLoginRouteImport } from './routes/admin-login'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
 import { Route as AdminSupportRouteImport } from './routes/admin.support'
 import { Route as AdminTaskforceRouteImport } from './routes/admin.taskforce'
+import { Route as DashboardIndexRouteImport } from './routes/dashboard.index'
+import { Route as DashboardSectionRouteImport } from './routes/dashboard.$section'
 import { Route as AdminAccountsIndexRouteImport } from './routes/admin.accounts.index'
 import { Route as AdminAccountsIdRouteImport } from './routes/admin.accounts.$id'
 import { Route as AdminApplicationsIndexRouteImport } from './routes/admin.applications.index'
 import { Route as AdminApplicationsIdRouteImport } from './routes/admin.applications.$id'
+import { Route as DashboardKindIdRouteImport } from './routes/dashboard.$kind.$id'
 import { Route as AdminRecordsKindIdRouteImport } from './routes/admin.records.$kind.$id'
 import { Route as ApiPublicCronCollectionsRouteImport } from './routes/api/public/cron/collections'
 import { Route as ApiPublicStripeWebhookRouteImport } from './routes/api/public/stripe/webhook'
@@ -44,6 +49,16 @@ const AdminLoginRoute = AdminLoginRouteImport.update({
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
+  id: '/forgot-password',
+  path: '/forgot-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SignupRoute = SignupRouteImport.update({
@@ -71,6 +86,16 @@ const AdminTaskforceRoute = AdminTaskforceRouteImport.update({
   path: '/taskforce',
   getParentRoute: () => AdminRoute,
 } as any)
+const DashboardIndexRoute = DashboardIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardSectionRoute = DashboardSectionRouteImport.update({
+  id: '/$section',
+  path: '/$section',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const AdminAccountsIndexRoute = AdminAccountsIndexRouteImport.update({
   id: '/accounts/',
   path: '/accounts/',
@@ -90,6 +115,11 @@ const AdminApplicationsIdRoute = AdminApplicationsIdRouteImport.update({
   id: '/applications/$id',
   path: '/applications/$id',
   getParentRoute: () => AdminRoute,
+} as any)
+const DashboardKindIdRoute = DashboardKindIdRouteImport.update({
+  id: '/$kind/$id',
+  path: '/$kind/$id',
+  getParentRoute: () => DashboardRoute,
 } as any)
 const AdminRecordsKindIdRoute = AdminRecordsKindIdRouteImport.update({
   id: '/records/$kind/$id',
@@ -112,14 +142,19 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/admin-login': typeof AdminLoginRoute
-  '/dashboard': typeof DashboardRoute
+  '/dashboard': typeof DashboardRouteWithChildren
+  '/forgot-password': typeof ForgotPasswordRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/support': typeof AdminSupportRoute
   '/admin/taskforce': typeof AdminTaskforceRoute
+  '/dashboard/$section': typeof DashboardSectionRoute
   '/admin/': typeof AdminIndexRoute
+  '/dashboard/': typeof DashboardIndexRoute
   '/admin/accounts/$id': typeof AdminAccountsIdRoute
   '/admin/applications/$id': typeof AdminApplicationsIdRoute
+  '/dashboard/$kind/$id': typeof DashboardKindIdRoute
   '/admin/accounts/': typeof AdminAccountsIndexRoute
   '/admin/applications/': typeof AdminApplicationsIndexRoute
   '/admin/records/$kind/$id': typeof AdminRecordsKindIdRoute
@@ -129,14 +164,18 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin-login': typeof AdminLoginRoute
-  '/dashboard': typeof DashboardRoute
+  '/forgot-password': typeof ForgotPasswordRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/support': typeof AdminSupportRoute
   '/admin/taskforce': typeof AdminTaskforceRoute
+  '/dashboard/$section': typeof DashboardSectionRoute
   '/admin': typeof AdminIndexRoute
+  '/dashboard': typeof DashboardIndexRoute
   '/admin/accounts/$id': typeof AdminAccountsIdRoute
   '/admin/applications/$id': typeof AdminApplicationsIdRoute
+  '/dashboard/$kind/$id': typeof DashboardKindIdRoute
   '/admin/accounts': typeof AdminAccountsIndexRoute
   '/admin/applications': typeof AdminApplicationsIndexRoute
   '/admin/records/$kind/$id': typeof AdminRecordsKindIdRoute
@@ -148,14 +187,19 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/admin-login': typeof AdminLoginRoute
-  '/dashboard': typeof DashboardRoute
+  '/dashboard': typeof DashboardRouteWithChildren
+  '/forgot-password': typeof ForgotPasswordRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/support': typeof AdminSupportRoute
   '/admin/taskforce': typeof AdminTaskforceRoute
+  '/dashboard/$section': typeof DashboardSectionRoute
   '/admin/': typeof AdminIndexRoute
+  '/dashboard/': typeof DashboardIndexRoute
   '/admin/accounts/$id': typeof AdminAccountsIdRoute
   '/admin/applications/$id': typeof AdminApplicationsIdRoute
+  '/dashboard/$kind/$id': typeof DashboardKindIdRoute
   '/admin/accounts/': typeof AdminAccountsIndexRoute
   '/admin/applications/': typeof AdminApplicationsIndexRoute
   '/admin/records/$kind/$id': typeof AdminRecordsKindIdRoute
@@ -169,13 +213,18 @@ export interface FileRouteTypes {
     | '/admin'
     | '/admin-login'
     | '/dashboard'
+    | '/forgot-password'
+    | '/reset-password'
     | '/signup'
     | '/admin/settings'
     | '/admin/support'
     | '/admin/taskforce'
+    | '/dashboard/$section'
     | '/admin/'
+    | '/dashboard/'
     | '/admin/accounts/$id'
     | '/admin/applications/$id'
+    | '/dashboard/$kind/$id'
     | '/admin/accounts/'
     | '/admin/applications/'
     | '/admin/records/$kind/$id'
@@ -185,14 +234,18 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/admin-login'
-    | '/dashboard'
+    | '/forgot-password'
+    | '/reset-password'
     | '/signup'
     | '/admin/settings'
     | '/admin/support'
     | '/admin/taskforce'
+    | '/dashboard/$section'
     | '/admin'
+    | '/dashboard'
     | '/admin/accounts/$id'
     | '/admin/applications/$id'
+    | '/dashboard/$kind/$id'
     | '/admin/accounts'
     | '/admin/applications'
     | '/admin/records/$kind/$id'
@@ -204,13 +257,18 @@ export interface FileRouteTypes {
     | '/admin'
     | '/admin-login'
     | '/dashboard'
+    | '/forgot-password'
+    | '/reset-password'
     | '/signup'
     | '/admin/settings'
     | '/admin/support'
     | '/admin/taskforce'
+    | '/dashboard/$section'
     | '/admin/'
+    | '/dashboard/'
     | '/admin/accounts/$id'
     | '/admin/applications/$id'
+    | '/dashboard/$kind/$id'
     | '/admin/accounts/'
     | '/admin/applications/'
     | '/admin/records/$kind/$id'
@@ -222,7 +280,9 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRouteWithChildren
   AdminLoginRoute: typeof AdminLoginRoute
-  DashboardRoute: typeof DashboardRoute
+  DashboardRoute: typeof DashboardRouteWithChildren
+  ForgotPasswordRoute: typeof ForgotPasswordRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
   SignupRoute: typeof SignupRoute
   ApiPublicCronCollectionsRoute: typeof ApiPublicCronCollectionsRoute
   ApiPublicStripeWebhookRoute: typeof ApiPublicStripeWebhookRoute
@@ -256,6 +316,20 @@ declare module '@tanstack/react-router' {
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/forgot-password': {
+      id: '/forgot-password'
+      path: '/forgot-password'
+      fullPath: '/forgot-password'
+      preLoaderRoute: typeof ForgotPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/signup': {
@@ -293,6 +367,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminTaskforceRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/dashboard/': {
+      id: '/dashboard/'
+      path: '/'
+      fullPath: '/dashboard/'
+      preLoaderRoute: typeof DashboardIndexRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/$section': {
+      id: '/dashboard/$section'
+      path: '/$section'
+      fullPath: '/dashboard/$section'
+      preLoaderRoute: typeof DashboardSectionRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/admin/accounts/': {
       id: '/admin/accounts/'
       path: '/accounts'
@@ -320,6 +408,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/applications/$id'
       preLoaderRoute: typeof AdminApplicationsIdRouteImport
       parentRoute: typeof AdminRoute
+    }
+    '/dashboard/$kind/$id': {
+      id: '/dashboard/$kind/$id'
+      path: '/$kind/$id'
+      fullPath: '/dashboard/$kind/$id'
+      preLoaderRoute: typeof DashboardKindIdRouteImport
+      parentRoute: typeof DashboardRoute
     }
     '/admin/records/$kind/$id': {
       id: '/admin/records/$kind/$id'
@@ -371,11 +466,29 @@ const AdminRouteChildren: AdminRouteChildren = {
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
+interface DashboardRouteChildren {
+  DashboardSectionRoute: typeof DashboardSectionRoute
+  DashboardIndexRoute: typeof DashboardIndexRoute
+  DashboardKindIdRoute: typeof DashboardKindIdRoute
+}
+
+const DashboardRouteChildren: DashboardRouteChildren = {
+  DashboardSectionRoute: DashboardSectionRoute,
+  DashboardIndexRoute: DashboardIndexRoute,
+  DashboardKindIdRoute: DashboardKindIdRoute,
+}
+
+const DashboardRouteWithChildren = DashboardRoute._addFileChildren(
+  DashboardRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRouteWithChildren,
   AdminLoginRoute: AdminLoginRoute,
-  DashboardRoute: DashboardRoute,
+  DashboardRoute: DashboardRouteWithChildren,
+  ForgotPasswordRoute: ForgotPasswordRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
   SignupRoute: SignupRoute,
   ApiPublicCronCollectionsRoute: ApiPublicCronCollectionsRoute,
   ApiPublicStripeWebhookRoute: ApiPublicStripeWebhookRoute,

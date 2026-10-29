@@ -1,0 +1,118 @@
+import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import type { ReactNode } from "react";
+import { ArrowLeft } from "lucide-react";
+import { DataTable, StatusBadge } from "@/components/admin/data-table";
+import { FieldGrid, Section } from "@/components/admin/record-bits";
+import { ActBtn, Actions, SubButtons, invoiceTotal, useClient, useClientActions, type R, type RecordKind } from "@/components/client/portal";
+import { formatDate, formatDay, humanize, money, statusLabel, type AppStatus } from "@/lib/admin";
+import { stageLabel, type CollectionStage } from "@/lib/billing";
+import { plans } from "@/lib/signup";
+
+const kinds: RecordKind[] = ["subscription", "project", "task", "invoice", "payment", "application", "ticket"];
+const back: Record<RecordKind, [string, string]> = {
+  subscription: ["subscriptions", "Subscriptions"], project: ["projects", "Projects"], task: ["tasks", "Tasks"], invoice: ["invoices", "Invoices"],
+  payment: ["payments", "Payments"], application: ["applications", "Applications"], ticket: ["support", "Support"],
+};
+
+export const Route = createFileRoute("/dashboard/$kind/$id")({
+  beforeLoad: ({ params }) => { if (!(kinds as string[]).includes(params.kind)) throw notFound(); },
+  component: Details,
+});
+
+function Details() {
+  const { kind: k, id } = Route.useParams();
+  const kind = k as RecordKind;
+  const { data, isLoading, error, userId } = useClient();
+  const a = useClientActions();
+  if (error) return <p className="text-sm text-destructive">{(error as Error).message}</p>;
+  if (isLoading || !data) return <p className="text-sm text-muted-foreground">Loading…</p>;
+  const list: Record<RecordKind, R[]> = { subscription: data.subs, project: data.projects, task: data.tasks, invoice: data.invoices, payment: data.payments, application: data.apps, ticket: data.tickets };
+  const r = list[kind].find((x) => x.id === id);
+  const [sec, label] = back[kind];
+  const header = (title: string, status?: ReactNode, actions?: ReactNode) => <>
+    <Link to="/dashboard/$section" params={{ section: sec }} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="size-4" />{label}</Link>
+    <div className="flex flex-wrap items-center justify-between gap-3"><div className="flex flex-wrap items-center gap-3"><h1 className="text-2xl font-extrabold">{title}</h1>{status}</div><div className="flex flex-wrap gap-2">{actions}</div></div>
+  </>;
+  if (!r) return <>{header("Not found")}<p className="text-sm text-muted-foreground">This record doesn't exist or isn't on your account.</p></>;
+  const subOf = (sid: string | null) => data.subs.find((s) => s.id === sid);
+  const subLink = (sid: string | null) => { const s = subOf(sid); return s ? <Link to="/dashboard/$kind/$id" params={{ kind: "subscription", id: s.id }} className="underline">{s.plan_name} plan</Link> : "—"; };
+  const miniTable = (title: string, rows: R[], rk: RecordKind, cols: [string, (x: R) => ReactNode][]) => (
+    <DataTable<R> title={title} rows={rows} searchable={false} empty={`No ${title.toLowerCase()}.`} columns={[
+      ...cols.map(([l, f], i) => ({ key: String(i), label: l, value: (x: R) => String(f(x) ?? ""), render: f })),
+      { key: "x", label: "Actions", value: () => "", render: (x: R) => <Actions kind={rk} id={x.id} /> },
+    ]} />
+  );
+  const tasksTable = (rows: R[]) => miniTable("Tasks", rows, "task", [["Task", (x) => x.title], ["Status", (x) => <StatusBadge status={x.status} />], ["Due", (x) => formatDay(x.due_at)]]);
+  const invTable = (rows: R[]) => miniTable("Invoices", rows, "invoice", [["Invoice", (x) => x.number], ["Total", (x) => money(invoiceTotal(x))], ["Status", (x) => <StatusBadge status={x.status} />]]);
+  const payTable = (rows: R[]) => miniTable("Payments", rows, "payment", [["Reference", (x) => x.reference], ["Amount", (x) => money(x.amount)], ["Date", (x) => formatDate(x.created_at)]]);
+  const hoursList = (rows: R[]) => <Section title="Hours log"><ul className="divide-y text-sm">{rows.map((h) => <li key={h.id} className="flex justify-between gap-3 px-5 py-3"><span>{h.description}</span><span className="shrink-0 text-muted-foreground">{h.hours} h, {formatDay(h.worked_on)}</span></li>)}{rows.length === 0 && <li className="px-5 py-6 text-muted-foreground">No hours logged yet.</li>}</ul></Section>;
+
+  if (kind === "subscription") {
+    const projects = data.projects.filter((p) => p.subscription_id === r.id);
+    const pIds = new Set(projects.map((p) => p.id));
+    const pending = plans.find((p) => p.id === r.pending_plan_id);
+    return <>
+      {header(`${r.plan_name} plan`, <StatusBadge status={r.status} />, <><SubButtons s={r} a={a} /><ActBtn onClick={() => a.newTicket(r.id)}>Get help</ActBtn></>)}
+      {r.payment_warning && <p className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm">{r.payment_warning}</p>}
+      <Section title="Plan">
+        <FieldGrid items={[["Monthly fee", money(r.monthly_fee)], ["Hours this month", `${r.hours_used} of ${r.monthly_hours}`], ["Started", formatDay(r.started_at)],
+          [r.cancel_at_period_end ? "Ends" : "Renews", formatDay(r.renews_at)], ["Scheduled change", pending ? `Moves to ${pending.name} at renewal` : "—"],
+          ["Money-back guarantee", r.guarantee_status === "running" ? `Until ${formatDay(r.guarantee_ends_at)}` : r.guarantee_status === "void" ? `Ended: ${r.guarantee_void_reason ?? "conditions not met"}` : humanize(r.guarantee_status)]]} />
+      </Section>
+      {miniTable("Projects", projects, "project", [["Project", (x) => x.name], ["Status", (x) => <StatusBadge status={x.status} />], ["Hours", (x) => x.hours]])}
+      {tasksTable(data.tasks.filter((t) => t.subscription_id === r.id || pIds.has(t.project_id)))}
+      {hoursList(data.hours.filter((h) => pIds.has(h.project_id)))}
+      {invTable(data.invoices.filter((i) => i.subscription_id === r.id))}
+      {payTable(data.payments.filter((p) => p.subscription_id === r.id))}
+      {miniTable("Support tickets", data.tickets.filter((t) => t.subscription_id === r.id), "ticket", [["Subject", (x) => x.subject], ["Status", (x) => <StatusBadge status={x.status} />]])}
+      {a.modalEl}
+    </>;
+  }
+  if (kind === "project") return <>
+    {header(r.name, <StatusBadge status={r.status} />)}
+    <Section title="Project"><FieldGrid items={[["Plan", subLink(r.subscription_id)], ["Service", r.service], ["Hours logged", r.hours], ["Started", formatDay(r.started_at)], ["Due", formatDay(r.due_at)], ["Completed", formatDate(r.completed_at)], ["Description", r.description ?? "—"]]} /></Section>
+    {tasksTable(data.tasks.filter((t) => t.project_id === r.id))}
+    {hoursList(data.hours.filter((h) => h.project_id === r.id))}
+  </>;
+  if (kind === "task") return <>
+    {header(r.title, <StatusBadge status={r.status} />, r.over_allowance && !r.overage_approved ? <ActBtn dark onClick={() => a.approve(r)}>Approve extra hours</ActBtn> : null)}
+    <Section title="Task"><FieldGrid items={[["Plan", subLink(r.subscription_id)], ["Project", data.projects.find((p) => p.id === r.project_id)?.name ?? "—"], ["Priority", humanize(r.priority)], ["Due", formatDay(r.due_at)],
+      ["Estimated hours", r.estimated_hours ?? "—"], ["Extra hours", r.over_allowance ? (r.overage_approved ? "Approved" : "Needs your approval") : "—"], ["Completed", formatDate(r.completed_at)], ["Details", r.details ?? "—"]]} /></Section>
+    {hoursList(data.hours.filter((h) => h.task_id === r.id))}
+    {a.modalEl}
+  </>;
+  if (kind === "invoice") return <>
+    {header(`Invoice ${r.number}`, <StatusBadge status={r.status} />, <>
+      {r.hosted_url && r.status !== "paid" && r.status !== "void" && <a href={r.hosted_url} target="_blank" rel="noopener noreferrer" className="h-8 rounded-full bg-foreground px-3 text-xs font-semibold leading-8 text-background">Pay now</a>}
+      {r.pdf_url && <a href={r.pdf_url} target="_blank" rel="noopener noreferrer" className="h-8 rounded-full bg-secondary px-3 text-xs font-semibold leading-8">Download PDF</a>}
+      <ActBtn onClick={() => a.newTicket(r.subscription_id ?? undefined)}>Question about this invoice</ActBtn></>)}
+    <Section title="Invoice"><FieldGrid items={[["Description", r.description ?? "—"], ["Plan", subLink(r.subscription_id)], ["Amount", money(r.amount)], ["Interest", money(r.interest_accrued)], ["Fees", money(r.fees_accrued)], ["Total", money(invoiceTotal(r))],
+      ["Issued", formatDay(r.issued_at)], ["Due", formatDay(r.due_at)], ["Paid", formatDate(r.paid_at)], ["Stage", r.collection_stage === "none" ? "—" : stageLabel[r.collection_stage as CollectionStage]]]} /></Section>
+    {payTable(data.payments.filter((p) => p.invoice_id === r.id))}
+    {a.modalEl}
+  </>;
+  if (kind === "payment") return <>
+    {header(`Payment ${r.reference}`, <StatusBadge status={r.status} />)}
+    <Section title="Payment"><FieldGrid items={[["Description", r.description], ["Amount", money(r.amount)], ["Method", humanize(r.method)], ["Date", formatDate(r.created_at)], ["Plan", subLink(r.subscription_id)],
+      ["Invoice", r.invoice_id ? <Link key="i" to="/dashboard/$kind/$id" params={{ kind: "invoice", id: r.invoice_id }} className="underline">{data.invoices.find((i) => i.id === r.invoice_id)?.number ?? "View"}</Link> : "—"]]} /></Section>
+  </>;
+  if (kind === "application") {
+    const sub = data.subs.find((s) => s.application_id === r.id);
+    return <>
+      {header(`${r.plan_name} application`, <StatusBadge status={r.status} label={statusLabel[r.status as AppStatus]} />)}
+      <Section title="Application"><FieldGrid items={[["Plan", r.plan_name], ["Monthly fee", money(r.monthly_fee)], ["Monthly hours", r.monthly_hours], ["Submitted", formatDate(r.created_at)], ["Signed", formatDate(r.signed_at)], ["Decided", formatDate(r.decided_at)], ["Subscription", sub ? subLink(sub.id) : "—"]]} /></Section>
+    </>;
+  }
+  const msgs = data.messages.filter((m) => m.ticket_id === r.id);
+  return <>
+    {header(r.subject, <StatusBadge status={r.status} />, r.status !== "closed" ? <ActBtn dark onClick={() => a.reply(r)}>Reply</ActBtn> : null)}
+    <Section title="Conversation">
+      <ul className="space-y-3 p-5">{msgs.map((m) => (
+        <li key={m.id} className={`rounded-xl p-3 text-sm ${m.actor_id === userId ? "ml-8 bg-secondary" : "mr-8 border"}`}><p className="whitespace-pre-wrap">{m.body}</p><p className="mt-1 text-xs text-muted-foreground">{m.actor_id === userId ? "You" : "FP team"}, {formatDate(m.created_at)}</p></li>
+      ))}</ul>
+      {r.status === "closed" && <p className="border-t p-4 text-sm text-muted-foreground">This ticket is closed and can't be reopened or replied to. Open a new request if you need more help.</p>}
+    </Section>
+    <Section title="Ticket"><FieldGrid items={[["Topic", humanize(r.category)], ["Priority", humanize(r.priority)], ["Plan", subLink(r.subscription_id)], ["Opened", formatDate(r.created_at)], ["Closed", formatDate(r.closed_at)]]} /></Section>
+    {a.modalEl}
+  </>;
+}

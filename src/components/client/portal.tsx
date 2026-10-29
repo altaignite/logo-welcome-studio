@@ -1,0 +1,125 @@
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link, useRouteContext } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
+import { useState, type ReactNode } from "react";
+import { Eye } from "lucide-react";
+import { db } from "@/components/admin/record-bits";
+import { FormModal, type FieldDef } from "@/components/admin/form-modal";
+import { usePopup } from "@/components/popup";
+import { pauseVoidsGuarantee } from "@/lib/billing";
+import { approveOverage, billingPortal, subscriptionAction } from "@/lib/billing.functions";
+import { changePlan, orderAdditionalPlan, undoCancel } from "@/lib/client.functions";
+import { plans } from "@/lib/signup";
+import { money } from "@/lib/admin";
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type R = any;
+export type ClientData = Awaited<ReturnType<typeof loadClient>>;
+export type RecordKind = "subscription" | "project" | "task" | "invoice" | "payment" | "application" | "ticket";
+
+async function loadClient(userId: string) {
+  const own = async (t: string, order = "created_at") => ((await db.from(t).select("*").eq("user_id", userId).order(order, { ascending: false })).data ?? []) as R[];
+  const [profile, subs, projects, tasks, apps, invoices, payments, tickets, messages, hours] = await Promise.all([
+    db.from("profiles").select("*").eq("id", userId).maybeSingle().then((r: R) => r.data as R | null),
+    own("subscriptions"), own("projects"), own("tasks"), own("applications"), own("invoices", "issued_at"), own("transactions"), own("support_tickets", "updated_at"),
+    db.from("ticket_messages").select("*").eq("user_id", userId).eq("internal", false).order("created_at").then((r: R) => (r.data ?? []) as R[]),
+    own("time_entries", "worked_on"),
+  ]);
+  return { profile, subs, projects, tasks, apps, invoices, payments, tickets, messages, hours };
+}
+
+export function useClient() {
+  const { userId, email } = useRouteContext({ from: "/dashboard" });
+  const q = useQuery({ queryKey: ["client", userId], queryFn: () => loadClient(userId) });
+  return { userId, email, ...q };
+}
+
+export const invoiceTotal = (i: R) => Number(i.amount) + Number(i.interest_accrued) + Number(i.fees_accrued);
+
+/** Actions column: View link plus any context buttons. Clicks never trigger the row. */
+export function Actions({ kind, id, children }: { kind: RecordKind; id: string; children?: ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+      {children}
+      <Link to="/dashboard/$kind/$id" params={{ kind, id }} aria-label="View details" className="inline-flex h-8 items-center gap-1 rounded-full border px-3 text-xs font-semibold hover:bg-secondary"><Eye className="size-3.5" />View</Link>
+    </div>
+  );
+}
+export const ActBtn = ({ onClick, children, dark, danger }: { onClick: () => void; children: ReactNode; dark?: boolean; danger?: boolean }) => (
+  <button type="button" onClick={onClick} className={`h-8 rounded-full px-3 text-xs font-semibold ${dark ? "bg-foreground text-background" : "bg-secondary"} ${danger ? "text-destructive" : ""}`}>{children}</button>
+);
+
+type Modal = { title: string; description?: string; fields: FieldDef[]; submitLabel: string; onSubmit: (v: R) => Promise<string | null> };
+
+/** Shared client actions (subscriptions, tickets, extra hours, billing) with their modal. */
+export function useClientActions() {
+  const { userId, email } = useClient();
+  const qc = useQueryClient();
+  const popup = usePopup();
+  const [modal, setModal] = useState<Modal | null>(null);
+  const fnSub = useServerFn(subscriptionAction), fnPortal = useServerFn(billingPortal), fnApprove = useServerFn(approveOverage);
+  const fnChange = useServerFn(changePlan), fnOrder = useServerFn(orderAdditionalPlan), fnUndo = useServerFn(undoCancel);
+  const refresh = () => qc.invalidateQueries({ queryKey: ["client"] });
+  const fail = (e: unknown) => popup({ type: "error", title: "Something went wrong", description: (e as Error).message, primaryLabel: "Close", secondaryLabel: null });
+  const err = (e: unknown) => (e as Error).message || "Something went wrong.";
+
+  const subAct = (s: R, action: "pause" | "resume" | "cancel_end") => setModal({
+    title: { pause: "Pause your plan", resume: "Resume your plan", cancel_end: "Cancel your plan" }[action], submitLabel: "Confirm",
+    description: action === "pause" && s.guarantee_status === "running" && pauseVoidsGuarantee(s.started_at)
+      ? "Pausing within your first 90 days ends your money-back guarantee. Work and billing stop while paused."
+      : action === "cancel_end" ? "Your plan stays active until the end of the current billing period. You can undo this before then." : action === "pause" ? "Work and billing stop while paused." : "Work and billing restart today.",
+    fields: [{ name: "reason", label: "Reason", type: "textarea", required: true }],
+    onSubmit: async (v) => { try { await fnSub({ data: { subscriptionId: s.id, action, reason: v.reason } }); await refresh(); return null; } catch (e) { return err(e); } },
+  });
+  const undo = (s: R) => popup({ type: "info", title: "Keep your plan?", description: `Your ${s.plan_name} plan will keep renewing as normal.`, primaryLabel: "Keep plan", secondaryLabel: "Cancel",
+    onPrimary: async () => { try { await fnUndo({ data: { subscriptionId: s.id } }); await refresh(); } catch (e) { fail(e); } } });
+  const change = (s: R) => setModal({
+    title: "Change plan", submitLabel: "Change plan",
+    description: "Upgrades start now and you pay the difference for this month. Downgrades start at your next renewal so you keep this month's hours.",
+    fields: [{ name: "plan", label: "New plan", type: "select", options: plans.map((p) => `${p.id}`), defaultValue: plans.find((p) => p.name === s.plan_name)?.id ?? "growth" }],
+    onSubmit: async (v) => { try { const r = await fnChange({ data: { subscriptionId: s.id, planId: v.plan } }); await refresh();
+      if (r.timing === "renewal") popup({ type: "success", title: "Change scheduled", description: "Your new plan starts at your next renewal.", primaryLabel: "Got it", secondaryLabel: null });
+      return null; } catch (e) { return err(e); } },
+  });
+  const order = () => setModal({
+    title: "Add another plan", submitLabel: "Send invoice",
+    description: `${plans.map((p) => `${p.name} ${money(p.monthlyFee)} for ${p.monthlyHours} hours`).join(", ")} per month. We email you an invoice and the plan starts once it's paid.`,
+    fields: [{ name: "plan", label: "Plan", type: "select", options: plans.map((p) => p.id) }],
+    onSubmit: async (v) => { try { await fnOrder({ data: { planId: v.plan } }); await refresh();
+      popup({ type: "success", title: "Invoice sent", description: "Pay it from Invoices or the email we sent to start your new plan.", primaryLabel: "Got it", secondaryLabel: null }); return null; } catch (e) { return err(e); } },
+  });
+  const approve = (t: R) => popup({ type: "info", title: "Approve extra hours?", description: "This task needs more hours than your plan has left this month. Extra hours are billed at your plan's hourly rate.", primaryLabel: "Approve", secondaryLabel: "Not now",
+    onPrimary: async () => { try { await fnApprove({ data: { taskId: t.id } }); await refresh(); } catch (e) { fail(e); } } });
+  const portal = async () => { try { const r = await fnPortal(); window.location.href = r.url; } catch (e) { fail(e); } };
+  const newTicket = (subscriptionId?: string) => setModal({
+    title: "New support request", submitLabel: "Send",
+    fields: [{ name: "subject", label: "Subject", required: true, max: 200 }, { name: "category", label: "Topic", type: "select", options: ["general", "billing", "project", "technical"] }, { name: "body", label: "Message", type: "textarea", required: true, max: 5000 }],
+    onSubmit: async (v) => {
+      const t = await db.from("support_tickets").insert({ user_id: userId, subject: v.subject.slice(0, 200), category: v.category, subscription_id: subscriptionId ?? null }).select("id").single();
+      if (t.error) return t.error.message;
+      const m = await db.from("ticket_messages").insert({ ticket_id: t.data.id, user_id: userId, body: v.body.slice(0, 5000), internal: false, actor_id: userId, actor_label: email });
+      if (m.error) return m.error.message;
+      await refresh(); return null;
+    },
+  });
+  const reply = (t: R) => setModal({
+    title: "Reply", submitLabel: "Send", fields: [{ name: "body", label: "Message", type: "textarea", required: true, max: 5000 }],
+    onSubmit: async (v) => {
+      const m = await db.from("ticket_messages").insert({ ticket_id: t.id, user_id: userId, body: v.body.slice(0, 5000), internal: false, actor_id: userId, actor_label: email });
+      if (m.error) return m.error.message; await refresh(); return null;
+    },
+  });
+  const modalEl = modal && <FormModal title={modal.title} description={modal.description} fields={modal.fields} submitLabel={modal.submitLabel} onClose={() => setModal(null)} onSubmit={modal.onSubmit} />;
+  return { subAct, undo, change, order, approve, portal, newTicket, reply, refresh, fail, modalEl, setModal };
+}
+
+/** Context buttons for a subscription, used in tables and on its details page. */
+export function SubButtons({ s, a }: { s: R; a: ReturnType<typeof useClientActions> }) {
+  return <>
+    {s.status === "active" && <ActBtn onClick={() => a.change(s)}>Change plan</ActBtn>}
+    {(s.status === "active" || s.status === "past_due") && <ActBtn onClick={() => a.subAct(s, "pause")}>Pause</ActBtn>}
+    {s.status === "paused" && <ActBtn dark onClick={() => a.subAct(s, "resume")}>Resume</ActBtn>}
+    {s.cancel_at_period_end ? <ActBtn dark onClick={() => a.undo(s)}>Keep plan</ActBtn>
+      : ["active", "paused", "past_due"].includes(s.status) && <ActBtn danger onClick={() => a.subAct(s, "cancel_end")}>Cancel</ActBtn>}
+  </>;
+}

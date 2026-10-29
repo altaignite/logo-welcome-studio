@@ -55,7 +55,10 @@ export const Route = createFileRoute("/api/public/stripe/webhook")({
                 else {
                   if (inv.kind === "renewal") {
                     const next = new Date(); next.setMonth(next.getMonth() + 1);
-                    await admin.from("subscriptions").update({ hours_used: 0, overage_billed_hours: 0, renews_at: next.toISOString() }).eq("id", subId);
+                    const { data: cur } = await admin.from("subscriptions").select("pending_plan_id").eq("id", subId).single();
+                    const { plans } = await import("@/lib/signup");
+                    const np = cur?.pending_plan_id ? plans.find((p) => p.id === cur.pending_plan_id) : undefined;
+                    await admin.from("subscriptions").update({ hours_used: 0, overage_billed_hours: 0, renews_at: next.toISOString(), ...(np ? { plan_name: np.name, monthly_fee: np.monthlyFee, monthly_hours: np.monthlyHours, pending_plan_id: null } : {}) }).eq("id", subId);
                   }
                   await B.reinstateAfterPayment(admin, subId);
                 }

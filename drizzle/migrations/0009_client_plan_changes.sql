@@ -1,0 +1,2 @@
+ALTER TABLE public.subscriptions ADD COLUMN IF NOT EXISTS pending_plan_id text, ADD COLUMN IF NOT EXISTS cancel_at_period_end boolean NOT NULL DEFAULT false;
+COMMENT ON COLUMN public.subscriptions.pending_plan_id IS 'Plan the subscription moves to at next renewal (downgrade).';

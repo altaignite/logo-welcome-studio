@@ -28,8 +28,6 @@ function Login() {
   const [show, setShow] = useState(false);
   const popup = usePopup();
   const navigate = useNavigate();
-  const soon = (what: string) =>
-    popup({ type: "info", title: `${what} is coming soon`, description: "This option isn't available yet.", primaryLabel: "Got it", secondaryLabel: null });
   const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
@@ -96,7 +94,7 @@ function Login() {
                 <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="h-4 w-4 accent-primary" />
                 Remember me
               </label>
-              <button type="button" onClick={() => soon("Password reset")} className="font-semibold text-foreground hover:text-primary">Forgot Password?</button>
+              <Link to="/forgot-password" className="font-semibold text-foreground hover:text-primary">Forgot Password?</Link>
             </div>
             <button type="submit" className="signup-primary group flex items-center justify-center gap-2 text-sm">
               Log In <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />

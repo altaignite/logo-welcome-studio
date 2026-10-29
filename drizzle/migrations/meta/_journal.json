@@ -64,6 +64,13 @@
       "when": 1793289969727,
       "tag": "0008_signup_plan_server_prices",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793290793024,
+      "tag": "0009_client_plan_changes",
+      "breakpoints": true
     }
   ]
 }

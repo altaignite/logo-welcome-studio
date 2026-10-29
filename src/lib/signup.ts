@@ -75,7 +75,7 @@ export const personalSchema = z.object({
 });
 export const accountSchema = z.object({
   email: z.string().trim().email("Enter a valid email address.").max(254),
-  password: z.string().min(8, "Use at least 8 characters for your password.").max(128),
+  password: z.string().min(10, "Use at least 10 characters for your password.").max(128).regex(/[a-z]/, "Add a lower case letter.").regex(/[A-Z]/, "Add an upper case letter.").regex(/\d/, "Add a number."),
   confirmPassword: z.string(),
 }).refine((v) => v.password === v.confirmPassword, { message: "Your passwords don't match.", path: ["confirmPassword"] });
 
