@@ -1,13 +1,21 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { useState } from "react";
+import { FormModal, type FieldDef } from "@/components/admin/form-modal";
+import { setAccountStatus } from "@/lib/crm.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { DataTable, StatusBadge } from "@/components/admin/data-table";
-import { formatAccount, formatDate, statusLabel } from "@/lib/admin";
+import { accountStatusLabel, accountStatuses, formatAccount, formatDate, statusLabel, type AccountStatus } from "@/lib/admin";
 
 export const Route = createFileRoute("/admin/accounts/")({ component: Accounts });
 
 function Accounts() {
   const navigate = useNavigate();
+  const qc = useQueryClient();
+  const change = useServerFn(setAccountStatus);
+  const [modal, setModal] = useState<{ ids: string[] } | null>(null);
+  const fields: FieldDef[] = [{ name: "status", label: "New status", type: "select", options: [...accountStatuses] }, { name: "reason", label: "Reason (saved in the audit log)", type: "textarea", required: true }];
   const { data = [], isLoading, error } = useQuery({
     queryKey: ["admin", "accounts"],
     queryFn: async () => {
@@ -25,17 +33,19 @@ function Accounts() {
     <div className="space-y-6">
       <div><h1 className="text-2xl font-extrabold sm:text-3xl">Accounts</h1><p className="mt-1 text-sm text-muted-foreground">All client accounts. Select one to see the full account.</p></div>
       {error ? <p className="text-sm text-destructive">{(error as Error).message}</p> : isLoading ? <p className="text-sm text-muted-foreground">Loading accounts…</p> :
-        <DataTable<Row> title="Accounts" rows={data} onRowClick={(r) => navigate({ to: "/admin/accounts/$id", params: { id: r.id } })} empty="No accounts yet." columns={[
+        <DataTable<Row> title="Accounts" rows={data} getId={(r) => r.id} bulkActions={[{ label: "Change status", run: (rows) => setModal({ ids: rows.map((r) => r.id) }) }]} onRowClick={(r) => navigate({ to: "/admin/accounts/$id", params: { id: r.id } })} empty="No accounts yet." columns={[
           { key: "acct", label: "Account no.", value: (r) => r.account_number, render: (r) => <span className="font-mono">{formatAccount(r.account_number)}</span> },
           { key: "name", label: "Name", value: (r) => `${r.first_name ?? ""} ${r.last_name ?? ""}`.trim() },
           { key: "company", label: "Business", value: (r) => r.company ?? "" },
           { key: "email", label: "Email", value: (r) => r.email ?? "" },
           { key: "plan", label: "Plan", value: (r) => r.app?.plan_name ?? "—" },
           { key: "status", label: "Application", value: (r) => r.app?.status ?? "", render: (r) => r.app ? <StatusBadge status={r.app.status} label={statusLabel[r.app.status]} /> : "—" },
-          { key: "acctstatus", label: "Account", value: (r) => r.status, render: (r) => <StatusBadge status={r.status === "active" ? "active" : "suspended"} label={r.status} /> },
+          { key: "acctstatus", label: "Account", value: (r) => r.status, render: (r) => <StatusBadge status={r.status} label={accountStatusLabel[r.status as AccountStatus] ?? r.status} /> },
           { key: "stage", label: "Stage", value: (r) => r.lifecycle_stage.replaceAll("_", " ") },
           { key: "created", label: "Joined", value: (r) => r.created_at, render: (r) => formatDate(r.created_at) },
         ]} />}
+      {modal && <FormModal title={`Change status for ${modal.ids.length} account${modal.ids.length === 1 ? "" : "s"}`} description="Staff accounts and your own account are skipped." fields={fields} submitLabel="Save status" onClose={() => setModal(null)}
+        onSubmit={async (v) => { if (v.reason!.length < 3) return "Add a short reason."; try { await change({ data: { userIds: modal.ids, status: v.status as AccountStatus, reason: v.reason! } }); await qc.invalidateQueries({ queryKey: ["admin"] }); return null; } catch (e) { return (e as Error).message; } }} />}
     </div>
   );
 }

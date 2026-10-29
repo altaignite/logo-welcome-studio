@@ -9,3 +9,9 @@
 - [x] Offer Starter $199/5 hours, Growth $499/15 hours and Scale $999/35 hours monthly, carried through review, agreements and completion.
 - [x] Add country flags using a free API, without emojis.
 - [x] Verify all signup steps across desktop, tablet and mobile and run the relevant tests.
+# Admin CRM overhaul
+- [x] Linked application, subscription and project (auto-created on signup), eight account statuses, full client profile.
+- [x] Details page for every record with client strip, linked records and audit history.
+- [x] Create, edit, archive/void and delete (operational records only); bulk select and actions on tables.
+- [x] Removed dot separators across the admin.
+- [ ] Second pass (awaiting go-ahead): client portal, emails, real payments, staff permission levels, documents, dashboard and global search.

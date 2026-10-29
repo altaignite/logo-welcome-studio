@@ -5,7 +5,7 @@ export type PopupType = "error" | "success" | "info";
 export type PopupOptions = {
   type?: PopupType;
   title: string;
-  description?: string;
+  description?: string | undefined;
   primaryLabel?: string;
   onPrimary?: () => void;
   secondaryLabel?: string | null;
