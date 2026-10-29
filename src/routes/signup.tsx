@@ -126,7 +126,7 @@ function Signup() {
 
   return <main className="min-h-dvh bg-background text-foreground md:flex md:items-start md:justify-center md:bg-secondary md:p-5 lg:items-center lg:p-8">
     <div className="relative mx-auto w-full max-w-6xl md:grid md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] md:rounded-[2rem] md:bg-card md:p-4 md:shadow-2xl lg:grid-cols-2">
-      <aside className="sticky top-9 order-2 hidden h-[calc(100dvh-4.5rem)] min-h-[680px] overflow-hidden rounded-3xl md:block">
+      <aside className="sticky top-9 order-2 hidden h-[min(860px,calc(100dvh-4.5rem))] min-h-[680px] overflow-hidden rounded-3xl md:block">
         <img src={hero} alt="Entrepreneur working late in a high-rise marketing office overlooking the city" width={896} height={1152} className="absolute inset-0 h-full w-full object-cover object-[60%_30%]" />
         <div className="absolute inset-0 bg-gradient-to-t from-foreground/80 via-foreground/10 to-transparent" />
         <div className="absolute inset-x-0 bottom-10 px-7 lg:px-10"><p className="text-sm font-medium uppercase tracking-[0.25em] text-background/70">Marketing Accelerator</p><p className="mt-3 max-w-sm text-3xl font-bold leading-tight text-background">Grow faster.<br />Market smarter.</p><div className="mt-6 flex items-start gap-2 text-sm leading-relaxed text-background/80"><ShieldCheck className="mt-0.5 size-5 shrink-0" /><p>90-day money-back guarantee<br />if no sales are received.<br /><span className="text-xs">Service fees only. Advertising excluded.</span></p></div></div>
