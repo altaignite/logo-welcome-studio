@@ -238,19 +238,19 @@ function ProcessingScreen({ hours, onDone }: { hours: number; onDone: () => void
     return () => window.clearInterval(timer);
   }, [total]);
   let acc = 0; let current = stages.length; let progress = 100;
-  for (let i = 0; i < stages.length; i++) {
-    if (elapsed < acc + stages[i].ms) {
+  for (const [i, stage] of stages.entries()) {
+    if (elapsed < acc + stage.ms) {
       current = i;
-      const t = (elapsed - acc) / stages[i].ms;
+      const t = (elapsed - acc) / stage.ms;
       const eased = t < 0.75 ? 1 - Math.pow(1 - t / 0.75, 2) : 1; // move, then pause like real work
-      progress = ((acc + stages[i].ms * eased * 0.96) / total) * 100;
+      progress = ((acc + stage.ms * eased * 0.96) / total) * 100;
       break;
     }
-    acc += stages[i].ms;
+    acc += stage.ms;
   }
   return <section className="mx-auto max-w-lg px-5 pb-16 pt-10 md:px-2 md:pt-14" aria-live="polite">
     <div className="text-center"><h1 className="text-2xl font-bold sm:text-3xl">Processing your application</h1><p className="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-muted-foreground">Please keep this page open. This can take up to a minute.</p></div>
-    <div className="mt-8"><div className="flex justify-between text-xs text-muted-foreground"><span>{current < stages.length ? stages[current].label : "Complete"}…</span><span className="tabular-nums">{Math.floor(progress)}%</span></div>
+    <div className="mt-8"><div className="flex justify-between text-xs text-muted-foreground"><span>{stages[current]?.label ?? "Complete"}…</span><span className="tabular-nums">{Math.floor(progress)}%</span></div>
       <div role="progressbar" aria-label="Processing application" aria-valuenow={Math.floor(progress)} aria-valuemin={0} aria-valuemax={100} className="relative mt-2 h-1.5 overflow-hidden rounded-full bg-secondary"><div className="h-full rounded-full bg-foreground transition-[width] duration-300 ease-out" style={{ width: `${progress}%` }} /><div className="signup-shimmer pointer-events-none absolute inset-0 bg-gradient-to-r from-transparent via-background/40 to-transparent" /></div></div>
     <ol className="mt-8 space-y-1 rounded-2xl border p-2">{stages.map((stage, i) => {
       const state = i < current ? "done" : i === current ? "active" : "todo";
