@@ -37,24 +37,24 @@ export function PopupProvider({ children }: { children: ReactNode }) {
     <PopupContext.Provider value={show}>
       {children}
       {popup && (
-        <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-foreground/30 backdrop-blur-sm animate-in fade-in sm:items-center sm:p-6" onClick={close}>
+        <div className="fixed inset-0 z-50 flex items-stretch justify-center overflow-y-auto bg-foreground/40 backdrop-blur-sm animate-in fade-in sm:items-center sm:p-6" onClick={close}>
           <div
             role="alertdialog"
             aria-modal="true"
             aria-labelledby="popup-title"
             onClick={(e) => e.stopPropagation()}
-            className="flex w-full flex-col bg-background px-6 pb-8 pt-12 animate-in slide-in-from-bottom-6 sm:max-w-md sm:rounded-3xl sm:px-8 sm:pt-10 sm:shadow-2xl sm:zoom-in-95"
+            className="flex min-h-dvh w-full flex-col bg-background px-6 pt-[max(3rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))] animate-in slide-in-from-bottom-6 duration-300 sm:my-auto sm:min-h-0 sm:max-w-md sm:rounded-[2rem] sm:px-10 sm:py-10 sm:shadow-2xl sm:zoom-in-95 lg:max-w-lg"
           >
             <div className="flex flex-1 flex-col items-center justify-center text-center sm:flex-none">
               <div className={`grid h-16 w-16 place-items-center rounded-full ${type === "success" ? "bg-primary/10 text-primary" : "bg-secondary text-foreground"}`}>
                 <Icon className="h-7 w-7" strokeWidth={2.25} />
               </div>
-              <h2 id="popup-title" className="mt-6 text-2xl font-extrabold leading-tight tracking-tight text-foreground sm:text-[1.6rem]">
+              <h2 id="popup-title" className="mt-6 max-w-sm text-2xl font-extrabold leading-tight tracking-tight text-balance text-foreground sm:text-[1.75rem]">
                 {popup.title}
               </h2>
-              {popup.description && <p className="mt-2 text-base text-muted-foreground">{popup.description}</p>}
+              {popup.description && <p className="mt-2 max-w-sm text-base text-pretty text-muted-foreground">{popup.description}</p>}
             </div>
-            <div className="mt-10 space-y-3">
+            <div className="mx-auto mt-10 w-full max-w-md space-y-3 sm:mt-8">
               <button
                 autoFocus
                 onClick={() => { popup.onPrimary?.(); close(); }}
