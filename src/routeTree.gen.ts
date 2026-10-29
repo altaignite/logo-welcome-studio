@@ -14,6 +14,9 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AdminLoginRouteImport } from './routes/admin-login'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
+import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
+import { Route as AdminSupportRouteImport } from './routes/admin.support'
+import { Route as AdminTaskforceRouteImport } from './routes/admin.taskforce'
 import { Route as AdminAccountsIndexRouteImport } from './routes/admin.accounts.index'
 import { Route as AdminAccountsIdRouteImport } from './routes/admin.accounts.$id'
 import { Route as AdminApplicationsIndexRouteImport } from './routes/admin.applications.index'
@@ -45,6 +48,21 @@ const SignupRoute = SignupRouteImport.update({
 const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminSettingsRoute = AdminSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminSupportRoute = AdminSupportRouteImport.update({
+  id: '/support',
+  path: '/support',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminTaskforceRoute = AdminTaskforceRouteImport.update({
+  id: '/taskforce',
+  path: '/taskforce',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminAccountsIndexRoute = AdminAccountsIndexRouteImport.update({
@@ -89,6 +107,9 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRouteWithChildren
   '/admin-login': typeof AdminLoginRoute
   '/signup': typeof SignupRoute
+  '/admin/settings': typeof AdminSettingsRoute
+  '/admin/support': typeof AdminSupportRoute
+  '/admin/taskforce': typeof AdminTaskforceRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/accounts/$id': typeof AdminAccountsIdRoute
   '/admin/applications/$id': typeof AdminApplicationsIdRoute
@@ -102,6 +123,9 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin-login': typeof AdminLoginRoute
   '/signup': typeof SignupRoute
+  '/admin/settings': typeof AdminSettingsRoute
+  '/admin/support': typeof AdminSupportRoute
+  '/admin/taskforce': typeof AdminTaskforceRoute
   '/admin': typeof AdminIndexRoute
   '/admin/accounts/$id': typeof AdminAccountsIdRoute
   '/admin/applications/$id': typeof AdminApplicationsIdRoute
@@ -117,6 +141,9 @@ export interface FileRoutesById {
   '/admin': typeof AdminRouteWithChildren
   '/admin-login': typeof AdminLoginRoute
   '/signup': typeof SignupRoute
+  '/admin/settings': typeof AdminSettingsRoute
+  '/admin/support': typeof AdminSupportRoute
+  '/admin/taskforce': typeof AdminTaskforceRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/accounts/$id': typeof AdminAccountsIdRoute
   '/admin/applications/$id': typeof AdminApplicationsIdRoute
@@ -133,6 +160,9 @@ export interface FileRouteTypes {
     | '/admin'
     | '/admin-login'
     | '/signup'
+    | '/admin/settings'
+    | '/admin/support'
+    | '/admin/taskforce'
     | '/admin/'
     | '/admin/accounts/$id'
     | '/admin/applications/$id'
@@ -146,6 +176,9 @@ export interface FileRouteTypes {
     | '/'
     | '/admin-login'
     | '/signup'
+    | '/admin/settings'
+    | '/admin/support'
+    | '/admin/taskforce'
     | '/admin'
     | '/admin/accounts/$id'
     | '/admin/applications/$id'
@@ -160,6 +193,9 @@ export interface FileRouteTypes {
     | '/admin'
     | '/admin-login'
     | '/signup'
+    | '/admin/settings'
+    | '/admin/support'
+    | '/admin/taskforce'
     | '/admin/'
     | '/admin/accounts/$id'
     | '/admin/applications/$id'
@@ -216,6 +252,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminIndexRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/settings': {
+      id: '/admin/settings'
+      path: '/settings'
+      fullPath: '/admin/settings'
+      preLoaderRoute: typeof AdminSettingsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/support': {
+      id: '/admin/support'
+      path: '/support'
+      fullPath: '/admin/support'
+      preLoaderRoute: typeof AdminSupportRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/taskforce': {
+      id: '/admin/taskforce'
+      path: '/taskforce'
+      fullPath: '/admin/taskforce'
+      preLoaderRoute: typeof AdminTaskforceRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/accounts/': {
       id: '/admin/accounts/'
       path: '/accounts'
@@ -269,6 +326,9 @@ declare module '@tanstack/react-router' {
 }
 
 interface AdminRouteChildren {
+  AdminSettingsRoute: typeof AdminSettingsRoute
+  AdminSupportRoute: typeof AdminSupportRoute
+  AdminTaskforceRoute: typeof AdminTaskforceRoute
   AdminIndexRoute: typeof AdminIndexRoute
   AdminAccountsIdRoute: typeof AdminAccountsIdRoute
   AdminApplicationsIdRoute: typeof AdminApplicationsIdRoute
@@ -278,6 +338,9 @@ interface AdminRouteChildren {
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
+  AdminSettingsRoute: AdminSettingsRoute,
+  AdminSupportRoute: AdminSupportRoute,
+  AdminTaskforceRoute: AdminTaskforceRoute,
   AdminIndexRoute: AdminIndexRoute,
   AdminAccountsIdRoute: AdminAccountsIdRoute,
   AdminApplicationsIdRoute: AdminApplicationsIdRoute,

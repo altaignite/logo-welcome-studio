@@ -9,6 +9,8 @@ import { runCollectionsNow } from "@/lib/billing.functions";
 
 export const Route = createFileRoute("/admin/settings")({ component: Settings });
 
+function F ({ label, children }: { label: string; children: React.ReactNode }) { return <label className="block text-sm"><span className="mb-1 block font-medium">{label}</span>{children}</label>; }
+
 function Settings() {
   const qc = useQueryClient();
   const popup = usePopup();
@@ -24,7 +26,6 @@ function Settings() {
     qc.invalidateQueries({ queryKey: ["admin"] });
   };
   const input = "signup-input h-10 w-full";
-  const F = ({ label, children }: { label: string; children: React.ReactNode }) => <label className="block text-sm"><span className="mb-1 block font-medium">{label}</span>{children}</label>;
   return (
     <div className="max-w-3xl space-y-6">
       <div><h1 className="text-2xl font-extrabold sm:text-3xl">Billing rules</h1><p className="mt-1 text-sm text-muted-foreground">Extra-hour rates, interest and legal fees. Confirm these with your lawyer and show them in the client agreement.</p></div>
