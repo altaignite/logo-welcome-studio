@@ -9,6 +9,7 @@ export const statusLabel: Record<AppStatus, string> = {
   escalated: "Escalated",
   approved: "Approved",
   rejected: "Rejected",
+  suspended: "Suspended",
 };
 
 /** Ordered workflow stages shown in the application progress tracker. */
@@ -33,6 +34,7 @@ export const workflowActions: Record<AppStatus, WorkflowAction[]> = {
   ],
   approved: [],
   rejected: [],
+  suspended: [],
 };
 
 export function canTransition(from: AppStatus, to: AppStatus) {

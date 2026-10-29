@@ -148,6 +148,42 @@ export type Database = {
         }
         Relationships: []
       }
+      billing_settings: {
+        Row: {
+          court_fees: Json
+          id: number
+          legal_after_days: number
+          legal_fee_min: number
+          legal_fee_pct: number
+          monthly_interest_pct: number
+          overage_needs_approval: boolean
+          overage_rates: Json
+          updated_at: string
+        }
+        Insert: {
+          court_fees?: Json
+          id?: number
+          legal_after_days?: number
+          legal_fee_min?: number
+          legal_fee_pct?: number
+          monthly_interest_pct?: number
+          overage_needs_approval?: boolean
+          overage_rates?: Json
+          updated_at?: string
+        }
+        Update: {
+          court_fees?: Json
+          id?: number
+          legal_after_days?: number
+          legal_fee_min?: number
+          legal_fee_pct?: number
+          monthly_interest_pct?: number
+          overage_needs_approval?: boolean
+          overage_rates?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
       compliance_requests: {
         Row: {
           actor_label: string
@@ -268,18 +304,85 @@ export type Database = {
         }
         Relationships: []
       }
+      invoice_charges: {
+        Row: {
+          actor_label: string
+          amount: number
+          billed_invoice_id: string | null
+          created_at: string
+          description: string
+          id: string
+          invoice_id: string | null
+          kind: string
+          stripe_item_id: string | null
+          subscription_id: string | null
+          user_id: string
+        }
+        Insert: {
+          actor_label?: string
+          amount: number
+          billed_invoice_id?: string | null
+          created_at?: string
+          description: string
+          id?: string
+          invoice_id?: string | null
+          kind: string
+          stripe_item_id?: string | null
+          subscription_id?: string | null
+          user_id: string
+        }
+        Update: {
+          actor_label?: string
+          amount?: number
+          billed_invoice_id?: string | null
+          created_at?: string
+          description?: string
+          id?: string
+          invoice_id?: string | null
+          kind?: string
+          stripe_item_id?: string | null
+          subscription_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_charges_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_charges_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoices: {
         Row: {
           amount: number
           archived_at: string | null
+          collection_notes: string | null
+          collection_stage: string
           created_at: string
           description: string | null
           due_at: string | null
+          fees_accrued: number
+          hosted_url: string | null
           id: string
+          interest_accrued: number
+          interest_paused: boolean
           issued_at: string
+          kind: string
           number: string
           paid_at: string | null
+          pdf_url: string | null
+          stage_changed_at: string | null
           status: string
+          stripe_invoice_id: string | null
           subscription_id: string | null
           user_id: string
           void_reason: string | null
@@ -287,14 +390,24 @@ export type Database = {
         Insert: {
           amount: number
           archived_at?: string | null
+          collection_notes?: string | null
+          collection_stage?: string
           created_at?: string
           description?: string | null
           due_at?: string | null
+          fees_accrued?: number
+          hosted_url?: string | null
           id?: string
+          interest_accrued?: number
+          interest_paused?: boolean
           issued_at?: string
+          kind?: string
           number: string
           paid_at?: string | null
+          pdf_url?: string | null
+          stage_changed_at?: string | null
           status?: string
+          stripe_invoice_id?: string | null
           subscription_id?: string | null
           user_id: string
           void_reason?: string | null
@@ -302,14 +415,24 @@ export type Database = {
         Update: {
           amount?: number
           archived_at?: string | null
+          collection_notes?: string | null
+          collection_stage?: string
           created_at?: string
           description?: string | null
           due_at?: string | null
+          fees_accrued?: number
+          hosted_url?: string | null
           id?: string
+          interest_accrued?: number
+          interest_paused?: boolean
           issued_at?: string
+          kind?: string
           number?: string
           paid_at?: string | null
+          pdf_url?: string | null
+          stage_changed_at?: string | null
           status?: string
+          stripe_invoice_id?: string | null
           subscription_id?: string | null
           user_id?: string
           void_reason?: string | null
@@ -353,6 +476,7 @@ export type Database = {
           status: string
           status_changed_at: string | null
           status_reason: string | null
+          stripe_customer_id: string | null
           tax_id: string | null
           terms_accepted_at: string | null
           timezone: string | null
@@ -387,6 +511,7 @@ export type Database = {
           status?: string
           status_changed_at?: string | null
           status_reason?: string | null
+          stripe_customer_id?: string | null
           tax_id?: string | null
           terms_accepted_at?: string | null
           timezone?: string | null
@@ -421,6 +546,7 @@ export type Database = {
           status?: string
           status_changed_at?: string | null
           status_reason?: string | null
+          stripe_customer_id?: string | null
           tax_id?: string | null
           terms_accepted_at?: string | null
           timezone?: string | null
@@ -488,24 +614,47 @@ export type Database = {
           },
         ]
       }
+      stripe_events: {
+        Row: {
+          id: string
+          received_at: string
+          type: string
+        }
+        Insert: {
+          id: string
+          received_at?: string
+          type: string
+        }
+        Update: {
+          id?: string
+          received_at?: string
+          type?: string
+        }
+        Relationships: []
+      }
       subscriptions: {
         Row: {
           application_id: string | null
           archived_at: string | null
           cancelled_at: string | null
           created_at: string
+          first_paid_at: string | null
           guarantee_ends_at: string | null
           guarantee_status: string
+          guarantee_void_reason: string | null
           hours_used: number
           id: string
           monthly_fee: number
           monthly_hours: number
           notes: string | null
+          overage_billed_hours: number
+          payment_warning: string | null
           plan_name: string
           renews_at: string | null
           sales_received: boolean
           started_at: string | null
           status: string
+          stripe_subscription_id: string | null
           user_id: string
         }
         Insert: {
@@ -513,18 +662,23 @@ export type Database = {
           archived_at?: string | null
           cancelled_at?: string | null
           created_at?: string
+          first_paid_at?: string | null
           guarantee_ends_at?: string | null
           guarantee_status?: string
+          guarantee_void_reason?: string | null
           hours_used?: number
           id?: string
           monthly_fee: number
           monthly_hours: number
           notes?: string | null
+          overage_billed_hours?: number
+          payment_warning?: string | null
           plan_name: string
           renews_at?: string | null
           sales_received?: boolean
           started_at?: string | null
           status?: string
+          stripe_subscription_id?: string | null
           user_id: string
         }
         Update: {
@@ -532,18 +686,23 @@ export type Database = {
           archived_at?: string | null
           cancelled_at?: string | null
           created_at?: string
+          first_paid_at?: string | null
           guarantee_ends_at?: string | null
           guarantee_status?: string
+          guarantee_void_reason?: string | null
           hours_used?: number
           id?: string
           monthly_fee?: number
           monthly_hours?: number
           notes?: string | null
+          overage_billed_hours?: number
+          payment_warning?: string | null
           plan_name?: string
           renews_at?: string | null
           sales_received?: boolean
           started_at?: string | null
           status?: string
+          stripe_subscription_id?: string | null
           user_id?: string
         }
         Relationships: [
@@ -617,7 +776,10 @@ export type Database = {
           created_at: string
           details: string | null
           due_at: string | null
+          estimated_hours: number | null
           id: string
+          over_allowance: boolean
+          overage_approved: boolean
           priority: string
           project_id: string | null
           status: string
@@ -632,7 +794,10 @@ export type Database = {
           created_at?: string
           details?: string | null
           due_at?: string | null
+          estimated_hours?: number | null
           id?: string
+          over_allowance?: boolean
+          overage_approved?: boolean
           priority?: string
           project_id?: string | null
           status?: string
@@ -647,7 +812,10 @@ export type Database = {
           created_at?: string
           details?: string | null
           due_at?: string | null
+          estimated_hours?: number | null
           id?: string
+          over_allowance?: boolean
+          overage_approved?: boolean
           priority?: string
           project_id?: string | null
           status?: string
@@ -722,6 +890,7 @@ export type Database = {
           hours: number
           id: string
           project_id: string
+          task_id: string | null
           user_id: string
           worked_on: string
         }
@@ -733,6 +902,7 @@ export type Database = {
           hours: number
           id?: string
           project_id: string
+          task_id?: string | null
           user_id: string
           worked_on?: string
         }
@@ -744,6 +914,7 @@ export type Database = {
           hours?: number
           id?: string
           project_id?: string
+          task_id?: string | null
           user_id?: string
           worked_on?: string
         }
@@ -753,6 +924,13 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "time_entries_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
             referencedColumns: ["id"]
           },
         ]
@@ -767,6 +945,7 @@ export type Database = {
           method: string | null
           reference: string
           status: string
+          stripe_id: string | null
           subscription_id: string | null
           user_id: string
           void_reason: string | null
@@ -780,6 +959,7 @@ export type Database = {
           method?: string | null
           reference: string
           status?: string
+          stripe_id?: string | null
           subscription_id?: string | null
           user_id: string
           void_reason?: string | null
@@ -793,6 +973,7 @@ export type Database = {
           method?: string | null
           reference?: string
           status?: string
+          stripe_id?: string | null
           subscription_id?: string | null
           user_id?: string
           void_reason?: string | null
@@ -854,6 +1035,7 @@ export type Database = {
         | "escalated"
         | "approved"
         | "rejected"
+        | "suspended"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -989,6 +1171,7 @@ export const Constants = {
         "escalated",
         "approved",
         "rejected",
+        "suspended",
       ],
     },
   },

@@ -9,6 +9,7 @@ import { FormModal, type FieldDef } from "@/components/admin/form-modal";
 import { usePopup } from "@/components/popup";
 import { AuditList, Btn, FieldGrid, Section, db, fmtText } from "@/components/admin/record-bits";
 import { setAccountStatus } from "@/lib/crm.functions";
+import { createInvoice, createOrder } from "@/lib/billing.functions";
 import { accountStatusLabel, accountStatuses, complianceKinds, formatAccount, formatDate, formatDay, humanize, lifecycleStages, money, statusLabel, type AccountStatus } from "@/lib/admin";
 import { plans } from "@/lib/signup";
 import { recordKinds, toPatch, type RecordKind, type Row, type Vals } from "@/lib/records";
@@ -18,7 +19,6 @@ const adminRoute = getRouteApi("/admin");
 
 const tabs = ["Overview", "Contacts", "Applications", "Subscriptions", "Projects", "Invoices", "Transactions", "Support tickets", "Activities", "Tasks", "Privacy", "Audit log"] as const;
 type Modal = { title: string; description?: string | undefined; fields: FieldDef[]; submitLabel: string; onSubmit: (v: Vals) => Promise<string | null> };
-const rand = () => Math.floor(Math.random() * 1e6).toString().padStart(6, "0");
 const today = () => new Date().toISOString().slice(0, 10);
 type R = Row;
 
@@ -29,6 +29,7 @@ function AccountDetail() {
   const qc = useQueryClient();
   const popup = usePopup();
   const changeStatus = useServerFn(setAccountStatus);
+  const fnOrder = useServerFn(createOrder), fnInvoice = useServerFn(createInvoice);
   const [tab, setTab] = useState<(typeof tabs)[number]>(tabs[0]);
   const [modal, setModal] = useState<Modal | null>(null);
   const { data, isLoading, error } = useQuery({
@@ -134,16 +135,11 @@ function AccountDetail() {
     onSubmit: async (v) => done((await supabase.from("compliance_requests").insert({ user_id: id, kind: v.kind, details: v.details || null, actor_label: adminEmail })).error),
   });
   const newOrder = () => setModal({
-    title: "New subscription order", submitLabel: "Create order", description: "Creates an application, a pending subscription and a project for this client.",
-    fields: [{ name: "plan", label: "Plan", type: "select", options: plans.map((x) => x.name) }, { name: "project", label: "Project name", required: true, defaultValue: p.company ?? `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() }],
+    title: "New subscription order", submitLabel: "Create and send invoice", description: "Creates the application, subscription and project, and Stripe emails the first invoice to the client. Everything activates when the invoice is paid.",
+    fields: [{ name: "plan", label: "Plan", type: "select", options: plans.map((x) => x.name) }, { name: "notes", label: "Internal notes", type: "textarea" }],
     onSubmit: async (v) => {
       const plan = plans.find((x) => x.name === v.plan)!;
-      const a = await supabase.from("applications").insert({ user_id: id, account_number: p.account_number, plan_id: plan.id, plan_name: plan.name, monthly_fee: plan.monthlyFee, monthly_hours: plan.monthlyHours, status: "in_review", assigned_to: adminEmail }).select("id").single();
-      if (a.error) return a.error.message;
-      await supabase.from("application_events").insert({ application_id: a.data.id, ...actor, action: "Order created by staff", to_status: "in_review" });
-      const s = await supabase.from("subscriptions").insert({ user_id: id, plan_name: plan.name, monthly_fee: plan.monthlyFee, monthly_hours: plan.monthlyHours, status: "pending", application_id: a.data.id }).select("id").single();
-      if (s.error) return s.error.message;
-      return done((await supabase.from("projects").insert({ user_id: id, name: v.project, service: "Marketing", status: "planned", subscription_id: s.data.id, description: `${plan.name} plan` })).error);
+      try { await fnOrder({ data: { userId: id, planId: plan.id, ...(v.notes ? { notes: v.notes } : {}) } }); await refresh(); return null; } catch (e) { return (e as Error).message; }
     },
   });
   const exportData = () => {
@@ -231,11 +227,12 @@ function AccountDetail() {
         columns={[col("name", "Project"), col("service", "Service"), col("hours", "Hours", "hours"), col("status", "Status", "status"), col("assigned_to", "Assigned to"), col("due_at", "Due", "day")]} />}
 
       {tab === "Invoices" && <DataTable<R> title="Invoices" rows={data.invoices} getId={(r) => r.id} onRowClick={open("invoices")} empty="No invoices yet."
-        toolbar={<Btn icon={Plus} onClick={() => setModal({ title: "New invoice", submitLabel: "Issue invoice", fields: [{ name: "subscription", label: "Subscription", type: "select", options: ["none", ...data.subscriptions.map((s) => `${s.plan_name} ${String(s.id).slice(0, 6)}`)] }, { name: "description", label: "Description", required: true }, { name: "amount", label: "Amount (USD)", type: "number", required: true }, { name: "due_at", label: "Due date", type: "date", defaultValue: new Date(Date.now() + 14 * 864e5).toISOString().slice(0, 10) }],
+        toolbar={<Btn icon={Plus} onClick={() => setModal({ title: "New invoice", submitLabel: "Issue invoice", fields: [{ name: "subscription", label: "Subscription", type: "select", options: data.subscriptions.map((s) => `${s.plan_name} ${String(s.id).slice(0, 6)}`) }, { name: "description", label: "Description", required: true }, { name: "amount", label: "Amount (USD)", type: "number", required: true }],
           onSubmit: async (v) => { const amount = Number(v.amount); if (!(amount > 0)) return "Enter an amount above 0."; const sub = data.subscriptions.find((s) => v.subscription.endsWith(String(s.id).slice(0, 6)));
-            return done((await supabase.from("invoices").insert({ user_id: id, subscription_id: sub?.id ?? null, number: `INV-${today().replaceAll("-", "")}-${rand()}`, amount, description: v.description, due_at: v.due_at || null })).error); } })}>New invoice</Btn>}
-        bulkActions={[bulkUpdate("invoices", { status: "overdue" }, "Mark overdue"), bulkVoid("invoices")]}
-        columns={[col("number", "Invoice"), col("description", "Description"), col("amount", "Amount", "money"), col("status", "Status", "status"), col("issued_at", "Issued", "day"), col("due_at", "Due", "day")]} />}
+            if (!sub) return "Choose the subscription this invoice belongs to.";
+            try { await fnInvoice({ data: { subscriptionId: sub.id, description: v.description, amount } }); await refresh(); return null; } catch (e) { return (e as Error).message; } } })}>New invoice</Btn>}
+        bulkActions={[bulkVoid("invoices")]}
+        columns={[col("number", "Invoice"), col("description", "Description"), col("amount", "Amount", "money"), col("status", "Status", "status"), col("collection_stage", "Collections", "status"), col("issued_at", "Issued", "day"), col("due_at", "Due", "day")]} />}
 
       {tab === "Transactions" && <DataTable<R> title="Transactions" rows={data.transactions} getId={(r) => r.id} onRowClick={open("transactions")} empty="No transactions yet." bulkActions={[bulkVoid("transactions")]}
         columns={[col("reference", "Reference"), col("description", "Description"), col("amount", "Amount", "money"), col("method", "Method"), col("status", "Status", "status"), col("created_at", "Date", "date")]} />}

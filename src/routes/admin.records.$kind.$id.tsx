@@ -1,18 +1,20 @@
 import { createFileRoute, Link, getRouteApi, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { approveOverage, billOverage, collectionAction, createInvoice, guaranteeRefund, sendFirstInvoice, subscriptionAction } from "@/lib/billing.functions";
+import { stageLabel, unbilledOverage, type CollectionStage } from "@/lib/billing";
 import { useState } from "react";
 import { Archive, ArchiveRestore, Ban, Clock, CreditCard, MessageSquare, Pencil, Plus, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
 import { DataTable } from "@/components/admin/data-table";
 import { FormModal, type FieldDef } from "@/components/admin/form-modal";
 import { usePopup } from "@/components/popup";
 import { AuditList, Btn, ClientBar, FieldGrid, FieldValue, Section, db, fmtText } from "@/components/admin/record-bits";
-import { canDelete, guaranteeEligible, guaranteeEnd, money } from "@/lib/admin";
+import { canDelete, guaranteeEligible, money } from "@/lib/admin";
 import { formDefaults, isRecordKind, recordKinds, toPatch, type Row, type Vals } from "@/lib/records";
 
 export const Route = createFileRoute("/admin/records/$kind/$id")({ component: RecordPage });
 const adminRoute = getRouteApi("/admin");
 type Modal = { title: string; description?: string | undefined; fields: FieldDef[]; submitLabel: string; onSubmit: (v: Vals) => Promise<string | null> };
-const rand = () => Math.floor(Math.random() * 1e6).toString().padStart(6, "0");
 const today = () => new Date().toISOString().slice(0, 10);
 
 function RecordPage() {
@@ -23,6 +25,7 @@ function RecordPage() {
   const popup = usePopup();
   const [modal, setModal] = useState<Modal | null>(null);
   const cfg = isRecordKind(kind) ? recordKinds[kind] : null;
+  const fnFirst = useServerFn(sendFirstInvoice), fnSub = useServerFn(subscriptionAction), fnOver = useServerFn(billOverage), fnColl = useServerFn(collectionAction), fnApprove = useServerFn(approveOverage), fnInvoice = useServerFn(createInvoice), fnRefund = useServerFn(guaranteeRefund);
 
   const { data, isLoading, error } = useQuery({
     enabled: !!cfg,
@@ -96,57 +99,30 @@ function RecordPage() {
       return done((await db.from("time_entries").insert({ project_id: pid, user_id: row.user_id, hours: h, description: v.description, worked_on: v.worked_on || today(), ...actor })).error);
     },
   });
-  const renew = () => popup({
-    type: "info", title: "Start a new billing period?", description: `Resets used hours to 0, moves the renewal date by one month and issues a ${money(Number(row.monthly_fee))} invoice.`,
-    primaryLabel: "Renew", secondaryLabel: "Cancel",
-    onPrimary: async () => {
-      const base = row.renews_at ? new Date(String(row.renews_at)) : new Date(); base.setMonth(base.getMonth() + 1);
-      const up = await db.from("subscriptions").update({ hours_used: 0, renews_at: base.toISOString(), status: "active" }).eq("id", id);
-      if (!up.error) await db.from("invoices").insert({ user_id: row.user_id, subscription_id: id, number: `INV-${today().replaceAll("-", "")}-${rand()}`, amount: row.monthly_fee, description: `${row.plan_name} service fee`, due_at: new Date(Date.now() + 14 * 864e5).toISOString().slice(0, 10) });
-      await refresh();
-    },
-  });
-  const activate = () => popup({
-    type: "info", title: "Activate subscription?", description: "Starts the billing period, the project and the 90-day money-back guarantee window.", primaryLabel: "Activate", secondaryLabel: "Cancel",
-    onPrimary: async () => {
-      const now = new Date(); const renew = new Date(now); renew.setMonth(renew.getMonth() + 1);
-      await db.from("subscriptions").update({ status: "active", started_at: now.toISOString(), renews_at: renew.toISOString(), guarantee_ends_at: guaranteeEnd(now).toISOString(), guarantee_status: "running" }).eq("id", id);
-      await db.from("projects").update({ status: "active", started_at: today() }).eq("subscription_id", id).eq("status", "planned");
-      await refresh();
-    },
-  });
   const newChild = (childKind: "projects" | "invoices" | "tasks") => {
     const fields: FieldDef[] = childKind === "projects" ? recordKinds.projects.edit : childKind === "tasks" ? recordKinds.tasks.edit
-      : [{ name: "description", label: "Description", required: true, defaultValue: `${row.plan_name} service fee` }, { name: "amount", label: "Amount (USD)", type: "number", required: true, defaultValue: String(row.monthly_fee) }, { name: "due_at", label: "Due date", type: "date" }];
+      : [{ name: "description", label: "Description", required: true, defaultValue: `${row.plan_name} service fee` }, { name: "amount", label: "Amount (USD)", type: "number", required: true, defaultValue: String(row.monthly_fee) }];
     setModal({
       title: `New ${recordKinds[childKind].singular.toLowerCase()}`, submitLabel: "Create", fields: fields.map((f) => f.name === "assigned_to" ? { ...f, defaultValue: adminEmail } : f),
       onSubmit: async (v) => {
         const base = { user_id: row.user_id, ...(kind === "projects" ? { project_id: id, subscription_id: row.subscription_id ?? null } : { subscription_id: id }) };
         const patch = toPatch(fields, v);
-        if (childKind === "invoices") { if (!(Number(v.amount) > 0)) return "Enter an amount above 0."; Object.assign(patch, { number: `INV-${today().replaceAll("-", "")}-${rand()}` }); }
+        if (childKind === "invoices") {
+          if (!(Number(v.amount) > 0)) return "Enter an amount above 0.";
+          try { await fnInvoice({ data: { subscriptionId: id, description: v.description, amount: Number(v.amount) } }); await refresh(); return null; } catch (e) { return (e as Error).message; }
+        }
         if (childKind === "tasks") Object.assign(patch, { actor_label: adminEmail });
         const ins = childKind === "projects" ? { user_id: row.user_id, subscription_id: id, ...patch } : childKind === "invoices" ? { user_id: row.user_id, subscription_id: id, ...patch } : { ...base, ...patch };
         return done((await db.from(childKind).insert(ins).select("id").single()).error);
       },
     });
   };
-  const recordPayment = () => setModal({
-    title: "Record payment", submitLabel: "Record payment", description: `${money(Number(row.amount))} for ${row.number}`,
-    fields: [{ name: "method", label: "Payment method", type: "select", options: ["bank_transfer", "card", "ach", "check", "other"] }],
-    onSubmit: async (v) => {
-      const t = await db.from("transactions").insert({ user_id: row.user_id, invoice_id: id, subscription_id: row.subscription_id ?? null, reference: `TX-${rand()}${rand()}`, description: `Payment for ${row.number}`, amount: row.amount, method: v.method, status: "completed" });
-      if (t.error) return t.error.message;
-      return done((await db.from("invoices").update({ status: "paid", paid_at: new Date().toISOString() }).eq("id", id)).error);
-    },
-  });
   const refund = () => setModal({
-    title: "Refund under the guarantee", submitLabel: "Record refund", description: "Only service fees are refundable. Advertising budgets are excluded.",
-    fields: [{ name: "amount", label: "Amount (USD)", type: "number", required: true }, { name: "method", label: "Method", type: "select", options: ["bank_transfer", "card", "ach", "check"] }, { name: "reason", label: "Reason", type: "textarea", required: true }],
+    title: "Refund under the guarantee", submitLabel: "Refund through Stripe", description: "Only service fees are refunded. Advertising budgets are excluded. The refund goes back to the client's original payment method.",
+    fields: [{ name: "amount", label: "Amount (USD)", type: "number", required: true }, { name: "reason", label: "Reason", type: "textarea", required: true }],
     onSubmit: async (v) => {
       const a = Number(v.amount); if (!(a > 0)) return "Enter an amount above 0.";
-      const t = await db.from("transactions").insert({ user_id: row.user_id, subscription_id: id, reference: `RF-${rand()}${rand()}`, description: `Guarantee refund: ${v.reason}`, amount: -a, method: v.method, status: "completed" });
-      if (t.error) return t.error.message;
-      return done((await db.from("subscriptions").update({ guarantee_status: "refunded" }).eq("id", id)).error);
+      try { await fnRefund({ data: { subscriptionId: id, amount: a, reason: v.reason } }); await refresh(); return null; } catch (e) { return (e as Error).message; }
     },
   });
   const reply = () => setModal({
@@ -158,6 +134,35 @@ function RecordPage() {
     },
   });
 
+  const attempt = async (title: string, description: string, fn: () => Promise<unknown>) => {
+    try { await fn(); await refresh(); popup({ type: "success", title, description, primaryLabel: "Done", secondaryLabel: null }); }
+    catch (e) { popup({ type: "error", title: "Something went wrong", description: (e as Error).message, primaryLabel: "Close", secondaryLabel: null }); }
+  };
+  const subAct = (action: "pause" | "resume" | "cancel_now" | "cancel_end") => setModal({
+    title: { pause: "Pause subscription", resume: "Resume subscription", cancel_now: "Cancel immediately", cancel_end: "Cancel at period end" }[action], submitLabel: "Confirm",
+    description: action === "pause" && row.guarantee_status === "running" ? "Pausing within the first 90 days voids the money-back guarantee. Billing in Stripe stops while paused." : "This is applied in Stripe and saved in the audit log.",
+    fields: [{ name: "reason", label: "Reason", type: "textarea", required: true }],
+    onSubmit: async (v) => { try { await fnSub({ data: { subscriptionId: id, action, reason: v.reason } }); await refresh(); return null; } catch (e) { return (e as Error).message; } },
+  });
+  const overage = () => setModal({
+    title: "Bill extra hours", submitLabel: "Bill", description: `${unbilledOverage(Number(row.hours_used), Number(row.monthly_hours), Number(row.overage_billed_hours ?? 0))} hours beyond the ${row.monthly_hours} hour allowance.`,
+    fields: [{ name: "when", label: "When", type: "select", options: ["next_invoice", "now"] }],
+    onSubmit: async (v) => { try { await fnOver({ data: { subscriptionId: id, when: v.when as "now" | "next_invoice" } }); await refresh(); return null; } catch (e) { return (e as Error).message; } },
+  });
+  const collections = () => setModal({
+    title: "Debt recovery", submitLabel: "Apply", description: `Stage: ${stageLabel[(row.collection_stage as CollectionStage) ?? "none"]}. Interest ${money(Number(row.interest_accrued ?? 0))}, fees ${money(Number(row.fees_accrued ?? 0))}.`,
+    fields: [
+      { name: "action", label: "Action", type: "select", options: ["flag", "court", "issue_arrears", "pause_interest", "resume_interest", "settle", "write_off"] },
+      { name: "note", label: "Note (saved in the audit log)", type: "textarea", required: true },
+    ],
+    onSubmit: async (v) => {
+      try {
+        let courtFees: { name: string; amount: number }[] | undefined;
+        if (v.action === "court") courtFees = ((await db.from("billing_settings").select("court_fees").eq("id", 1).maybeSingle()).data?.court_fees ?? []) as { name: string; amount: number }[];
+        await fnColl({ data: { invoiceId: id, action: v.action as "flag", note: v.note, ...(courtFees ? { courtFees } : {}) } }); await refresh(); return null;
+      } catch (e) { return (e as Error).message; }
+    },
+  });
   const isVoid = row.status === "void";
   return (
     <div className="space-y-6">
@@ -169,12 +174,18 @@ function RecordPage() {
           {!!row.archived_at && <p className="mt-1 text-sm text-muted-foreground">Archived on {fmtText(row.archived_at, "date")}</p>}
         </div>
         <div className="flex flex-wrap gap-2">
-          {kind === "subscriptions" && row.status === "pending" && <Btn icon={RefreshCw} onClick={activate}>Activate</Btn>}
-          {kind === "subscriptions" && row.status === "active" && <Btn icon={RefreshCw} onClick={renew}>Renew period</Btn>}
+          {kind === "subscriptions" && row.status === "pending" && <Btn icon={CreditCard} onClick={() => attempt("First invoice sent", "Stripe emailed the invoice. The subscription activates when it's paid.", () => fnFirst({ data: { subscriptionId: id } }))}>Send first invoice</Btn>}
+          {kind === "subscriptions" && (row.status === "active" || row.status === "past_due") && <Btn icon={Ban} onClick={() => subAct("pause")}>Pause</Btn>}
+          {kind === "subscriptions" && row.status === "paused" && <Btn icon={RefreshCw} onClick={() => subAct("resume")}>Resume</Btn>}
+          {kind === "subscriptions" && !["cancelled", "pending"].includes(String(row.status)) && <Btn icon={Ban} danger onClick={() => subAct("cancel_end")}>Cancel at period end</Btn>}
+          {kind === "subscriptions" && row.status !== "cancelled" && <Btn icon={Ban} danger onClick={() => subAct("cancel_now")}>Cancel now</Btn>}
+          {kind === "subscriptions" && unbilledOverage(Number(row.hours_used), Number(row.monthly_hours), Number(row.overage_billed_hours ?? 0)) > 0 && <Btn icon={Clock} onClick={overage}>Bill extra hours</Btn>}
           {kind === "subscriptions" && subProjects.length > 0 && <Btn icon={Clock} onClick={() => logHours()}>Log hours</Btn>}
-          {kind === "subscriptions" && guaranteeEligible({ guarantee_ends_at: (row.guarantee_ends_at as string) ?? null, sales_received: !!row.sales_received }) && row.guarantee_status !== "refunded" && <Btn icon={RotateCcw} onClick={refund}>Guarantee refund</Btn>}
+          {kind === "subscriptions" && guaranteeEligible({ guarantee_ends_at: (row.guarantee_ends_at as string) ?? null, sales_received: !!row.sales_received }) && row.guarantee_status === "running" && <Btn icon={RotateCcw} onClick={refund}>Guarantee refund</Btn>}
           {kind === "projects" && <Btn icon={Clock} onClick={() => logHours(id)}>Log hours</Btn>}
-          {kind === "invoices" && (row.status === "open" || row.status === "overdue") && <Btn icon={CreditCard} onClick={recordPayment}>Record payment</Btn>}
+          {kind === "tasks" && !!row.over_allowance && !row.overage_approved && <Btn icon={Clock} onClick={() => attempt("Extra hours approved", "Time can now be logged beyond the plan allowance.", () => fnApprove({ data: { taskId: id } }))}>Approve extra hours</Btn>}
+          {kind === "invoices" && !!row.hosted_url && <Btn icon={CreditCard} onClick={() => window.open(String(row.hosted_url), "_blank", "noopener")}>Open Stripe invoice</Btn>}
+          {kind === "invoices" && (row.status === "open" || row.status === "overdue") && <Btn icon={Ban} onClick={collections}>Collections</Btn>}
           {kind === "support_tickets" && <Btn icon={MessageSquare} onClick={reply}>Add message</Btn>}
           {!isVoid && <Btn icon={Pencil} onClick={edit}>Edit</Btn>}
           {cfg.archivable && <Btn icon={row.archived_at ? ArchiveRestore : Archive} onClick={archive}>{row.archived_at ? "Restore" : "Archive"}</Btn>}
