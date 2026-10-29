@@ -117,11 +117,11 @@ function Signup() {
   };
   const selectedDoc = documentIndex === null ? null : documents[documentIndex];
 
-  return <main className="min-h-dvh bg-background text-foreground md:flex md:items-start md:justify-center md:bg-secondary md:p-5 lg:items-center lg:p-8">
-    <div className="relative mx-auto w-full max-w-2xl md:rounded-[2rem] md:bg-card md:p-4 md:shadow-2xl lg:p-6">
-      <section className="min-w-0 md:px-3 lg:px-6">
-    <header className="border-b bg-background md:border-none">
-      <div className="mx-auto flex h-16 items-center justify-between px-5 sm:h-20 md:px-2">
+  return <main className="min-h-dvh bg-background text-foreground">
+    <div className="relative w-full">
+      <section className="min-w-0">
+    <header className="border-b bg-background">
+      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5 sm:h-20 sm:px-8">
         <Link to="/" aria-label="FP home"><img src={logo.url} alt="FP" className="size-9 object-contain sm:size-11" /></Link>
         <span className="text-sm font-semibold">{step < 5 ? steps[step] : step === 5 ? "Almost there…" : "Application complete"}</span>
         {step < 5 ? <Button variant="ghost" size="icon" aria-label="Close signup" onClick={() => popup({ type: "info", title: "Leave your application?", description: "Your details won't be saved.", primaryLabel: "Leave application", onPrimary: () => { navigate({ to: "/" }); }, secondaryLabel: "Keep going" })}><X /></Button> : <div className="size-9" />}
@@ -129,7 +129,7 @@ function Signup() {
     </header>
 
     {step < 5 ? <>
-      <nav aria-label="Application progress" className="mx-auto px-5 pt-4 md:px-2">
+      <nav aria-label="Application progress" className="mx-auto max-w-2xl px-5 pt-6 sm:pt-8">
         <ol className="flex gap-2 sm:gap-4">{steps.map((name, index) => <li key={name} className="min-w-0 flex-1"><div className={`h-1 rounded-full ${index <= step ? "bg-primary" : "bg-secondary"}`} /><span className={`mt-2 hidden text-xs xl:block ${index === step ? "font-semibold text-foreground" : "text-muted-foreground"}`}>{index + 1}. {name}</span></li>)}</ol>
         <p className="mt-2 text-xs text-muted-foreground xl:hidden">Step {step + 1} of 5</p>
       </nav>
