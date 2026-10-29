@@ -20,6 +20,7 @@ import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
 import { Route as AdminSupportRouteImport } from './routes/admin.support'
 import { Route as AdminTaskforceRouteImport } from './routes/admin.taskforce'
+import { Route as DashboardIndexRouteImport } from './routes/dashboard.index'
 import { Route as AdminAccountsIndexRouteImport } from './routes/admin.accounts.index'
 import { Route as AdminAccountsIdRouteImport } from './routes/admin.accounts.$id'
 import { Route as AdminApplicationsIndexRouteImport } from './routes/admin.applications.index'
@@ -83,6 +84,11 @@ const AdminTaskforceRoute = AdminTaskforceRouteImport.update({
   path: '/taskforce',
   getParentRoute: () => AdminRoute,
 } as any)
+const DashboardIndexRoute = DashboardIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const AdminAccountsIndexRoute = AdminAccountsIndexRouteImport.update({
   id: '/accounts/',
   path: '/accounts/',
@@ -124,7 +130,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/admin-login': typeof AdminLoginRoute
-  '/dashboard': typeof DashboardRoute
+  '/dashboard': typeof DashboardRouteWithChildren
   '/forgot-password': typeof ForgotPasswordRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
@@ -132,6 +138,7 @@ export interface FileRoutesByFullPath {
   '/admin/support': typeof AdminSupportRoute
   '/admin/taskforce': typeof AdminTaskforceRoute
   '/admin/': typeof AdminIndexRoute
+  '/dashboard/': typeof DashboardIndexRoute
   '/admin/accounts/$id': typeof AdminAccountsIdRoute
   '/admin/applications/$id': typeof AdminApplicationsIdRoute
   '/admin/accounts/': typeof AdminAccountsIndexRoute
@@ -143,7 +150,6 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin-login': typeof AdminLoginRoute
-  '/dashboard': typeof DashboardRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
@@ -151,6 +157,7 @@ export interface FileRoutesByTo {
   '/admin/support': typeof AdminSupportRoute
   '/admin/taskforce': typeof AdminTaskforceRoute
   '/admin': typeof AdminIndexRoute
+  '/dashboard': typeof DashboardIndexRoute
   '/admin/accounts/$id': typeof AdminAccountsIdRoute
   '/admin/applications/$id': typeof AdminApplicationsIdRoute
   '/admin/accounts': typeof AdminAccountsIndexRoute
@@ -164,7 +171,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/admin-login': typeof AdminLoginRoute
-  '/dashboard': typeof DashboardRoute
+  '/dashboard': typeof DashboardRouteWithChildren
   '/forgot-password': typeof ForgotPasswordRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
@@ -172,6 +179,7 @@ export interface FileRoutesById {
   '/admin/support': typeof AdminSupportRoute
   '/admin/taskforce': typeof AdminTaskforceRoute
   '/admin/': typeof AdminIndexRoute
+  '/dashboard/': typeof DashboardIndexRoute
   '/admin/accounts/$id': typeof AdminAccountsIdRoute
   '/admin/applications/$id': typeof AdminApplicationsIdRoute
   '/admin/accounts/': typeof AdminAccountsIndexRoute
@@ -194,6 +202,7 @@ export interface FileRouteTypes {
     | '/admin/support'
     | '/admin/taskforce'
     | '/admin/'
+    | '/dashboard/'
     | '/admin/accounts/$id'
     | '/admin/applications/$id'
     | '/admin/accounts/'
@@ -205,7 +214,6 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/admin-login'
-    | '/dashboard'
     | '/forgot-password'
     | '/reset-password'
     | '/signup'
@@ -213,6 +221,7 @@ export interface FileRouteTypes {
     | '/admin/support'
     | '/admin/taskforce'
     | '/admin'
+    | '/dashboard'
     | '/admin/accounts/$id'
     | '/admin/applications/$id'
     | '/admin/accounts'
@@ -233,6 +242,7 @@ export interface FileRouteTypes {
     | '/admin/support'
     | '/admin/taskforce'
     | '/admin/'
+    | '/dashboard/'
     | '/admin/accounts/$id'
     | '/admin/applications/$id'
     | '/admin/accounts/'
@@ -246,7 +256,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRouteWithChildren
   AdminLoginRoute: typeof AdminLoginRoute
-  DashboardRoute: typeof DashboardRoute
+  DashboardRoute: typeof DashboardRouteWithChildren
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SignupRoute: typeof SignupRoute
@@ -333,6 +343,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminTaskforceRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/dashboard/': {
+      id: '/dashboard/'
+      path: '/'
+      fullPath: '/dashboard/'
+      preLoaderRoute: typeof DashboardIndexRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/admin/accounts/': {
       id: '/admin/accounts/'
       path: '/accounts'
@@ -411,11 +428,23 @@ const AdminRouteChildren: AdminRouteChildren = {
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
+interface DashboardRouteChildren {
+  DashboardIndexRoute: typeof DashboardIndexRoute
+}
+
+const DashboardRouteChildren: DashboardRouteChildren = {
+  DashboardIndexRoute: DashboardIndexRoute,
+}
+
+const DashboardRouteWithChildren = DashboardRoute._addFileChildren(
+  DashboardRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRouteWithChildren,
   AdminLoginRoute: AdminLoginRoute,
-  DashboardRoute: DashboardRoute,
+  DashboardRoute: DashboardRouteWithChildren,
   ForgotPasswordRoute: ForgotPasswordRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SignupRoute: SignupRoute,
