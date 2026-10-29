@@ -32,6 +32,8 @@ function Accounts() {
           { key: "email", label: "Email", value: (r) => r.email ?? "" },
           { key: "plan", label: "Plan", value: (r) => r.app?.plan_name ?? "—" },
           { key: "status", label: "Application", value: (r) => r.app?.status ?? "", render: (r) => r.app ? <StatusBadge status={r.app.status} label={statusLabel[r.app.status]} /> : "—" },
+          { key: "acctstatus", label: "Account", value: (r) => r.status, render: (r) => <StatusBadge status={r.status === "active" ? "active" : "suspended"} label={r.status} /> },
+          { key: "stage", label: "Stage", value: (r) => r.lifecycle_stage.replaceAll("_", " ") },
           { key: "created", label: "Joined", value: (r) => r.created_at, render: (r) => formatDate(r.created_at) },
         ]} />}
     </div>

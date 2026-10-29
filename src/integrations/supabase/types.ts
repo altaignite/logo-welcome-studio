@@ -106,34 +106,160 @@ export type Database = {
         }
         Relationships: []
       }
+      audit_log: {
+        Row: {
+          account_id: string | null
+          action: string
+          actor_id: string | null
+          actor_label: string
+          changes: Json | null
+          created_at: string
+          id: string
+          record_id: string | null
+          table_name: string
+        }
+        Insert: {
+          account_id?: string | null
+          action: string
+          actor_id?: string | null
+          actor_label?: string
+          changes?: Json | null
+          created_at?: string
+          id?: string
+          record_id?: string | null
+          table_name: string
+        }
+        Update: {
+          account_id?: string | null
+          action?: string
+          actor_id?: string | null
+          actor_label?: string
+          changes?: Json | null
+          created_at?: string
+          id?: string
+          record_id?: string | null
+          table_name?: string
+        }
+        Relationships: []
+      }
+      compliance_requests: {
+        Row: {
+          actor_label: string
+          completed_at: string | null
+          created_at: string
+          details: string | null
+          due_at: string
+          id: string
+          kind: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          actor_label?: string
+          completed_at?: string | null
+          created_at?: string
+          details?: string | null
+          due_at?: string
+          id?: string
+          kind: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          actor_label?: string
+          completed_at?: string | null
+          created_at?: string
+          details?: string | null
+          due_at?: string
+          id?: string
+          kind?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      crm_activities: {
+        Row: {
+          actor_id: string | null
+          actor_label: string
+          body: string | null
+          created_at: string
+          direction: string | null
+          duration_minutes: number | null
+          follow_up_at: string | null
+          id: string
+          kind: string
+          occurred_at: string
+          outcome: string | null
+          subject: string
+          user_id: string
+        }
+        Insert: {
+          actor_id?: string | null
+          actor_label?: string
+          body?: string | null
+          created_at?: string
+          direction?: string | null
+          duration_minutes?: number | null
+          follow_up_at?: string | null
+          id?: string
+          kind?: string
+          occurred_at?: string
+          outcome?: string | null
+          subject: string
+          user_id: string
+        }
+        Update: {
+          actor_id?: string | null
+          actor_label?: string
+          body?: string | null
+          created_at?: string
+          direction?: string | null
+          duration_minutes?: number | null
+          follow_up_at?: string | null
+          id?: string
+          kind?: string
+          occurred_at?: string
+          outcome?: string | null
+          subject?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       invoices: {
         Row: {
           amount: number
           created_at: string
+          description: string | null
           due_at: string | null
           id: string
           issued_at: string
           number: string
+          paid_at: string | null
           status: string
           user_id: string
         }
         Insert: {
           amount: number
           created_at?: string
+          description?: string | null
           due_at?: string | null
           id?: string
           issued_at?: string
           number: string
+          paid_at?: string | null
           status?: string
           user_id: string
         }
         Update: {
           amount?: number
           created_at?: string
+          description?: string | null
           due_at?: string | null
           id?: string
           issued_at?: string
           number?: string
+          paid_at?: string | null
           status?: string
           user_id?: string
         }
@@ -141,68 +267,125 @@ export type Database = {
       }
       profiles: {
         Row: {
+          account_manager: string | null
           account_number: string
+          address_line: string | null
+          city: string | null
           company: string | null
           country: string | null
           created_at: string
+          do_not_sell: boolean
           email: string | null
           first_name: string | null
           id: string
           last_name: string | null
+          legal_hold: boolean
+          lifecycle_stage: string
+          marketing_opt_in: boolean
           phone: string | null
+          postal_code: string | null
+          sms_opt_in: boolean
+          state: string | null
+          status: string
+          status_changed_at: string | null
+          status_reason: string | null
+          terms_accepted_at: string | null
+          updated_at: string
+          website: string | null
         }
         Insert: {
+          account_manager?: string | null
           account_number: string
+          address_line?: string | null
+          city?: string | null
           company?: string | null
           country?: string | null
           created_at?: string
+          do_not_sell?: boolean
           email?: string | null
           first_name?: string | null
           id: string
           last_name?: string | null
+          legal_hold?: boolean
+          lifecycle_stage?: string
+          marketing_opt_in?: boolean
           phone?: string | null
+          postal_code?: string | null
+          sms_opt_in?: boolean
+          state?: string | null
+          status?: string
+          status_changed_at?: string | null
+          status_reason?: string | null
+          terms_accepted_at?: string | null
+          updated_at?: string
+          website?: string | null
         }
         Update: {
+          account_manager?: string | null
           account_number?: string
+          address_line?: string | null
+          city?: string | null
           company?: string | null
           country?: string | null
           created_at?: string
+          do_not_sell?: boolean
           email?: string | null
           first_name?: string | null
           id?: string
           last_name?: string | null
+          legal_hold?: boolean
+          lifecycle_stage?: string
+          marketing_opt_in?: boolean
           phone?: string | null
+          postal_code?: string | null
+          sms_opt_in?: boolean
+          state?: string | null
+          status?: string
+          status_changed_at?: string | null
+          status_reason?: string | null
+          terms_accepted_at?: string | null
+          updated_at?: string
+          website?: string | null
         }
         Relationships: []
       }
       projects: {
         Row: {
+          completed_at: string | null
           created_at: string
+          description: string | null
           due_at: string | null
           hours: number
           id: string
           name: string
           service: string
+          started_at: string | null
           status: string
           user_id: string
         }
         Insert: {
+          completed_at?: string | null
           created_at?: string
+          description?: string | null
           due_at?: string | null
           hours?: number
           id?: string
           name: string
           service: string
+          started_at?: string | null
           status?: string
           user_id: string
         }
         Update: {
+          completed_at?: string | null
           created_at?: string
+          description?: string | null
           due_at?: string | null
           hours?: number
           id?: string
           name?: string
           service?: string
+          started_at?: string | null
           status?: string
           user_id?: string
         }
@@ -249,30 +432,127 @@ export type Database = {
       }
       support_tickets: {
         Row: {
+          assigned_to: string | null
+          category: string
+          closed_at: string | null
           created_at: string
           id: string
           priority: string
           status: string
           subject: string
+          updated_at: string
           user_id: string
         }
         Insert: {
+          assigned_to?: string | null
+          category?: string
+          closed_at?: string | null
           created_at?: string
           id?: string
           priority?: string
           status?: string
           subject: string
+          updated_at?: string
           user_id: string
         }
         Update: {
+          assigned_to?: string | null
+          category?: string
+          closed_at?: string | null
           created_at?: string
           id?: string
           priority?: string
           status?: string
           subject?: string
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
+      }
+      ticket_messages: {
+        Row: {
+          actor_id: string | null
+          actor_label: string
+          body: string
+          created_at: string
+          id: string
+          internal: boolean
+          ticket_id: string
+          user_id: string
+        }
+        Insert: {
+          actor_id?: string | null
+          actor_label?: string
+          body: string
+          created_at?: string
+          id?: string
+          internal?: boolean
+          ticket_id: string
+          user_id: string
+        }
+        Update: {
+          actor_id?: string | null
+          actor_label?: string
+          body?: string
+          created_at?: string
+          id?: string
+          internal?: boolean
+          ticket_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_messages_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      time_entries: {
+        Row: {
+          actor_id: string | null
+          actor_label: string
+          created_at: string
+          description: string
+          hours: number
+          id: string
+          project_id: string
+          user_id: string
+          worked_on: string
+        }
+        Insert: {
+          actor_id?: string | null
+          actor_label?: string
+          created_at?: string
+          description: string
+          hours: number
+          id?: string
+          project_id: string
+          user_id: string
+          worked_on?: string
+        }
+        Update: {
+          actor_id?: string | null
+          actor_label?: string
+          created_at?: string
+          description?: string
+          hours?: number
+          id?: string
+          project_id?: string
+          user_id?: string
+          worked_on?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "time_entries_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       transactions: {
         Row: {

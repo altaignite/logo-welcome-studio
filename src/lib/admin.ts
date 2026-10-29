@@ -41,11 +41,28 @@ export function canTransition(from: AppStatus, to: AppStatus) {
 
 export function statusTone(s: string) {
   if (s === "approved" || s === "active" || s === "paid" || s === "completed" || s === "closed") return "bg-emerald-50 text-emerald-700 ring-emerald-200";
-  if (s === "rejected" || s === "failed" || s === "overdue") return "bg-red-50 text-red-700 ring-red-200";
-  if (s === "escalated" || s === "info_requested" || s === "pending" || s === "open") return "bg-amber-50 text-amber-700 ring-amber-200";
+  if (s === "rejected" || s === "failed" || s === "overdue" || s === "suspended" || s === "closed_account" || s === "void" || s === "cancelled") return "bg-red-50 text-red-700 ring-red-200";
+  if (s === "escalated" || s === "info_requested" || s === "pending" || s === "open" || s === "paused" || s === "in_progress") return "bg-amber-50 text-amber-700 ring-amber-200";
   return "bg-secondary text-foreground ring-border";
 }
 
 export const formatAccount = (n: string) => n.replace(/(\d{4})(\d{3})(\d{3})/, "$1 $2 $3");
 export const formatDate = (d: string | null) => (d ? new Date(d).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" }) : "—");
 export const money = (n: number) => `$${Number(n).toLocaleString("en-US", { minimumFractionDigits: 0 })}`;
+
+export const lifecycleStages = ["onboarding", "active", "at_risk", "churned", "won_back"] as const;
+export const complianceKinds = ["access", "deletion", "correction", "opt_out_of_sale", "marketing_opt_out"] as const;
+
+/** Human-readable one-line summary of an audit log entry. */
+export function auditSummary(action: string, changes: unknown): string {
+  if (!changes || typeof changes !== "object") return action;
+  const c = changes as Record<string, unknown>;
+  if (action !== "update") {
+    const pick = ["subject", "name", "number", "reference", "kind", "status", "amount", "hours", "plan_name"].filter((k) => c[k] != null);
+    return pick.map((k) => `${k.replaceAll("_", " ")}: ${String(c[k])}`).join(" · ") || action;
+  }
+  return Object.entries(c).map(([k, v]) => {
+    const d = v as { from?: unknown; to?: unknown };
+    return `${k.replaceAll("_", " ")}: ${d.from ?? "—"} → ${d.to ?? "—"}`;
+  }).join(" · ");
+}
