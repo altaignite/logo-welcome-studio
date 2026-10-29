@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { accountSchema, countries, createSignatureCode, isSignatureMatch, personalSchema, refundEligible, subscription, plans, planTerms } from "@/lib/signup";
+import { accountSchema, countries, createSignatureCode, isSignatureMatch, personalSchema, refundEligible, subscription, plans, planTerms, createAccountNumber } from "@/lib/signup";
 
 describe("Marketing subscription rules", () => {
   it("starts at $199 per month", () => expect(subscription.monthlyFee).toBe(199));
@@ -71,5 +71,13 @@ describe("mobile number field", () => {
     const { personalSchema } = await import("@/lib/signup");
     const d = { firstName: "A", lastName: "B", company: "C", country: "NL", phone: "+31 20 123 4567" };
     expect(personalSchema.safeParse(d).success).toBe(false);
+  });
+});
+
+describe("Account number", () => {
+  it("is 10 random digits", () => {
+    const n = createAccountNumber();
+    expect(n).toMatch(/^[1-9]\d{9}$/);
+    expect(new Set(Array.from({ length: 50 }, createAccountNumber)).size).toBe(50);
   });
 });

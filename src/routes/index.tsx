@@ -5,6 +5,7 @@ import { usePopup } from "@/components/popup";
 import logo from "@/assets/logo.png.asset.json";
 import hero from "@/assets/login-hero.jpg";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -28,7 +29,7 @@ function Login() {
   const popup = usePopup();
   const soon = (what: string) =>
     popup({ type: "info", title: `${what} is coming soon`, description: "This option isn't available yet.", primaryLabel: "Got it", secondaryLabel: null });
-  const onSubmit = (e: FormEvent<HTMLFormElement>) => {
+  const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
     const email = String(f.get("email") ?? "").trim();
@@ -37,8 +38,9 @@ function Login() {
       popup({ type: "error", title: "Please fill in your email and password", description: "Both fields are needed to log in." });
       return;
     }
-    if (pw.length < 6) {
-      popup({ type: "error", title: "Something went wrong while trying to log you in", description: "Try again or come back later." });
+    const { error } = await supabase.auth.signInWithPassword({ email, password: pw });
+    if (error) {
+      popup({ type: "error", title: "Something went wrong while trying to log you in", description: error.message });
       return;
     }
     popup({ type: "success", title: "Welcome back!", description: "You're logged in successfully.", primaryLabel: "Continue", secondaryLabel: null });
