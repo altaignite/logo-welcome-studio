@@ -184,7 +184,7 @@ function Dashboard() {
 
         {tab === "Support" && (openTicket ? (
           <Section title={openTicket.subject} actions={<button type="button" className="text-sm underline" onClick={() => setTicket(null)}>All tickets</button>}>
-            <ul className="space-y-3 p-5">{data.messages.filter((m) => m.ticket_id === openTicket.id).map((m) => (
+            <ul className="space-y-3 p-5">{data.messages.filter((m: R) => m.ticket_id === openTicket.id).map((m: R) => (
               <li key={m.id} className={`rounded-xl p-3 text-sm ${m.actor_id === userId ? "ml-8 bg-secondary" : "mr-8 border"}`}><p className="whitespace-pre-wrap">{m.body}</p><p className="mt-1 text-xs text-muted-foreground">{m.actor_id === userId ? "You" : "FP team"}, {formatDate(m.created_at)}</p></li>
             ))}</ul>
             <div className="border-t p-4">{openTicket.status === "closed"
