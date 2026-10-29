@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { ArrowLeft, ArrowRight, Check, ChevronDown, Download, Eye, EyeOff, LockKeyhole, PenLine, Rocket, ShieldCheck, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Clock, Code2, Megaphone, Palette, ChevronDown, Download, Eye, EyeOff, LockKeyhole, PenLine, Rocket, ShieldCheck, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CountryField, CountryFlag } from "@/components/country-field";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
@@ -142,15 +142,22 @@ function Signup() {
       <div className="mx-auto max-w-lg px-5 pb-8 pt-6 md:px-2 md:pt-8">
         <div className="mb-6 text-center"><h1 className="text-2xl font-extrabold leading-tight lg:text-3xl">{titles[step]}</h1><p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">{subtitles[step]}</p></div>
         {step === 0 && <div>
-          <div className="grid gap-5 pt-2" role="group" aria-label="Subscription plans">{plans.map((plan) => <div key={plan.id} aria-pressed={selectedPlan.id === plan.id} className={`relative rounded-2xl border bg-background p-5 shadow-sm sm:p-6 ${selectedPlan.id === plan.id ? "border-foreground ring-2 ring-foreground/10" : "border-border"}`}>
-            {plan.id === "growth" && <span className="absolute -top-3 left-5 rounded-full bg-primary px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-background">Popular</span>}
+          <div className="grid gap-5 pt-2" role="group" aria-label="Subscription plans">{plans.map((plan) => <div key={plan.id} className={`rounded-[1.75rem] border bg-card p-6 sm:p-8 ${selectedPlan.id === plan.id ? "border-foreground/40" : "border-border"}`}>
             <div className="flex items-start justify-between gap-3">
-              <h2 className="text-xl font-bold">{plan.name}</h2>
-              <p className="text-right"><span className="text-3xl font-extrabold">${plan.monthlyFee}</span><span className="text-sm text-muted-foreground"> / month</span></p>
+              <h2 className="text-2xl font-semibold tracking-tight">{plan.name} Plan</h2>
+              {plan.id === "growth" && <span className="rounded-full bg-foreground px-4 py-1.5 text-sm font-medium text-background shadow-lg">Popular</span>}
             </div>
-            <p className="mt-1 text-sm text-muted-foreground">{plan.description}</p>
-            <ul className="mt-4 space-y-2 text-sm text-muted-foreground">{["Marketing, design & development", `${plan.monthlyHours} assigned service hours per month`, "Advertising budgets billed separately"].map((text) => <li key={text} className="flex items-start gap-2"><Check className="mt-0.5 size-4 shrink-0 text-primary" />{text}</li>)}</ul>
-            <Button className="signup-primary mt-5 w-full" aria-pressed={selectedPlan.id === plan.id} onClick={() => { setSelectedPlan(plan); setStep(1); }}>{selectedPlan.id === plan.id ? "Continue with" : "Choose"} {plan.name}<ArrowRight /></Button>
+            <p className="mt-3 flex items-baseline gap-1.5"><span className="text-4xl font-bold tracking-tight">${plan.monthlyFee}</span><span className="text-base text-muted-foreground">/month</span></p>
+            <p className="mt-3 text-sm text-muted-foreground">{plan.description}</p>
+            <div className="my-5 h-px bg-border" />
+            <ul className="space-y-5">{[
+              { icon: Clock, title: `${plan.monthlyHours} Service Hours`, text: "Assigned every month." },
+              { icon: Megaphone, title: "Marketing", text: "Campaigns, content and strategy." },
+              { icon: Palette, title: "Design", text: "Brand, social and web visuals." },
+              { icon: Code2, title: "Development", text: "Websites, landing pages and fixes." },
+            ].map(({ icon: Icon, title, text }) => <li key={title} className="flex items-center gap-4"><span className="grid size-11 shrink-0 place-items-center rounded-xl bg-secondary"><Icon className="size-5" strokeWidth={1.5} /></span><span><span className="block text-[15px] font-medium">{title}</span><span className="block text-sm text-muted-foreground">{text}</span></span></li>)}</ul>
+            <Button className="mt-7 h-14 w-full rounded-2xl bg-foreground text-base font-semibold text-background hover:bg-foreground/90" onClick={() => { setSelectedPlan(plan); setStep(1); }}>Choose {plan.name}</Button>
+            <p className="mt-4 text-center text-xs text-muted-foreground">90 days money-back guarantee ! Ads budget excluded</p>
           </div>)}</div>
           <p className="mt-4 text-xs leading-relaxed text-muted-foreground">Your hours are shared across all services. Service delivery is not unlimited.</p>
           <div className="mt-4 flex items-start justify-center gap-2 text-center text-xs leading-relaxed text-muted-foreground"><ShieldCheck className="size-4 shrink-0 text-primary" /><p>90-day money-back guarantee if no sales are received.<br />Service fees only.</p></div>
