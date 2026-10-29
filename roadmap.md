@@ -6,6 +6,6 @@
 
 # Signup corrections
 - [ ] Match desktop and tablet signup to the login layout across every step.
-- [ ] Offer multiple plans with assigned monthly hours, carried through review, agreements and completion (awaiting plan prices and hours).
+- [ ] Offer Starter $199/5 hours, Growth $499/15 hours and Scale $999/35 hours monthly, carried through review, agreements and completion.
 - [ ] Add country flags using a free API, without emojis.
 - [ ] Verify all signup steps across desktop, tablet and mobile and run the relevant tests.
