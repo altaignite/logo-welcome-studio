@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { CountryField, CountryFlag } from "@/components/country-field";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { usePopup } from "@/components/popup";
-import { accountSchema, countries, createSignatureCode, isSignatureMatch, personalSchema, plans, planTerms, type Plan, type CountryCode, type PersonalDetails } from "@/lib/signup";
+import { accountSchema, countries, createSignatureCode, isSignatureMatch, personalSchema, plans, planTerms, type Plan, type CountryCode, type PersonalDetails, formatPhoneInput, switchPhoneCountry, phonePlaceholder } from "@/lib/signup";
 import logo from "@/assets/logo.png.asset.json";
 
 export const Route = createFileRoute("/signup")({
@@ -31,7 +31,7 @@ const baseDocuments = [
 ];
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
-  return <label className="block space-y-2 text-sm font-medium text-foreground"><span>{label}</span>{children}</label>;
+  return <label className="block space-y-1.5"><span className="block text-[13px] font-medium text-foreground">{label}<span className="text-primary">*</span></span>{children}</label>;
 }
 
 function Signup() {
@@ -65,7 +65,7 @@ function Signup() {
         if (!countryTouched.current) setPersonal((p) => ({ ...p, country: detected.code }));
         if (!phoneTouched.current) {
           setPhoneCountry(detected.code);
-          setPersonal((p) => ({ ...p, phone: `${detected.dial} ` }));
+          setPersonal((p) => (p.phone ? p : { ...p, phone: `${detected.dial} ` }));
         }
       }).catch(() => {}).finally(() => window.clearTimeout(timeout));
     return () => { controller.abort(); window.clearTimeout(timeout); };
@@ -81,10 +81,14 @@ function Signup() {
     if (!phoneTouched.current) changePhoneCountry(country);
   };
   const changePhoneCountry = (country: CountryCode) => {
-    const oldDial = countries.find((c) => c.code === phoneCountry)?.dial;
-    const nextDial = countries.find((c) => c.code === country)?.dial;
+    setPersonal((p) => ({ ...p, phone: switchPhoneCountry(p.phone, phoneCountry as CountryCode | "", country) }));
     setPhoneCountry(country);
-    setPersonal((p) => ({ ...p, phone: `${nextDial ?? ""} ${oldDial && p.phone.startsWith(oldDial) ? p.phone.slice(oldDial.length).trim() : p.phone.replace(/^\+\d+\s*/, "")}` }));
+  };
+  const typePhone = (raw: string) => {
+    phoneTouched.current = true;
+    const next = formatPhoneInput(raw, phoneCountry as CountryCode | "");
+    setPhoneCountry(next.country);
+    setPersonal((p) => ({ ...p, phone: next.value }));
   };
   const advance = (event: FormEvent) => {
     event.preventDefault();
@@ -153,12 +157,12 @@ function Signup() {
           <div className="mt-4 flex items-start justify-center gap-2 text-center text-xs leading-relaxed text-muted-foreground"><ShieldCheck className="size-4 shrink-0 text-primary" /><p>90-day money-back guarantee if no sales are received.<br />Service fees only.</p></div>
           <p className="mt-5 text-center text-sm text-muted-foreground">Already have an account? <Button asChild variant="link" className="h-auto p-0 font-semibold text-foreground"><Link to="/">Log in</Link></Button></p>
         </div>}
-        {(step === 1 || step === 2) && <form onSubmit={advance} noValidate className="space-y-5">
+        {(step === 1 || step === 2) && <form onSubmit={advance} noValidate className="space-y-4">
           {step === 1 ? <>
-            <div className="grid gap-5 lg:grid-cols-2"><Field label="First name"><input className="signup-input" autoComplete="given-name" value={personal.firstName} onChange={(e) => setPersonal({ ...personal, firstName: e.target.value })} maxLength={80} /></Field><Field label="Last name"><input className="signup-input" autoComplete="family-name" value={personal.lastName} onChange={(e) => setPersonal({ ...personal, lastName: e.target.value })} maxLength={80} /></Field></div>
+            <div className="grid gap-4 sm:grid-cols-2"><Field label="First name"><input className="signup-input" autoComplete="given-name" value={personal.firstName} onChange={(e) => setPersonal({ ...personal, firstName: e.target.value })} maxLength={80} /></Field><Field label="Last name"><input className="signup-input" autoComplete="family-name" value={personal.lastName} onChange={(e) => setPersonal({ ...personal, lastName: e.target.value })} maxLength={80} /></Field></div>
             <Field label="Business name"><input className="signup-input" autoComplete="organization" value={personal.company} onChange={(e) => setPersonal({ ...personal, company: e.target.value })} maxLength={160} /></Field>
-            <div className="space-y-2"><span className="text-sm font-medium">Country</span><CountryField value={personal.country} onChange={setCountry} /></div>
-            <div className="space-y-2"><label htmlFor="mobile" className="text-sm font-medium">Mobile number</label><div className="signup-group"><CountryField phone value={phoneCountry} onChange={(v) => { phoneTouched.current = true; changePhoneCountry(v); }} /><input id="mobile" aria-label="Mobile number" autoComplete="tel" type="tel" inputMode="tel" placeholder="+31 6 1234 5678" value={personal.phone} maxLength={30} onChange={(e) => { phoneTouched.current = true; setPersonal({ ...personal, phone: e.target.value.replace(/[^\d+\s()-]/g, "") }); }} className="h-full min-w-0 flex-1 bg-transparent px-4 text-base outline-none" /></div></div>
+            <div className="space-y-1.5"><span className="block text-[13px] font-medium">Country<span className="text-primary">*</span></span><CountryField value={personal.country} onChange={setCountry} /></div>
+            <div className="space-y-1.5"><label htmlFor="mobile" className="block text-[13px] font-medium">Mobile number<span className="text-primary">*</span></label><div className="signup-group"><CountryField phone value={phoneCountry} onChange={(v) => { phoneTouched.current = true; changePhoneCountry(v); }} /><input id="mobile" autoComplete="tel" type="tel" inputMode="tel" placeholder={phonePlaceholder(phoneCountry as CountryCode | "")} value={personal.phone} maxLength={24} onChange={(e) => typePhone(e.target.value)} className="h-full min-w-0 flex-1 bg-transparent px-3 text-[15px] outline-none sm:text-sm" /></div></div>
           </> : <>
             <Field label="Email Address"><input className="signup-input" type="email" inputMode="email" autoComplete="email" value={account.email} maxLength={254} onChange={(e) => setAccount({ ...account, email: e.target.value })} /></Field>
             <Field label="Password"><div className="relative"><input className="signup-input pr-12" type={showPassword ? "text" : "password"} autoComplete="new-password" maxLength={128} value={account.password} onChange={(e) => setAccount({ ...account, password: e.target.value })} /><Button variant="ghost" size="icon" type="button" aria-label={showPassword ? "Hide password" : "Show password"} className="absolute right-1 top-1/2 -translate-y-1/2" onClick={() => setShowPassword((s) => !s)}>{showPassword ? <EyeOff /> : <Eye />}</Button></div></Field>
@@ -166,7 +170,7 @@ function Signup() {
             <Field label="Confirm password"><input className="signup-input" type={showPassword ? "text" : "password"} autoComplete="new-password" maxLength={128} value={account.confirmPassword} onChange={(e) => setAccount({ ...account, confirmPassword: e.target.value })} /></Field>
             <div className="flex gap-3 border-t pt-5 text-sm text-muted-foreground"><LockKeyhole className="size-5 shrink-0" /><p>These login details are for this preview only. No account is created.</p></div>
           </>}
-          <div className="flex items-center gap-3 pt-4"><Button type="button" variant="secondary" aria-label="Back" className="size-14 shrink-0 rounded-[14px]" onClick={() => setStep(step - 1)}><ArrowLeft /></Button><Button type="submit" className="signup-primary flex-1">{step === 1 ? "Continue" : "Review application"}<ArrowRight /></Button></div>
+          <div className="flex items-center gap-3 pt-4"><Button type="button" variant="secondary" aria-label="Back" className="size-11 shrink-0 rounded-lg" onClick={() => setStep(step - 1)}><ArrowLeft /></Button><Button type="submit" className="signup-primary flex-1">{step === 1 ? "Continue" : "Review application"}<ArrowRight /></Button></div>
         </form>}
         {step === 3 && <div>
           <ReviewSection title="Your application" onEdit={() => setStep(0)}><ReviewRow label="Plan" value={selectedPlan.name} /><ReviewRow label="Service fee" value={`$${selectedPlan.monthlyFee} / month`} /><ReviewRow label="Assigned monthly hours" value={`${selectedPlan.monthlyHours} hours shared across all services; not unlimited`} /><ReviewRow label="Included services" value="Marketing, design & development" /><ReviewRow label="Money-back guarantee" value="90 days if no sales are received. Service fees only; advertising budgets excluded." /></ReviewSection>
@@ -180,7 +184,7 @@ function Signup() {
           <div className="-mx-5 mt-6 bg-secondary px-5 py-4 sm:mx-0 sm:px-6"><h2 className="text-xl font-medium">Conditions & information</h2></div>
           {documents.slice(2).map((doc, index) => <DocumentRow key={doc.title} title={doc.title} onRead={() => setDocumentIndex(index + 2)} onDownload={() => downloadDocument(index + 2)} />)}
           <p className="mt-6 text-xs leading-relaxed text-muted-foreground">The documents summarise the supplied subscription terms; they are not final legal contracts. By continuing, you can confirm this demonstration application.</p>
-          <div className="mt-6 flex gap-3"><Button variant="secondary" aria-label="Back to review" className="size-14 shrink-0 rounded-[14px]" onClick={() => setStep(3)}><ArrowLeft /></Button><Button className="signup-primary flex-1" onClick={openConfirmation}>Accept & continue <PenLine /></Button></div>
+          <div className="mt-6 flex gap-3"><Button variant="secondary" aria-label="Back to review" className="size-11 shrink-0 rounded-lg" onClick={() => setStep(3)}><ArrowLeft /></Button><Button className="signup-primary flex-1" onClick={openConfirmation}>Accept & continue <PenLine /></Button></div>
         </div>}
       </div>
     </> : step === 5 ? <ProcessingScreen hours={selectedPlan.monthlyHours} onDone={() => { setAccount((a) => ({ ...a, password: "", confirmPassword: "" })); setStep(6); }} /> : <SuccessScreen name={personal.firstName} plan={selectedPlan} signedAt={signature?.at ?? new Date().toISOString()} email={account.email} />}
@@ -195,14 +199,14 @@ function Signup() {
             <p className="text-center text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">Your signature code</p>
             <div data-testid="signature-code" aria-label={`Confirmation code ${code}`} className="mt-3 flex items-center justify-center gap-2 font-mono text-3xl font-semibold tabular-nums tracking-[0.15em] sm:text-4xl"><span>{code.slice(0, 3)}</span><span className="text-muted-foreground">–</span><span>{code.slice(3)}</span></div>
           </div>
-          <div className="mt-6"><InputOTP maxLength={6} value={entered} onChange={setEntered} aria-label="Enter six-digit confirmation code" inputMode="numeric" pattern="[0-9]*" containerClassName="w-full justify-center"><InputOTPGroup className="grid w-full grid-cols-6 gap-2">{Array.from({ length: 6 }, (_, index) => <InputOTPSlot key={index} index={index} className="h-14 w-full rounded-[14px] border border-input bg-background text-xl first:rounded-[14px] first:border-l last:rounded-[14px]" />)}</InputOTPGroup></InputOTP></div>
+          <div className="mt-6"><InputOTP maxLength={6} value={entered} onChange={setEntered} aria-label="Enter six-digit confirmation code" inputMode="numeric" pattern="[0-9]*" containerClassName="w-full justify-center"><InputOTPGroup className="grid w-full grid-cols-6 gap-2">{Array.from({ length: 6 }, (_, index) => <InputOTPSlot key={index} index={index} className="h-12 w-full rounded-lg border border-input bg-background text-lg first:rounded-lg first:border-l last:rounded-lg" />)}</InputOTPGroup></InputOTP></div>
           <div className="relative z-10 mt-5 flex items-center justify-between gap-3 text-sm"><span className="text-muted-foreground">Code not working?</span><Button type="button" variant="outline" size="sm" className="relative z-10 rounded-full" onClick={newCode}><RefreshCw /> Use a new code</Button></div>
           <p className="mt-5 text-xs leading-relaxed text-muted-foreground">Entering this code confirms your acceptance as your digital signature. Every attempt uses a new code.</p>
         </div>
-        <div className="mt-8 space-y-3"><Button className="signup-primary relative z-10" disabled={entered.length !== 6} onClick={accept}>Accept & sign</Button><Button variant="secondary" className="h-14 w-full rounded-[14px]" onClick={() => setConfirmOpen(false)}>Cancel</Button></div>
+        <div className="mt-8 space-y-3"><Button className="signup-primary relative z-10" disabled={entered.length !== 6} onClick={accept}>Accept & sign</Button><Button variant="secondary" className="h-11 w-full rounded-lg" onClick={() => setConfirmOpen(false)}>Cancel</Button></div>
       </Dialog.Content></Dialog.Portal>
     </Dialog.Root>
-    <Dialog.Root open={selectedDoc !== null} onOpenChange={(open) => { if (!open) setDocumentIndex(null); }}><Dialog.Portal><Dialog.Overlay className="fixed inset-0 z-30 bg-foreground/40 backdrop-blur-sm" /><Dialog.Content className="signature-dialog"><Dialog.Title className="pr-8 text-2xl font-bold">{selectedDoc?.title}</Dialog.Title><Dialog.Description className="mt-6 whitespace-pre-line text-base leading-relaxed text-muted-foreground">{selectedDoc?.body}</Dialog.Description><p className="mt-6 text-xs text-muted-foreground">Summary for this demonstration; not a final legal contract.</p><div className="mt-auto space-y-3 pt-8"><Button className="signup-primary" onClick={() => { if (documentIndex !== null) downloadDocument(documentIndex); }}><Download /> Save a copy</Button><Dialog.Close asChild><Button variant="secondary" className="h-14 w-full rounded-[14px]">Close</Button></Dialog.Close></div></Dialog.Content></Dialog.Portal></Dialog.Root>
+    <Dialog.Root open={selectedDoc !== null} onOpenChange={(open) => { if (!open) setDocumentIndex(null); }}><Dialog.Portal><Dialog.Overlay className="fixed inset-0 z-30 bg-foreground/40 backdrop-blur-sm" /><Dialog.Content className="signature-dialog"><Dialog.Title className="pr-8 text-2xl font-bold">{selectedDoc?.title}</Dialog.Title><Dialog.Description className="mt-6 whitespace-pre-line text-base leading-relaxed text-muted-foreground">{selectedDoc?.body}</Dialog.Description><p className="mt-6 text-xs text-muted-foreground">Summary for this demonstration; not a final legal contract.</p><div className="mt-auto space-y-3 pt-8"><Button className="signup-primary" onClick={() => { if (documentIndex !== null) downloadDocument(documentIndex); }}><Download /> Save a copy</Button><Dialog.Close asChild><Button variant="secondary" className="h-11 w-full rounded-lg">Close</Button></Dialog.Close></div></Dialog.Content></Dialog.Portal></Dialog.Root>
   </main>;
 }
 

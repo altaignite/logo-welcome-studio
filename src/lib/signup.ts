@@ -1,5 +1,7 @@
 import { z } from "zod";
-import { getCountries, getCountryCallingCode, parsePhoneNumberFromString, type CountryCode } from "libphonenumber-js";
+import { AsYouType, getCountries, getCountryCallingCode, getExampleNumber, type CountryCode } from "libphonenumber-js";
+import { parsePhoneNumberFromString as parseMobile } from "libphonenumber-js/mobile";
+import examples from "libphonenumber-js/mobile/examples";
 
 export const subscription = {
   name: "Marketing Accelerator",
@@ -25,12 +27,51 @@ export const countries = getCountries().map((code) => ({
   code, name: countryNames.of(code) ?? code, dial: `+${getCountryCallingCode(code)}`,
 })).sort((a, b) => a.name.localeCompare(b.name, "en"));
 
+/** Main country for calling codes shared by several countries. */
+const mainCountryForCode: Record<string, CountryCode> = { "1": "US", "7": "RU", "44": "GB", "47": "NO", "61": "AU", "212": "MA", "262": "RE", "290": "SH", "358": "FI", "590": "GP", "599": "CW" };
+
+/**
+ * Formats a typed mobile number internationally and detects its country.
+ * Numbers typed without "+" are treated as national numbers of the current country.
+ */
+export function formatPhoneInput(raw: string, current: CountryCode | ""): { value: string; country: CountryCode | "" } {
+  const cleaned = raw.replace(/[^\d+]/g, "").replace(/(?!^)\+/g, "");
+  if (!cleaned) return { value: "", country: current };
+  let international = cleaned;
+  if (!cleaned.startsWith("+")) {
+    if (!current) return { value: cleaned, country: current };
+    const national = cleaned.replace(/^0+/, "");
+    international = `+${getCountryCallingCode(current)}${national}`;
+  }
+  const typer = new AsYouType();
+  const value = typer.input(international);
+  const callingCode = typer.getCallingCode();
+  let country: CountryCode | "" = typer.getCountry() ?? "";
+  if (!country && callingCode) {
+    country = current && getCountryCallingCode(current) === callingCode ? current : mainCountryForCode[callingCode] ?? countries.find((c) => c.dial === `+${callingCode}`)?.code ?? current;
+  }
+  return { value, country };
+}
+
+/** Switches the calling code while keeping the national digits the user already typed. */
+export function switchPhoneCountry(value: string, from: CountryCode | "", to: CountryCode): string {
+  const digits = value.replace(/[^\d]/g, "");
+  const oldCode = from ? getCountryCallingCode(from) : "";
+  const national = value.trim().startsWith("+") && oldCode && digits.startsWith(oldCode) ? digits.slice(oldCode.length) : digits.replace(/^0+/, "");
+  return formatPhoneInput(`+${getCountryCallingCode(to)}${national}`, to).value;
+}
+
+export function phonePlaceholder(country: CountryCode | ""): string {
+  if (!country) return "+31 6 12345678";
+  return getExampleNumber(country, examples)?.formatInternational() ?? `+${getCountryCallingCode(country)}`;
+}
+
 export const personalSchema = z.object({
   firstName: z.string().trim().min(1, "Enter your first name.").max(80),
   lastName: z.string().trim().min(1, "Enter your last name.").max(80),
   company: z.string().trim().min(1, "Enter your business name.").max(160),
   country: z.string().refine((v) => countries.some((c) => c.code === v), "Choose your country."),
-  phone: z.string().max(30).refine((v) => parsePhoneNumberFromString(v)?.isValid() === true, "Enter a valid mobile number, including its country code."),
+  phone: z.string().max(30).refine((v) => parseMobile(v)?.isValid() === true, "Enter a valid mobile number for the selected country."),
 });
 export const accountSchema = z.object({
   email: z.string().trim().email("Enter a valid email address.").max(254),

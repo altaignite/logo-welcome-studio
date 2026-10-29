@@ -54,3 +54,22 @@ describe("Marketing subscription rules", () => {
     expect(accountSchema.safeParse({ email: "not-email", password: "Testing123", confirmPassword: "other" }).success).toBe(false);
   });
 });
+import { formatPhoneInput, switchPhoneCountry } from "@/lib/signup";
+describe("mobile number field", () => {
+  it("detects the country from a typed calling code", () => {
+    expect(formatPhoneInput("+44 7700 900123", "NL").country).toBe("GB");
+    expect(formatPhoneInput("+316", "").country).toBe("NL");
+  });
+  it("turns a national number into international format for the chosen country", () => {
+    expect(formatPhoneInput("0612345678", "NL").value).toBe("+31 6 12345678");
+  });
+  it("keeps typed digits when switching country", () => {
+    expect(switchPhoneCountry("+31 6 12345678", "NL", "BE").startsWith("+32")).toBe(true);
+    expect(switchPhoneCountry("+31 6 12345678", "NL", "BE").replace(/\D/g, "")).toBe("32612345678");
+  });
+  it("rejects landline numbers as mobile", async () => {
+    const { personalSchema } = await import("@/lib/signup");
+    const d = { firstName: "A", lastName: "B", company: "C", country: "NL", phone: "+31 20 123 4567" };
+    expect(personalSchema.safeParse(d).success).toBe(false);
+  });
+});
