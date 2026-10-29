@@ -55,7 +55,16 @@ export const Route = createFileRoute("/api/public/stripe/webhook")({
                 else {
                   if (inv.kind === "renewal") {
                     const next = new Date(); next.setMonth(next.getMonth() + 1);
-                    await admin.from("subscriptions").update({ hours_used: 0, overage_billed_hours: 0, renews_at: next.toISOString() }).eq("id", subId);
+                    const { data: cur } = await admin.from("subscriptions").select("pending_plan_id, stripe_subscription_id").eq("id", subId).single();
+                    const { plans } = await import("@/lib/signup");
+                    const np = cur?.pending_plan_id ? plans.find((p) => p.id === cur.pending_plan_id) : undefined;
+                    await admin.from("subscriptions").update({ hours_used: 0, overage_billed_hours: 0, renews_at: next.toISOString(), ...(np ? { plan_name: np.name, monthly_fee: np.monthlyFee, monthly_hours: np.monthlyHours, pending_plan_id: null } : {}) }).eq("id", subId);
+                    if (np && cur?.stripe_subscription_id) {
+                      const { stripe: st, planPrice } = await import("@/lib/stripe.server");
+                      const s = await st("GET", `subscriptions/${cur.stripe_subscription_id}`);
+                      const item = s.items?.data?.[0]?.id;
+                      if (item) await st("POST", `subscriptions/${cur.stripe_subscription_id}`, { "items[0][id]": item, "items[0][price]": await planPrice(np.name, np.monthlyFee), proration_behavior: "none" });
+                    }
                   }
                   await B.reinstateAfterPayment(admin, subId);
                 }

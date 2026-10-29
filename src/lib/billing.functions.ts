@@ -83,6 +83,7 @@ export const subscriptionAction = createServerFn({ method: "POST" })
       patch.status = "active";
     } else if (data.action === "cancel_end") {
       if (sid) await stripe("POST", `subscriptions/${sid}`, { cancel_at_period_end: true });
+      patch.cancel_at_period_end = true;
       patch.notes = [sub.notes, `Cancels at period end (${sub.renews_at?.slice(0, 10) ?? "next renewal"})`].filter(Boolean).join("\n");
     } else {
       if (sid) await stripe("DELETE", `subscriptions/${sid}`);
