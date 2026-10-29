@@ -19,3 +19,5 @@
 - Render country flags from the free FlagCDN image API with empty alt text alongside country names and graceful image-failure fallback, so flags remain decorative rather than replacing accessible country labels.
 
 - After every code or database change, do a focused security-audit-skill review (guidance mode) of the changed trust boundaries before finishing; the owner requires security checks on every change.
+- Admin record pages are one generic route (/admin/records/$kind/$id) driven by src/lib/records.ts; add a record type there instead of writing a new page, so every table row opens a consistent details page.
+- Financial and legal records (applications, subscriptions, invoices, transactions, audit) are archived or voided, never deleted; only tables listed in deletableTables in src/lib/admin.ts get DELETE policies.
