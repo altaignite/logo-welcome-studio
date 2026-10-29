@@ -9,7 +9,7 @@ import { FormModal, type FieldDef } from "@/components/admin/form-modal";
 import { usePopup } from "@/components/popup";
 import { AuditList, Btn, FieldGrid, Section, db, fmtText } from "@/components/admin/record-bits";
 import { setAccountStatus } from "@/lib/crm.functions";
-import { createInvoice, createOrder } from "@/lib/billing.functions";
+import { createInvoice, createOrder, subscriptionAction, voidInvoices } from "@/lib/billing.functions";
 import { accountStatusLabel, accountStatuses, complianceKinds, formatAccount, formatDate, formatDay, humanize, lifecycleStages, money, statusLabel, type AccountStatus } from "@/lib/admin";
 import { plans } from "@/lib/signup";
 import { recordKinds, toPatch, type RecordKind, type Row, type Vals } from "@/lib/records";
@@ -29,7 +29,7 @@ function AccountDetail() {
   const qc = useQueryClient();
   const popup = usePopup();
   const changeStatus = useServerFn(setAccountStatus);
-  const fnOrder = useServerFn(createOrder), fnInvoice = useServerFn(createInvoice);
+  const fnOrder = useServerFn(createOrder), fnInvoice = useServerFn(createInvoice), fnSub = useServerFn(subscriptionAction), fnVoid = useServerFn(voidInvoices);
   const [tab, setTab] = useState<(typeof tabs)[number]>(tabs[0]);
   const [modal, setModal] = useState<Modal | null>(null);
   const { data, isLoading, error } = useQuery({
@@ -74,7 +74,24 @@ function AccountDetail() {
   const bulkVoid = (table: string): BulkAction<R> => ({
     label: "Void", danger: true, run: (rows) => setModal({ title: `Void ${rows.length} record${rows.length > 1 ? "s" : ""}`, submitLabel: "Void", description: "Voided records stay on file for tax and legal purposes.",
       fields: [{ name: "reason", label: "Reason", type: "textarea", required: true }],
-      onSubmit: async (v) => done((await db.from(table).update({ status: "void", void_reason: v.reason }).in("id", rows.filter((x) => x.status !== "paid").map((x) => x.id))).error) }),
+      onSubmit: async (v) => {
+        const ids = rows.filter((x) => x.status !== "paid").map((x) => x.id);
+        if (!ids.length) return "Paid records can't be voided.";
+        // Invoices are voided in Stripe too, so a voided invoice can't still be paid.
+        if (table === "invoices") { try { await fnVoid({ data: { invoiceIds: ids, reason: v.reason } }); await refresh(); return null; } catch (e) { return (e as Error).message; } }
+        return done((await db.from(table).update({ status: "void", void_reason: v.reason }).in("id", ids)).error);
+      } }),
+  });
+  /** Pause or resume through the billing action so Stripe stops or restarts charging. */
+  const bulkSub = (action: "pause" | "resume", label: string): BulkAction<R> => ({
+    label, run: (rows) => setModal({ title: `${label} ${rows.length} subscription${rows.length > 1 ? "s" : ""}`, submitLabel: label, description: "This is applied in Stripe and saved in the audit log.",
+      fields: [{ name: "reason", label: "Reason", type: "textarea", required: true }],
+      onSubmit: async (v) => {
+        const failed: string[] = [];
+        for (const r of rows) { try { await fnSub({ data: { subscriptionId: r.id, action, reason: v.reason } }); } catch (e) { failed.push(`${r.plan_name}: ${(e as Error).message}`); } }
+        await refresh();
+        return failed.length ? failed.join(" ") : null;
+      } }),
   });
   const archive = (table: string) => bulkUpdate(table, { archived_at: new Date().toISOString() }, "Archive");
 
@@ -216,7 +233,7 @@ function AccountDetail() {
         ]} />}
 
       {tab === "Subscriptions" && <DataTable<R> title="Subscriptions" rows={data.subscriptions} getId={(r) => r.id} onRowClick={open("subscriptions")} empty="No subscriptions." toolbar={<Btn icon={FilePlus2} onClick={newOrder}>New order</Btn>}
-        bulkActions={[bulkUpdate("subscriptions", { status: "paused" }, "Pause"), bulkUpdate("subscriptions", { status: "active" }, "Resume"), archive("subscriptions")]} columns={[
+        bulkActions={[bulkSub("pause", "Pause"), bulkSub("resume", "Resume"), archive("subscriptions")]} columns={[
           col("plan_name", "Plan"), col("monthly_fee", "Fee", "money"),
           { key: "hours", label: "Hours used", value: (r) => Number(r.hours_used), render: (r) => `${r.hours_used} of ${r.monthly_hours} h` },
           col("status", "Status", "status"), col("guarantee_status", "Guarantee", "status"), col("renews_at", "Renews", "day"),

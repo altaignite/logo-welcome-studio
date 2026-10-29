@@ -66,5 +66,6 @@ export async function verifyStripeSignature(payload: string, header: string | nu
 
 /** Writes an audit entry from server code (service role has no auth.uid, so record the actor explicitly). */
 export async function audit(admin: any, accountId: string, table: string, recordId: string, action: string, changes: Record<string, unknown>, actorId: string | null, actorLabel: string) {
-  await admin.from("audit_log").insert({ account_id: accountId, table_name: table, record_id: recordId, action, changes, actor_id: actorId, actor_label: actorLabel });
+  const { error } = await admin.from("audit_log").insert({ account_id: accountId, table_name: table, record_id: recordId, action, changes, actor_id: actorId, actor_label: actorLabel });
+  if (error) console.error("Audit log write failed", table, recordId, action, error.message);
 }

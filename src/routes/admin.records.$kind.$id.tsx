@@ -1,7 +1,7 @@
 import { createFileRoute, Link, getRouteApi, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { approveOverage, billOverage, collectionAction, createInvoice, guaranteeRefund, sendFirstInvoice, subscriptionAction } from "@/lib/billing.functions";
+import { approveOverage, billOverage, collectionAction, createInvoice, guaranteeRefund, sendFirstInvoice, subscriptionAction, voidInvoices } from "@/lib/billing.functions";
 import { stageLabel, unbilledOverage, type CollectionStage } from "@/lib/billing";
 import { useState } from "react";
 import { Archive, ArchiveRestore, Ban, Clock, CreditCard, MessageSquare, Pencil, Plus, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
@@ -25,7 +25,7 @@ function RecordPage() {
   const popup = usePopup();
   const [modal, setModal] = useState<Modal | null>(null);
   const cfg = isRecordKind(kind) ? recordKinds[kind] : null;
-  const fnFirst = useServerFn(sendFirstInvoice), fnSub = useServerFn(subscriptionAction), fnOver = useServerFn(billOverage), fnColl = useServerFn(collectionAction), fnApprove = useServerFn(approveOverage), fnInvoice = useServerFn(createInvoice), fnRefund = useServerFn(guaranteeRefund);
+  const fnFirst = useServerFn(sendFirstInvoice), fnSub = useServerFn(subscriptionAction), fnOver = useServerFn(billOverage), fnColl = useServerFn(collectionAction), fnApprove = useServerFn(approveOverage), fnInvoice = useServerFn(createInvoice), fnRefund = useServerFn(guaranteeRefund), fnVoid = useServerFn(voidInvoices);
 
   const { data, isLoading, error } = useQuery({
     enabled: !!cfg,
@@ -63,7 +63,6 @@ function RecordPage() {
       if (kind === "support_tickets") { patch.closed_at = v.status === "closed" ? (row.closed_at ?? new Date().toISOString()) : null; patch.updated_at = new Date().toISOString(); }
       if (kind === "projects" && v.status === "completed" && !row.completed_at) patch.completed_at = new Date().toISOString();
       if (kind === "compliance_requests") patch.completed_at = v.status === "open" ? null : (row.completed_at ?? new Date().toISOString());
-      if (kind === "subscriptions" && v.status === "cancelled" && !row.cancelled_at) patch.cancelled_at = new Date().toISOString();
       return done((await db.from(kind).update(patch).eq("id", id)).error);
     },
   });
@@ -79,7 +78,10 @@ function RecordPage() {
   const voidIt = () => setModal({
     title: `Void ${cfg.singular.toLowerCase()}`, submitLabel: "Void", description: "Voided records stay on file for tax and legal purposes.",
     fields: [{ name: "reason", label: "Reason", type: "textarea", required: true }],
-    onSubmit: async (v) => done((await db.from(kind).update({ status: "void", void_reason: v.reason }).eq("id", id)).error),
+    onSubmit: async (v) => {
+      if (kind === "invoices") { try { await fnVoid({ data: { invoiceIds: [id], reason: v.reason } }); await refresh(); return null; } catch (e) { return (e as Error).message; } }
+      return done((await db.from(kind).update({ status: "void", void_reason: v.reason }).eq("id", id)).error);
+    },
   });
   const archive = async () => { const r = await db.from(kind).update({ archived_at: row.archived_at ? null : new Date().toISOString() }).eq("id", id); if (r.error) popup({ type: "error", title: "Couldn't archive", description: r.error.message, secondaryLabel: null, primaryLabel: "Close" }); await refresh(); };
 

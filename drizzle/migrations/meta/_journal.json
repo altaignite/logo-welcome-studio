@@ -71,6 +71,13 @@
       "when": 1793290793024,
       "tag": "0009_client_plan_changes",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1793291393024,
+      "tag": "0010_billing_integrity",
+      "breakpoints": true
     }
   ]
 }

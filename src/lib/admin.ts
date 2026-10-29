@@ -50,6 +50,10 @@ export const accountStatusLabel: Record<AccountStatus, string> = {
 };
 /** Statuses that block the client from signing in. */
 export const signInBlocked = (s: string) => s === "suspended" || s === "closed";
+/** Statuses in which the client can't change their own plans (staff hold, suspension or closure). */
+export const clientActionsBlocked = (s: string) => ["on_hold", "suspended", "cancelled", "closed"].includes(s);
+/** Statuses in which the client can't order another plan. */
+export const orderingBlocked = (s: string) => s === "past_due" || clientActionsBlocked(s);
 /** What happens to running subscriptions when an account moves to a status. */
 export function subscriptionEffect(s: string): "paused" | "cancelled" | null {
   if (s === "on_hold" || s === "suspended") return "paused";

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { plans } from "@/lib/signup";
 import { planChangeTiming, profileUpdateSchema } from "@/lib/client";
+import { orderingBlocked } from "@/lib/admin";
 
 const uuid = z.string().uuid();
 const label = (c: { claims: any }) => String(c.claims?.email ?? "Client");
@@ -34,7 +35,7 @@ export const orderAdditionalPlan = createServerFn({ method: "POST" })
     const admin = await getAdmin();
     const plan = plans.find((p) => p.id === data.planId)!;
     const { data: prof } = await admin.from("profiles").select("account_number, company, first_name, last_name, status").eq("id", context.userId).single();
-    if (!prof || ["suspended", "closed"].includes(prof.status)) throw new Error("Your account can't place orders right now. Please contact support.");
+    if (!prof || orderingBlocked(prof.status)) throw new Error("Your account can't place orders right now. Please contact support.");
     const { count } = await admin.from("subscriptions").select("id", { count: "exact", head: true }).eq("user_id", context.userId).eq("status", "pending");
     if ((count ?? 0) >= 2) throw new Error("Please pay your open plan invoices before ordering another plan.");
     const app = await admin.from("applications").insert({ user_id: context.userId, account_number: prof.account_number, plan_id: plan.id, plan_name: plan.name, monthly_fee: plan.monthlyFee, monthly_hours: plan.monthlyHours, status: "approved", decided_at: new Date().toISOString() }).select("id").single();
@@ -55,10 +56,11 @@ export const changePlan = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ subscriptionId: uuid, planId: z.enum(["starter", "growth", "scale"]) }).parse(d))
   .handler(async ({ data, context }) => {
-    const { getAdmin } = await import("@/lib/billing.server");
+    const { getAdmin, assertClientMayAct } = await import("@/lib/billing.server");
     const { stripe, planPrice, audit } = await import("@/lib/stripe.server");
     const admin = await getAdmin();
     const sub = await ownSub(admin, data.subscriptionId, context.userId);
+    await assertClientMayAct(admin, context.userId);
     if (sub.status !== "active") throw new Error("Only active plans can be changed.");
     const plan = plans.find((p) => p.id === data.planId)!;
     const timing = planChangeTiming(sub.plan_name, plan.id);

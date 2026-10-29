@@ -1,10 +1,52 @@
 /** Server-only billing workflows shared by server functions, the Stripe webhook and the daily collections job. */
 import { audit, cents, ensureCustomer, planPrice, stripe } from "@/lib/stripe.server";
 import { autoStage, compoundInterest, daysOverdue, defaultRules, failedPaymentVoidsGuarantee, legalFee, monthsOverdue, round2, type BillingRules, type CollectionStage } from "@/lib/billing";
-import { guaranteeEnd } from "@/lib/admin";
+import { clientActionsBlocked, guaranteeEnd } from "@/lib/admin";
 
 type Admin = any;
 const today = () => new Date().toISOString().slice(0, 10);
+
+/** Unwraps a Supabase result. supabase-js returns errors instead of throwing, so writes must be checked to fail loudly (and let Stripe retry). */
+export function must(res: { data: any; error: { message: string } | null }): any {
+  if (res.error) throw new Error(`Database error: ${res.error.message}`);
+  return res.data;
+}
+
+/** Stops clients changing plans while staff hold, suspend or close their account (sign-in bans take up to an hour to apply). */
+export async function assertClientMayAct(admin: Admin, userId: string) {
+  const p = must(await admin.from("profiles").select("status").eq("id", userId).maybeSingle()) as { status: string } | null;
+  if (!p || clientActionsBlocked(p.status)) throw new Error("Your account is on hold. Please contact support.");
+}
+
+/** Applies a pause, resume or cancellation in Stripe before it's saved locally, so billing matches the local status. */
+export async function applyStripeStatus(sub: { stripe_subscription_id: string | null }, to: "paused" | "active" | "cancelled") {
+  const sid = sub.stripe_subscription_id;
+  if (!sid) return;
+  if (to === "paused") await stripe("POST", `subscriptions/${sid}`, { "pause_collection[behavior]": "void" });
+  else if (to === "active") await stripe("POST", `subscriptions/${sid}`, { pause_collection: "" });
+  else {
+    try { await stripe("DELETE", `subscriptions/${sid}`); }
+    catch (e) { if ((await stripe("GET", `subscriptions/${sid}`)).status !== "canceled") throw e; }
+  }
+}
+
+/** Voids an open Stripe invoice (or deletes a draft) before the local copy is voided. Paid invoices can't be voided. */
+export async function voidStripeInvoice(stripeInvoiceId: string) {
+  const s = await stripe("GET", `invoices/${stripeInvoiceId}`);
+  if (s.status === "void") return;
+  if (s.status === "paid") throw new Error(`Invoice ${s.number ?? stripeInvoiceId} is already paid in Stripe and can't be voided.`);
+  if (s.status === "draft") await stripe("DELETE", `invoices/${stripeInvoiceId}`);
+  else await stripe("POST", `invoices/${stripeInvoiceId}/void`);
+}
+
+/** Voids unpaid first invoices of a subscription that won't start, so the client can't pay for it later. */
+export async function voidOpenFirstInvoices(admin: Admin, subId: string, reason: string) {
+  const rows = must(await admin.from("invoices").select("id, stripe_invoice_id").eq("subscription_id", subId).eq("kind", "first").in("status", ["open", "overdue"])) ?? [];
+  for (const inv of rows) {
+    if (inv.stripe_invoice_id) await voidStripeInvoice(inv.stripe_invoice_id);
+    must(await admin.from("invoices").update({ status: "void", void_reason: reason, interest_paused: true }).eq("id", inv.id));
+  }
+}
 
 export async function getAdmin(): Promise<Admin> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -45,8 +87,15 @@ export async function issueStripeInvoice(admin: Admin, o: {
 
 /** Activation after the first invoice is paid: starts the Stripe subscription, project and guarantee window. */
 export async function activateSubscription(admin: Admin, subId: string) {
-  const { data: sub } = await admin.from("subscriptions").select("*").eq("id", subId).single();
+  const sub = must(await admin.from("subscriptions").select("*").eq("id", subId).maybeSingle());
   if (!sub || sub.status === "active") return;
+  if (sub.status !== "pending") {
+    // Paid after staff paused or cancelled it: don't start billing, flag it for staff instead.
+    const warning = `First invoice paid while the subscription was ${sub.status}. Review and refund or reactivate.`;
+    must(await admin.from("subscriptions").update({ payment_warning: warning }).eq("id", subId));
+    await audit(admin, sub.user_id, "subscriptions", subId, "payment_while_inactive", { status: sub.status, note: warning }, null, "Stripe");
+    return;
+  }
   const now = new Date(); const next = new Date(now); next.setMonth(next.getMonth() + 1);
   let stripeSubId: string | null = sub.stripe_subscription_id;
   if (!stripeSubId) {
@@ -60,56 +109,56 @@ export async function activateSubscription(admin: Admin, subId: string) {
     }, `sub-${subId}`);
     stripeSubId = s.id;
   }
-  await admin.from("subscriptions").update({
+  must(await admin.from("subscriptions").update({
     status: "active", started_at: now.toISOString(), first_paid_at: sub.first_paid_at ?? now.toISOString(), renews_at: next.toISOString(),
     guarantee_ends_at: guaranteeEnd(now).toISOString(), guarantee_status: "running", stripe_subscription_id: stripeSubId, payment_warning: null,
-  }).eq("id", subId);
-  await admin.from("projects").update({ status: "active", started_at: today() }).eq("subscription_id", subId).in("status", ["planned", "pending", "on_hold"]);
-  if (sub.application_id) await admin.from("applications").update({ status: "approved", decided_at: now.toISOString() }).eq("id", sub.application_id).in("status", ["submitted", "in_review", "escalated", "info_requested"]);
+  }).eq("id", subId));
+  must(await admin.from("projects").update({ status: "active", started_at: today() }).eq("subscription_id", subId).in("status", ["planned", "pending", "on_hold"]));
+  if (sub.application_id) must(await admin.from("applications").update({ status: "approved", decided_at: now.toISOString() }).eq("id", sub.application_id).in("status", ["submitted", "in_review", "escalated", "info_requested"]));
   await audit(admin, sub.user_id, "subscriptions", subId, "activated", { status: { from: sub.status, to: "active" }, reason: "First invoice paid" }, null, "Stripe");
 }
 
 /** Suspends subscription, its projects and its application after payment failure retries end. */
 export async function suspendForNonPayment(admin: Admin, subId: string, note: string) {
-  const { data: sub } = await admin.from("subscriptions").select("*").eq("id", subId).single();
+  const sub = must(await admin.from("subscriptions").select("*").eq("id", subId).maybeSingle());
   if (!sub || sub.status === "suspended" || sub.status === "cancelled") return;
   const warning = `Suspended for non-payment: ${note}`;
-  await admin.from("subscriptions").update({ status: "suspended", payment_warning: warning, notes: [sub.notes, `${today()} ${warning}`].filter(Boolean).join("\n") }).eq("id", subId);
-  await admin.from("projects").update({ status: "on_hold" }).eq("subscription_id", subId).eq("status", "active");
+  must(await admin.from("subscriptions").update({ status: "suspended", payment_warning: warning, notes: [sub.notes, `${today()} ${warning}`].filter(Boolean).join("\n") }).eq("id", subId));
+  must(await admin.from("projects").update({ status: "on_hold" }).eq("subscription_id", subId).eq("status", "active"));
   if (sub.application_id) {
-    await admin.from("applications").update({ status: "suspended" }).eq("id", sub.application_id);
+    must(await admin.from("applications").update({ status: "suspended" }).eq("id", sub.application_id));
     await admin.from("application_events").insert({ application_id: sub.application_id, actor_label: "Stripe", action: "Suspended for non-payment", to_status: "suspended", note });
   }
   await audit(admin, sub.user_id, "subscriptions", subId, "suspended", { status: { from: sub.status, to: "suspended" }, reason: note }, null, "Stripe");
 }
 
 export async function reinstateAfterPayment(admin: Admin, subId: string) {
-  const { data: sub } = await admin.from("subscriptions").select("*").eq("id", subId).single();
+  const sub = must(await admin.from("subscriptions").select("*").eq("id", subId).maybeSingle());
   if (!sub || (sub.status !== "suspended" && sub.status !== "past_due")) return;
-  await admin.from("subscriptions").update({ status: "active", payment_warning: null }).eq("id", subId);
-  await admin.from("projects").update({ status: "active" }).eq("subscription_id", subId).eq("status", "on_hold");
+  must(await admin.from("subscriptions").update({ status: "active", payment_warning: null }).eq("id", subId));
+  must(await admin.from("projects").update({ status: "active" }).eq("subscription_id", subId).eq("status", "on_hold"));
   if (sub.application_id && sub.status === "suspended") {
-    await admin.from("applications").update({ status: "approved" }).eq("id", sub.application_id).eq("status", "suspended");
+    must(await admin.from("applications").update({ status: "approved" }).eq("id", sub.application_id).eq("status", "suspended"));
     await admin.from("application_events").insert({ application_id: sub.application_id, actor_label: "Stripe", action: "Reinstated after payment", to_status: "approved", note: "Outstanding invoice paid" });
   }
   await audit(admin, sub.user_id, "subscriptions", subId, "reinstated", { status: { from: sub.status, to: "active" }, reason: "Payment received" }, null, "Stripe");
 }
 
 export async function markPastDue(admin: Admin, subId: string, note: string) {
-  const { data: sub } = await admin.from("subscriptions").select("*").eq("id", subId).single();
+  const sub = must(await admin.from("subscriptions").select("*").eq("id", subId).maybeSingle());
   if (!sub) return;
   const voids = failedPaymentVoidsGuarantee(sub.first_paid_at) && sub.guarantee_status === "running";
-  await admin.from("subscriptions").update({
+  must(await admin.from("subscriptions").update({
     status: sub.status === "suspended" ? "suspended" : "past_due", payment_warning: `Payment failed: ${note}`,
     ...(voids ? { guarantee_status: "void", guarantee_void_reason: "Failed payment after the initial successful payment" } : {}),
-  }).eq("id", subId);
+  }).eq("id", subId));
   await audit(admin, sub.user_id, "subscriptions", subId, "payment_failed", { note, ...(voids ? { guarantee: { from: "running", to: "void" } } : {}) }, null, "Stripe");
 }
 
 /** Daily run: accrue compound interest, move stages, add legal fees. Returns number of invoices touched. */
 export async function runCollections(admin: Admin, now = new Date()) {
   const rules = await loadRules(admin);
-  const { data: rows } = await admin.from("invoices").select("*").in("status", ["open", "overdue"]).neq("kind", "arrears").lt("due_at", now.toISOString().slice(0, 10));
+  const rows = must(await admin.from("invoices").select("*").in("status", ["open", "overdue"]).neq("kind", "arrears").lt("due_at", now.toISOString().slice(0, 10)));
   let touched = 0;
   for (const inv of rows ?? []) {
     const stage = inv.collection_stage as CollectionStage;
@@ -119,7 +168,7 @@ export async function runCollections(admin: Admin, now = new Date()) {
       const target = compoundInterest(Number(inv.amount), monthsOverdue(inv.due_at, now), Number(rules.monthly_interest_pct));
       const delta = round2(target - Number(inv.interest_accrued));
       if (delta > 0) {
-        await admin.from("invoice_charges").insert({ user_id: inv.user_id, invoice_id: inv.id, subscription_id: inv.subscription_id, kind: "interest", description: `Interest at ${rules.monthly_interest_pct}% monthly, compounded`, amount: delta });
+        must(await admin.from("invoice_charges").insert({ user_id: inv.user_id, invoice_id: inv.id, subscription_id: inv.subscription_id, kind: "interest", description: `Interest at ${rules.monthly_interest_pct}% monthly, compounded`, amount: delta }));
         patch.interest_accrued = target;
       }
     }
@@ -128,13 +177,13 @@ export async function runCollections(admin: Admin, now = new Date()) {
       patch.collection_stage = next; patch.stage_changed_at = now.toISOString();
       if (next === "legal") {
         const fee = legalFee(Number(inv.amount) + Number(patch.interest_accrued ?? inv.interest_accrued), rules);
-        await admin.from("invoice_charges").insert({ user_id: inv.user_id, invoice_id: inv.id, subscription_id: inv.subscription_id, kind: "legal_fee", description: `Legal and collection fee (${rules.legal_fee_pct}%, min $${rules.legal_fee_min})`, amount: fee });
+        must(await admin.from("invoice_charges").insert({ user_id: inv.user_id, invoice_id: inv.id, subscription_id: inv.subscription_id, kind: "legal_fee", description: `Legal and collection fee (${rules.legal_fee_pct}%, min $${rules.legal_fee_min})`, amount: fee }));
         patch.fees_accrued = round2(Number(inv.fees_accrued) + fee);
         patch.collection_notes = [inv.collection_notes, `${now.toISOString().slice(0, 10)} Moved to legal after ${rules.legal_after_days} days unpaid. Legal fee $${fee} added.`].filter(Boolean).join("\n");
       }
       await audit(admin, inv.user_id, "invoices", inv.id, "collection_stage", { collection_stage: { from: stage, to: next } }, null, "Collections");
     }
-    await admin.from("invoices").update(patch).eq("id", inv.id);
+    must(await admin.from("invoices").update(patch).eq("id", inv.id));
     touched++;
   }
   return touched;
@@ -150,6 +199,6 @@ export async function issueArrears(admin: Admin, invoiceId: string) {
     lines: charges.map((c: any) => ({ description: `${c.description} (${inv.number})`, amount: Number(c.amount) })),
     metadata: { original_invoice_id: invoiceId }, idem: `arrears-${invoiceId}-${charges.map((c: any) => c.id).join("").slice(0, 60)}`,
   });
-  await admin.from("invoice_charges").update({ billed_invoice_id: row.id }).in("id", charges.map((c: any) => c.id));
+  must(await admin.from("invoice_charges").update({ billed_invoice_id: row.id }).in("id", charges.map((c: any) => c.id)));
   return row;
 }

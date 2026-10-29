@@ -61,7 +61,7 @@ export const subscriptionAction = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => z.object({ subscriptionId: uuid, action: z.enum(["pause", "resume", "cancel_end", "cancel_now"]), reason: z.string().trim().min(3).max(1000) }).parse(d))
   .handler(async ({ data, context }) => {
     const staff = await isAdmin(context);
-    const { getAdmin } = await import("@/lib/billing.server");
+    const { getAdmin, applyStripeStatus, assertClientMayAct, voidOpenFirstInvoices } = await import("@/lib/billing.server");
     const { stripe, audit } = await import("@/lib/stripe.server");
     const { pauseVoidsGuarantee } = await import("@/lib/billing");
     const admin = await getAdmin();
@@ -69,24 +69,28 @@ export const subscriptionAction = createServerFn({ method: "POST" })
     if (!sub || (!staff && sub.user_id !== context.userId)) throw new Error("Subscription not found.");
     if (sub.status === "cancelled") throw new Error("This subscription is already cancelled.");
     if (!staff && sub.status === "suspended") throw new Error("Please settle the outstanding invoice or contact support.");
+    // Clients may still cancel during a staff hold, but not resume their own billing.
+    if (!staff && data.action === "resume") await assertClientMayAct(admin, context.userId);
     const sid = sub.stripe_subscription_id as string | null;
     const patch: any = {};
     const note = `${new Date().toISOString().slice(0, 10)} ${data.action.replace("_", " ")} by ${staff ? "staff" : "client"}: ${data.reason}`;
     if (data.action === "pause") {
       if (sub.status !== "active" && sub.status !== "past_due") throw new Error("Only active subscriptions can be paused.");
-      if (sid) await stripe("POST", `subscriptions/${sid}`, { "pause_collection[behavior]": "void" });
+      await applyStripeStatus(sub, "paused");
       patch.status = "paused";
       if (sub.guarantee_status === "running" && pauseVoidsGuarantee(sub.started_at)) { patch.guarantee_status = "void"; patch.guarantee_void_reason = "Paused within the first 90 days"; }
     } else if (data.action === "resume") {
       if (sub.status !== "paused") throw new Error("Only paused subscriptions can be resumed.");
-      if (sid) await stripe("POST", `subscriptions/${sid}`, { pause_collection: "" });
-      patch.status = "active";
+      await applyStripeStatus(sub, "active");
+      // A plan paused before its first payment goes back to waiting for that payment, not straight to active.
+      patch.status = sub.started_at ? "active" : "pending";
     } else if (data.action === "cancel_end") {
       if (sid) await stripe("POST", `subscriptions/${sid}`, { cancel_at_period_end: true });
       patch.cancel_at_period_end = true;
       patch.notes = [sub.notes, `Cancels at period end (${sub.renews_at?.slice(0, 10) ?? "next renewal"})`].filter(Boolean).join("\n");
     } else {
-      if (sid) await stripe("DELETE", `subscriptions/${sid}`);
+      await applyStripeStatus(sub, "cancelled");
+      if (sub.status === "pending") await voidOpenFirstInvoices(admin, sub.id, `Subscription cancelled: ${data.reason}`);
       patch.status = "cancelled"; patch.cancelled_at = new Date().toISOString();
       await admin.from("projects").update({ status: "cancelled" }).eq("subscription_id", sub.id).in("status", ["planned", "active", "on_hold"]);
     }
@@ -103,7 +107,7 @@ export const billOverage = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => z.object({ subscriptionId: uuid, when: z.enum(["next_invoice", "now"]) }).parse(d))
   .handler(async ({ data, context }) => {
     await requireAdmin(context);
-    const { getAdmin, issueStripeInvoice, loadRules } = await import("@/lib/billing.server");
+    const { getAdmin, issueStripeInvoice, loadRules, must } = await import("@/lib/billing.server");
     const { stripe, ensureCustomer, cents } = await import("@/lib/stripe.server");
     const { unbilledOverage, overageAmount } = await import("@/lib/billing");
     const admin = await getAdmin();
@@ -112,19 +116,29 @@ export const billOverage = createServerFn({ method: "POST" })
     if (!sub) throw new Error("Subscription not found.");
     const hours = unbilledOverage(Number(sub.hours_used), Number(sub.monthly_hours), Number(sub.overage_billed_hours));
     if (hours <= 0) throw new Error("There are no unbilled extra hours.");
+    if (data.when === "next_invoice" && !sub.stripe_subscription_id) throw new Error("This plan isn't billed monthly in Stripe yet. Bill the extra hours now instead.");
+    const billedBefore = Number(sub.overage_billed_hours);
+    // Claim the hours first so a double click or a second staff member can't bill them twice.
+    const claimed = must(await admin.from("subscriptions").update({ overage_billed_hours: billedBefore + hours }).eq("id", sub.id).eq("overage_billed_hours", billedBefore).select("id"));
+    if (!claimed?.length) throw new Error("These hours were just billed. Refresh to see the latest.");
+    const release = () => admin.from("subscriptions").update({ overage_billed_hours: billedBefore }).eq("id", sub.id).eq("overage_billed_hours", billedBefore + hours);
     const amount = overageAmount(hours, sub.plan_name, rules);
     const desc = `${hours} extra hours at $${rules.overage_rates[sub.plan_name] ?? 60}/hour`;
     let stripeItem: string | null = null; let billed: string | null = null;
-    if (data.when === "now") {
-      const inv = await issueStripeInvoice(admin, { userId: sub.user_id, subscriptionId: sub.id, kind: "overage", description: "Extra service hours", lines: [{ description: desc, amount }], idem: `ovr-${sub.id}-${sub.overage_billed_hours}-${hours}` });
-      billed = inv.id;
-    } else {
-      const customer = await ensureCustomer(admin, sub.user_id);
-      const it = await stripe("POST", "invoiceitems", { customer, currency: "usd", amount: cents(amount), description: desc, ...(sub.stripe_subscription_id ? { subscription: sub.stripe_subscription_id } : {}) }, `ovr-item-${sub.id}-${sub.overage_billed_hours}-${hours}`);
-      stripeItem = it.id;
+    try {
+      if (data.when === "now") {
+        const inv = await issueStripeInvoice(admin, { userId: sub.user_id, subscriptionId: sub.id, kind: "overage", description: "Extra service hours", lines: [{ description: desc, amount }], idem: `ovr-${sub.id}-${billedBefore}-${hours}` });
+        billed = inv.id;
+      } else {
+        const customer = await ensureCustomer(admin, sub.user_id);
+        const it = await stripe("POST", "invoiceitems", { customer, currency: "usd", amount: cents(amount), description: desc, subscription: sub.stripe_subscription_id }, `ovr-item-${sub.id}-${billedBefore}-${hours}`);
+        stripeItem = it.id;
+      }
+    } catch (e) {
+      await release();
+      throw e;
     }
-    await admin.from("invoice_charges").insert({ user_id: sub.user_id, subscription_id: sub.id, kind: "overage", description: desc, amount, stripe_item_id: stripeItem, billed_invoice_id: billed, actor_label: actorLabel(context) });
-    await admin.from("subscriptions").update({ overage_billed_hours: Number(sub.overage_billed_hours) + hours }).eq("id", sub.id);
+    must(await admin.from("invoice_charges").insert({ user_id: sub.user_id, subscription_id: sub.id, kind: "overage", description: desc, amount, stripe_item_id: stripeItem, billed_invoice_id: billed, actor_label: actorLabel(context) }));
     return { hours, amount };
   });
 
@@ -134,11 +148,12 @@ export const approveOverage = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => z.object({ taskId: uuid }).parse(d))
   .handler(async ({ data, context }) => {
     const staff = await isAdmin(context);
-    const { getAdmin } = await import("@/lib/billing.server");
+    const { getAdmin, assertClientMayAct } = await import("@/lib/billing.server");
     const { audit } = await import("@/lib/stripe.server");
     const admin = await getAdmin();
     const { data: t } = await admin.from("tasks").select("id, user_id").eq("id", data.taskId).single();
     if (!t || (!staff && t.user_id !== context.userId)) throw new Error("Task not found.");
+    if (!staff) await assertClientMayAct(admin, context.userId);
     await admin.from("tasks").update({ overage_approved: true }).eq("id", t.id);
     await audit(admin, t.user_id, "tasks", t.id, "overage_approved", { overage_approved: { from: false, to: true } }, context.userId, actorLabel(context));
     return { ok: true };
@@ -157,9 +172,11 @@ export const collectionAction = createServerFn({ method: "POST" })
     await requireAdmin(context);
     const { getAdmin, issueArrears } = await import("@/lib/billing.server");
     const { audit, stripe } = await import("@/lib/stripe.server");
+    const { collectionActionAllowed } = await import("@/lib/billing");
     const admin = await getAdmin();
     const { data: inv } = await admin.from("invoices").select("*").eq("id", data.invoiceId).single();
     if (!inv) throw new Error("Invoice not found.");
+    if (!collectionActionAllowed(data.action, inv.status)) throw new Error("Only unpaid invoices can be moved through collections.");
     const stamp = `${new Date().toISOString().slice(0, 10)} ${actorLabel(context)}: ${data.note}`;
     const patch: any = { collection_notes: [inv.collection_notes, stamp].filter(Boolean).join("\n") };
     const setStage = (s: string) => { patch.collection_stage = s; patch.stage_changed_at = new Date().toISOString(); };
@@ -235,24 +252,51 @@ export const guaranteeRefund = createServerFn({ method: "POST" })
     const { getAdmin } = await import("@/lib/billing.server");
     const { stripe, cents, audit } = await import("@/lib/stripe.server");
     const { guaranteeEligible } = await import("@/lib/admin");
+    const { planRefund } = await import("@/lib/billing");
     const admin = await getAdmin();
     const { data: sub } = await admin.from("subscriptions").select("*").eq("id", data.subscriptionId).single();
     if (!sub || sub.guarantee_status !== "running" || !guaranteeEligible(sub)) throw new Error("This subscription isn't eligible for a guarantee refund.");
-    const { data: paid } = await admin.from("invoices").select("stripe_invoice_id, amount").eq("subscription_id", sub.id).eq("status", "paid").not("stripe_invoice_id", "is", null).in("kind", ["first", "renewal", "service"]);
-    const paidTotal = (paid ?? []).reduce((s: number, i: any) => s + Number(i.amount), 0);
-    if (data.amount > paidTotal) throw new Error(`You can refund at most $${paidTotal} of paid service fees.`);
-    let left = data.amount;
+    const { data: paid } = await admin.from("invoices").select("stripe_invoice_id").eq("subscription_id", sub.id).eq("status", "paid").not("stripe_invoice_id", "is", null).in("kind", ["first", "renewal", "service"]);
+    // What's still refundable comes from Stripe, so refunds made earlier (or by a retry after a partial failure) are never repeated.
+    const sources: { pi: string; refundable: number; refunded: number }[] = [];
     for (const i of paid ?? []) {
-      if (left <= 0) break;
       const inv = await stripe("GET", `invoices/${i.stripe_invoice_id}`, { "expand[]": "payments" });
-      const pi = inv.payment_intent ?? inv.payments?.data?.[0]?.payment?.payment_intent;
+      const raw = inv.payment_intent ?? inv.payments?.data?.[0]?.payment?.payment_intent;
+      const pi = typeof raw === "string" ? raw : raw?.id;
       if (!pi) continue;
-      const amt = Math.min(left, Number(i.amount));
-      await stripe("POST", "refunds", { payment_intent: typeof pi === "string" ? pi : pi.id, amount: cents(amt), "metadata[reason]": "90-day guarantee" }, `refund-${i.stripe_invoice_id}-${cents(amt)}`);
-      left -= amt;
+      const intent = await stripe("GET", `payment_intents/${pi}`, { "expand[]": "latest_charge" });
+      const charge = intent.latest_charge;
+      const refunded = Number(charge?.amount_refunded ?? 0);
+      const refundable = Number(charge?.amount_captured ?? intent.amount_received ?? 0) - refunded;
+      if (refundable > 0) sources.push({ pi, refundable, refunded });
     }
-    if (left > 0) throw new Error("Part of the refund couldn't be matched to a card payment. Please refund the rest in Stripe.");
+    const plan = planRefund(cents(data.amount), sources);
+    if (!plan) throw new Error(`You can refund at most $${sources.reduce((s, x) => s + x.refundable, 0) / 100} of paid service fees.`);
+    for (const p of plan) {
+      await stripe("POST", "refunds", { payment_intent: p.pi, amount: p.amount, "metadata[reason]": "90-day guarantee", "metadata[subscription_id]": sub.id }, `refund-${p.pi}-${p.refunded}-${p.amount}`);
+    }
     await admin.from("subscriptions").update({ guarantee_status: "refunded" }).eq("id", sub.id);
     await audit(admin, sub.user_id, "subscriptions", sub.id, "guarantee_refund", { amount: data.amount, reason: data.reason }, context.userId, actorLabel(context));
     return { ok: true };
+  });
+
+/** Voids unpaid invoices in Stripe first, then locally, so a voided invoice can't still be paid. Paid invoices are skipped. */
+export const voidInvoices = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ invoiceIds: z.array(uuid).min(1).max(100), reason: z.string().trim().min(3).max(1000) }).parse(d))
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context);
+    const { getAdmin, must, voidStripeInvoice } = await import("@/lib/billing.server");
+    const { audit } = await import("@/lib/stripe.server");
+    const admin = await getAdmin();
+    const rows = must(await admin.from("invoices").select("*").in("id", data.invoiceIds)) ?? [];
+    let voided = 0, skipped = 0;
+    for (const inv of rows) {
+      if (inv.status === "paid" || inv.status === "void") { skipped++; continue; }
+      if (inv.stripe_invoice_id) await voidStripeInvoice(inv.stripe_invoice_id);
+      must(await admin.from("invoices").update({ status: "void", void_reason: data.reason, interest_paused: true }).eq("id", inv.id));
+      await audit(admin, inv.user_id, "invoices", inv.id, "void", { status: { from: inv.status, to: "void" }, reason: data.reason }, context.userId, actorLabel(context));
+      voided++;
+    }
+    return { voided, skipped };
   });
