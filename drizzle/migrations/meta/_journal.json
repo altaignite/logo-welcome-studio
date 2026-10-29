@@ -43,6 +43,13 @@
       "when": 1793288211212,
       "tag": "0005_stripe_billing_collections",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793288888004,
+      "tag": "0006_client_ticket_scope",
+      "breakpoints": true
     }
   ]
 }
