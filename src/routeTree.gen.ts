@@ -21,6 +21,7 @@ import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
 import { Route as AdminSupportRouteImport } from './routes/admin.support'
 import { Route as AdminTaskforceRouteImport } from './routes/admin.taskforce'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard.index'
+import { Route as DashboardSectionRouteImport } from './routes/dashboard.$section'
 import { Route as AdminAccountsIndexRouteImport } from './routes/admin.accounts.index'
 import { Route as AdminAccountsIdRouteImport } from './routes/admin.accounts.$id'
 import { Route as AdminApplicationsIndexRouteImport } from './routes/admin.applications.index'
@@ -89,6 +90,11 @@ const DashboardIndexRoute = DashboardIndexRouteImport.update({
   path: '/',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardSectionRoute = DashboardSectionRouteImport.update({
+  id: '/$section',
+  path: '/$section',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const AdminAccountsIndexRoute = AdminAccountsIndexRouteImport.update({
   id: '/accounts/',
   path: '/accounts/',
@@ -137,6 +143,7 @@ export interface FileRoutesByFullPath {
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/support': typeof AdminSupportRoute
   '/admin/taskforce': typeof AdminTaskforceRoute
+  '/dashboard/$section': typeof DashboardSectionRoute
   '/admin/': typeof AdminIndexRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/admin/accounts/$id': typeof AdminAccountsIdRoute
@@ -156,6 +163,7 @@ export interface FileRoutesByTo {
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/support': typeof AdminSupportRoute
   '/admin/taskforce': typeof AdminTaskforceRoute
+  '/dashboard/$section': typeof DashboardSectionRoute
   '/admin': typeof AdminIndexRoute
   '/dashboard': typeof DashboardIndexRoute
   '/admin/accounts/$id': typeof AdminAccountsIdRoute
@@ -178,6 +186,7 @@ export interface FileRoutesById {
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/support': typeof AdminSupportRoute
   '/admin/taskforce': typeof AdminTaskforceRoute
+  '/dashboard/$section': typeof DashboardSectionRoute
   '/admin/': typeof AdminIndexRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/admin/accounts/$id': typeof AdminAccountsIdRoute
@@ -201,6 +210,7 @@ export interface FileRouteTypes {
     | '/admin/settings'
     | '/admin/support'
     | '/admin/taskforce'
+    | '/dashboard/$section'
     | '/admin/'
     | '/dashboard/'
     | '/admin/accounts/$id'
@@ -220,6 +230,7 @@ export interface FileRouteTypes {
     | '/admin/settings'
     | '/admin/support'
     | '/admin/taskforce'
+    | '/dashboard/$section'
     | '/admin'
     | '/dashboard'
     | '/admin/accounts/$id'
@@ -241,6 +252,7 @@ export interface FileRouteTypes {
     | '/admin/settings'
     | '/admin/support'
     | '/admin/taskforce'
+    | '/dashboard/$section'
     | '/admin/'
     | '/dashboard/'
     | '/admin/accounts/$id'
@@ -350,6 +362,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardIndexRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/$section': {
+      id: '/dashboard/$section'
+      path: '/$section'
+      fullPath: '/dashboard/$section'
+      preLoaderRoute: typeof DashboardSectionRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/admin/accounts/': {
       id: '/admin/accounts/'
       path: '/accounts'
@@ -429,10 +448,12 @@ const AdminRouteChildren: AdminRouteChildren = {
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
 interface DashboardRouteChildren {
+  DashboardSectionRoute: typeof DashboardSectionRoute
   DashboardIndexRoute: typeof DashboardIndexRoute
 }
 
 const DashboardRouteChildren: DashboardRouteChildren = {
+  DashboardSectionRoute: DashboardSectionRoute,
   DashboardIndexRoute: DashboardIndexRoute,
 }
 
