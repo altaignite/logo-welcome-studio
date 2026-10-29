@@ -61,20 +61,20 @@ function Login() {
           </div>
         </div>
 
-        <section className="relative -mt-8 flex flex-1 flex-col items-center rounded-t-[2rem] bg-background px-6 pb-8 pt-8 sm:px-12 lg:mt-0 lg:rounded-none lg:bg-transparent lg:px-14 lg:py-12">
-          <img src={logo.url} alt="FP logo" className="h-12 w-12 object-contain sm:h-14 sm:w-14" />
+        <section className="relative -mt-6 flex flex-1 flex-col items-center rounded-t-[1.5rem] bg-background px-5 pb-6 pt-5 sm:px-12 lg:mt-0 lg:rounded-none lg:bg-transparent lg:px-14 lg:py-12">
+          <img src={logo.url} alt="FP logo" className="h-10 w-10 object-contain sm:h-14 sm:w-14" />
 
-          <div className="mt-6 text-center lg:mt-12">
-            <h1 className="text-[1.75rem] font-extrabold tracking-tight text-foreground sm:text-4xl">WELCOME BACK!</h1>
-            <p className="mt-2 text-sm text-muted-foreground sm:text-base">Access your personal account by logging in.</p>
+          <div className="mt-3 text-center lg:mt-12">
+            <h1 className="text-2xl font-extrabold tracking-tight text-foreground sm:text-4xl">WELCOME BACK!</h1>
+            <p className="mt-1 text-sm text-muted-foreground sm:mt-2 sm:text-base">Access your personal account by logging in.</p>
           </div>
 
-          <form className="mt-8 w-full max-w-md space-y-5" onSubmit={onSubmit} noValidate>
-            <div className="space-y-2">
-              <label htmlFor="email" className="pl-1 text-sm font-semibold text-foreground">Email Address or Username</label>
+          <form className="mt-5 w-full max-w-md space-y-4 sm:mt-8 sm:space-y-5" onSubmit={onSubmit} noValidate>
+            <div className="space-y-1.5 sm:space-y-2">
+              <label htmlFor="email" className="pl-1 text-sm font-semibold text-foreground">Email Address</label>
               <div className="relative">
-                <Mail className="pointer-events-none absolute left-5 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                <input id="email" name="email" type="text" autoComplete="username" placeholder="Enter your email" className={input} />
+                <Mail className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground sm:left-5" />
+                <input id="email" name="email" type="email" autoComplete="email" inputMode="email" placeholder="Enter your email" className={input} />
               </div>
             </div>
             <div className="space-y-2">
