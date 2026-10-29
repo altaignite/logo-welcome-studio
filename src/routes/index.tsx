@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
+import { usePopup } from "@/components/popup";
 import logo from "@/assets/logo.png.asset.json";
 import hero from "@/assets/login-hero.jpg";
 
@@ -33,13 +34,31 @@ const input =
 
 function Login() {
   const [remember, setRemember] = useState(false);
+  const popup = usePopup();
+  const soon = (what: string) =>
+    popup({ type: "info", title: `${what} is coming soon`, description: "This option isn't available yet.", primaryLabel: "Got it", secondaryLabel: null });
+  const onSubmit = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const f = new FormData(e.currentTarget);
+    const email = String(f.get("email") ?? "").trim();
+    const pw = String(f.get("password") ?? "");
+    if (!email || !pw) {
+      popup({ type: "error", title: "Please fill in your email and password", description: "Both fields are needed to log in." });
+      return;
+    }
+    if (pw.length < 6) {
+      popup({ type: "error", title: "Something went wrong while trying to log you in", description: "Try again or come back later." });
+      return;
+    }
+    popup({ type: "success", title: "Welcome back!", description: "You're logged in successfully.", primaryLabel: "Continue", secondaryLabel: null });
+  };
   return (
     <main className="min-h-screen bg-secondary sm:p-6 lg:flex lg:items-center lg:justify-center lg:p-10">
       <div className="mx-auto grid min-h-screen w-full max-w-6xl bg-card sm:min-h-0 sm:rounded-3xl sm:shadow-xl lg:grid-cols-2 lg:p-6">
         <div className="relative h-56 sm:h-72 lg:order-2 lg:h-auto">
           <img
             src={hero}
-            alt="Portrait in a linen blazer and red sunglasses"
+            alt="Marketing strategist presenting growth plans"
             width={896}
             height={1152}
             className="h-full w-full object-cover object-top sm:rounded-t-3xl lg:rounded-2xl"
@@ -54,32 +73,32 @@ function Login() {
             <p className="mt-2 text-sm text-muted-foreground">Access your personal account by logging in.</p>
           </div>
 
-          <form className="mt-8 w-full max-w-md space-y-5" onSubmit={(e) => e.preventDefault()}>
+          <form className="mt-8 w-full max-w-md space-y-5" onSubmit={onSubmit} noValidate>
             <div className="space-y-2">
               <label htmlFor="email" className="text-sm font-medium text-foreground">Email Address or Username</label>
-              <input id="email" type="text" placeholder="Enter your email" className={input} />
+              <input id="email" name="email" type="text" placeholder="Enter your email" className={input} />
             </div>
             <div className="space-y-2">
               <label htmlFor="password" className="text-sm font-medium text-foreground">Password</label>
-              <input id="password" type="password" placeholder="Enter your password" className={input} />
+              <input id="password" name="password" type="password" placeholder="Enter your password" className={input} />
             </div>
             <div className="flex items-center justify-between gap-3 text-sm">
               <label className="flex cursor-pointer items-center gap-2 text-muted-foreground">
                 <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="h-4 w-4 rounded-full accent-primary" />
                 Remember me
               </label>
-              <a href="#" className="font-medium text-foreground hover:text-primary">Forgot Password</a>
+              <button type="button" onClick={() => soon("Password reset")} className="font-medium text-foreground hover:text-primary">Forgot Password</button>
             </div>
             <button type="submit" className="h-12 w-full rounded-full bg-foreground text-sm font-medium text-background transition hover:bg-primary">
               Log In
             </button>
-            <button type="button" className="flex h-12 w-full items-center justify-center gap-2 rounded-full border border-input bg-secondary text-sm font-medium text-foreground transition hover:bg-muted">
+            <button type="button" onClick={() => soon("Google sign-in")} className="flex h-12 w-full items-center justify-center gap-2 rounded-full border border-input bg-secondary text-sm font-medium text-foreground transition hover:bg-muted">
               <GoogleIcon /> Sign In with Google
             </button>
           </form>
 
           <p className="mt-10 text-sm text-muted-foreground lg:mt-auto lg:pt-12">
-            Don't have an account ? <a href="#" className="ml-1 font-medium text-foreground hover:text-primary">Sign up</a>
+            Don't have an account ? <button type="button" onClick={() => soon("Sign up")} className="ml-1 font-medium text-foreground hover:text-primary">Sign up</button>
           </p>
         </section>
       </div>
