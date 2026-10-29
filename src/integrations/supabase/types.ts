@@ -636,6 +636,7 @@ export type Database = {
         Row: {
           application_id: string | null
           archived_at: string | null
+          cancel_at_period_end: boolean
           cancelled_at: string | null
           created_at: string
           first_paid_at: string | null
@@ -649,6 +650,7 @@ export type Database = {
           notes: string | null
           overage_billed_hours: number
           payment_warning: string | null
+          pending_plan_id: string | null
           plan_name: string
           renews_at: string | null
           sales_received: boolean
@@ -660,6 +662,7 @@ export type Database = {
         Insert: {
           application_id?: string | null
           archived_at?: string | null
+          cancel_at_period_end?: boolean
           cancelled_at?: string | null
           created_at?: string
           first_paid_at?: string | null
@@ -673,6 +676,7 @@ export type Database = {
           notes?: string | null
           overage_billed_hours?: number
           payment_warning?: string | null
+          pending_plan_id?: string | null
           plan_name: string
           renews_at?: string | null
           sales_received?: boolean
@@ -684,6 +688,7 @@ export type Database = {
         Update: {
           application_id?: string | null
           archived_at?: string | null
+          cancel_at_period_end?: boolean
           cancelled_at?: string | null
           created_at?: string
           first_paid_at?: string | null
@@ -697,6 +702,7 @@ export type Database = {
           notes?: string | null
           overage_billed_hours?: number
           payment_warning?: string | null
+          pending_plan_id?: string | null
           plan_name?: string
           renews_at?: string | null
           sales_received?: boolean
