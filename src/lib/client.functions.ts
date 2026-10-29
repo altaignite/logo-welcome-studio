@@ -63,13 +63,13 @@ export const changePlan = createServerFn({ method: "POST" })
     const plan = plans.find((p) => p.id === data.planId)!;
     const timing = planChangeTiming(sub.plan_name, plan.id);
     if (timing === "same") { await admin.from("subscriptions").update({ pending_plan_id: null }).eq("id", sub.id); return { timing }; }
-    if (timing === "now") {
-      if (sub.stripe_subscription_id) {
+    if (sub.stripe_subscription_id) {
         const s = await stripe("GET", `subscriptions/${sub.stripe_subscription_id}`);
         const item = s.items?.data?.[0]?.id;
         if (!item) throw new Error("Couldn't find the plan in billing.");
-        await stripe("POST", `subscriptions/${sub.stripe_subscription_id}`, { "items[0][id]": item, "items[0][price]": await planPrice(plan.name, plan.monthlyFee), proration_behavior: "always_invoice" });
-      }
+        await stripe("POST", `subscriptions/${sub.stripe_subscription_id}`, { "items[0][id]": item, "items[0][price]": await planPrice(plan.name, plan.monthlyFee), proration_behavior: timing === "now" ? "always_invoice" : "none" });
+    }
+    if (timing === "now") {
       await admin.from("subscriptions").update({ plan_name: plan.name, monthly_fee: plan.monthlyFee, monthly_hours: plan.monthlyHours, pending_plan_id: null }).eq("id", sub.id);
     } else {
       await admin.from("subscriptions").update({ pending_plan_id: plan.id }).eq("id", sub.id);
