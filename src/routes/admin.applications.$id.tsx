@@ -5,7 +5,7 @@ import { ArrowLeft, Check, Circle, MessageSquare, UserCheck } from "lucide-react
 import { supabase } from "@/integrations/supabase/client";
 import { StatusBadge } from "@/components/admin/data-table";
 import { usePopup } from "@/components/popup";
-import { formatAccount, formatDate, money, statusLabel, workflowActions, workflowStages, type WorkflowAction } from "@/lib/admin";
+import { formatAccount, formatDate, money, statusLabel, workflowActions, workflowStages, type WorkflowAction, type AppStatus } from "@/lib/admin";
 
 export const Route = createFileRoute("/admin/applications/$id")({ component: ApplicationDetail });
 const adminRoute = getRouteApi("/admin");
@@ -31,7 +31,7 @@ function ApplicationDetail() {
     },
   });
   const refresh = () => qc.invalidateQueries({ queryKey: ["admin"] });
-  const log = (action: string, extra: { from_status?: typeof app.status; to_status?: typeof app.status; note?: string } = {}) =>
+  const log = (action: string, extra: { from_status?: AppStatus; to_status?: AppStatus; note?: string } = {}) =>
     supabase.from("application_events").insert({ application_id: id, actor_id: adminId, actor_label: adminEmail, action, ...extra });
 
   if (error) return <p className="text-sm text-destructive">{(error as Error).message}</p>;
