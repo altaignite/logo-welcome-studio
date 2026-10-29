@@ -4,7 +4,7 @@ import type { FieldDef } from "@/components/admin/form-modal";
 export type Fmt = "text" | "money" | "date" | "day" | "status" | "bool" | "hours" | "long";
 export type RecordKind = "subscriptions" | "projects" | "invoices" | "transactions" | "support_tickets" | "crm_activities" | "tasks" | "contacts" | "compliance_requests";
 
-export type Child = { label: string; kind: RecordKind | "time_entries" | "ticket_messages"; fk: string; columns: [string, string, Fmt][] };
+export type Child = { label: string; kind: RecordKind | "time_entries" | "ticket_messages" | "invoice_charges"; fk: string; columns: [string, string, Fmt][] };
 export type Parent = { label: string; kind: RecordKind | "applications"; fk: string };
 
 export type KindConfig = {
@@ -34,7 +34,8 @@ export const recordKinds: Record<RecordKind, KindConfig> = {
     title: (r) => `${s(r.plan_name)} subscription`,
     fields: [["Plan", "plan_name", "text"], ["Status", "status", "status"], ["Monthly fee", "monthly_fee", "money"], ["Monthly hours", "monthly_hours", "hours"],
       ["Hours used this period", "hours_used", "hours"], ["Started", "started_at", "date"], ["Renews", "renews_at", "date"], ["Cancelled", "cancelled_at", "date"],
-      ["Guarantee ends", "guarantee_ends_at", "date"], ["Guarantee", "guarantee_status", "status"], ["Sales received", "sales_received", "bool"], ["Notes", "notes", "long"]],
+      ["Guarantee ends", "guarantee_ends_at", "date"], ["Guarantee", "guarantee_status", "status"], ["Guarantee void reason", "guarantee_void_reason", "long"], ["Sales received", "sales_received", "bool"],
+      ["Extra hours billed", "overage_billed_hours", "hours"], ["Payment warning", "payment_warning", "long"], ["Notes", "notes", "long"]],
     edit: [{ name: "plan_name", label: "Plan name", required: true }, { name: "monthly_fee", label: "Monthly fee (USD)", type: "number", required: true },
       { name: "monthly_hours", label: "Monthly hours", type: "number", required: true }, sel("status", "Status", ["pending", "active", "paused", "cancelled"]),
       sel("sales_received", "Sales received", ["no", "yes"]), sel("guarantee_status", "Guarantee", ["not_started", "running", "claimed", "refunded", "expired", "denied"]),
@@ -66,11 +67,12 @@ export const recordKinds: Record<RecordKind, KindConfig> = {
     singular: "Invoice", plural: "Invoices", voidable: true,
     title: (r) => `Invoice ${s(r.number)}`,
     fields: [["Number", "number", "text"], ["Amount", "amount", "money"], ["Status", "status", "status"], ["Issued", "issued_at", "day"], ["Due", "due_at", "day"],
-      ["Paid", "paid_at", "date"], ["Description", "description", "long"], ["Void reason", "void_reason", "long"]],
-    edit: [{ name: "description", label: "Description", required: true }, { name: "amount", label: "Amount (USD)", type: "number", required: true },
-      sel("status", "Status", ["open", "overdue", "paid"]), { name: "due_at", label: "Due date", type: "date" }],
+      ["Paid", "paid_at", "date"], ["Type", "kind", "text"], ["Collection stage", "collection_stage", "status"], ["Interest accrued", "interest_accrued", "money"],
+      ["Legal and court fees", "fees_accrued", "money"], ["Interest paused", "interest_paused", "bool"], ["Description", "description", "long"], ["Collection notes", "collection_notes", "long"], ["Void reason", "void_reason", "long"]],
+    edit: [{ name: "description", label: "Description", required: true }],
     parents: [{ label: "Subscription", kind: "subscriptions", fk: "subscription_id" }],
-    children: [{ label: "Payments", kind: "transactions", fk: "invoice_id", columns: [["Reference", "reference", "text"], ["Amount", "amount", "money"], ["Method", "method", "text"], ["Date", "created_at", "date"]] }],
+    children: [{ label: "Interest and fees", kind: "invoice_charges", fk: "invoice_id", columns: [["Date", "created_at", "date"], ["Type", "kind", "text"], ["Charge", "description", "text"], ["Amount", "amount", "money"]] },
+      { label: "Payments", kind: "transactions", fk: "invoice_id", columns: [["Reference", "reference", "text"], ["Amount", "amount", "money"], ["Method", "method", "text"], ["Date", "created_at", "date"]] }],
   },
   transactions: {
     singular: "Transaction", plural: "Transactions", voidable: true,
@@ -103,8 +105,9 @@ export const recordKinds: Record<RecordKind, KindConfig> = {
     singular: "Task", plural: "Tasks",
     title: (r) => s(r.title),
     fields: [["Task", "title", "text"], ["Status", "status", "status"], ["Priority", "priority", "text"], ["Due", "due_at", "day"], ["Assigned to", "assigned_to", "text"],
-      ["Completed", "completed_at", "date"], ["Created by", "actor_label", "text"], ["Details", "details", "long"]],
-    edit: [{ name: "title", label: "Task", required: true }, sel("status", "Status", ["open", "in_progress", "completed", "cancelled"]), sel("priority", "Priority", ["low", "normal", "high", "urgent"]),
+      ["Completed", "completed_at", "date"], ["Estimated hours", "estimated_hours", "hours"], ["Over allowance", "over_allowance", "bool"], ["Extra hours approved", "overage_approved", "bool"],
+      ["Created by", "actor_label", "text"], ["Details", "details", "long"]],
+    edit: [{ name: "title", label: "Task", required: true }, sel("status", "Status", ["open", "in_progress", "review", "completed", "cancelled"]), sel("priority", "Priority", ["low", "normal", "high", "urgent"]),
       { name: "due_at", label: "Due date", type: "date" }, { name: "assigned_to", label: "Assigned to" }, { name: "details", label: "Details", type: "textarea" }],
     parents: [{ label: "Subscription", kind: "subscriptions", fk: "subscription_id" }, { label: "Project", kind: "projects", fk: "project_id" }],
   },
