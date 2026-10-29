@@ -1,7 +1,7 @@
 import { createFileRoute, Link, Outlet, redirect, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { FileText, LogOut, Menu, Users, X } from "lucide-react";
+import { FileText, LifeBuoy, ListChecks, LogOut, Menu, Settings, Users, X } from "lucide-react";
 import logo from "@/assets/logo.png.asset.json";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -31,6 +31,9 @@ export const Route = createFileRoute("/admin")({
 const nav = [
   { to: "/admin/accounts", label: "Accounts", icon: Users },
   { to: "/admin/applications", label: "Applications", icon: FileText },
+  { to: "/admin/taskforce", label: "Taskforce", icon: ListChecks },
+  { to: "/admin/support", label: "Support", icon: LifeBuoy },
+  { to: "/admin/settings", label: "Billing rules", icon: Settings },
 ] as const;
 
 function AdminLayout() {

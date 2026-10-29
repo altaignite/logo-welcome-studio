@@ -35,10 +35,10 @@ export async function issueStripeInvoice(admin: Admin, o: {
   await stripe("POST", `invoices/${inv.id}/send`, {}, `send-${o.idem}`).catch(() => null);
   const total = round2(o.lines.reduce((s, l) => s + l.amount, 0));
   const due = new Date(Date.now() + (o.daysUntilDue ?? 7) * 864e5).toISOString().slice(0, 10);
-  const { data: row, error } = await admin.from("invoices").insert({
+  const { data: row, error } = await admin.from("invoices").upsert({
     user_id: o.userId, subscription_id: o.subscriptionId, number: fin.number ?? inv.id, amount: total, description: o.description,
     due_at: due, status: "open", kind: o.kind, stripe_invoice_id: inv.id, hosted_url: fin.hosted_invoice_url, pdf_url: fin.invoice_pdf,
-  }).select("*").single();
+  }, { onConflict: "stripe_invoice_id" }).select("*").single();
   if (error) throw new Error("Invoice was sent but couldn't be saved locally.");
   return row;
 }
