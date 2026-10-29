@@ -170,7 +170,7 @@ function Signup() {
             <Field label="Confirm password"><input className="signup-input" type={showPassword ? "text" : "password"} autoComplete="new-password" maxLength={128} value={account.confirmPassword} onChange={(e) => setAccount({ ...account, confirmPassword: e.target.value })} /></Field>
             <div className="flex gap-3 border-t pt-5 text-sm text-muted-foreground"><LockKeyhole className="size-5 shrink-0" /><p>These login details are for this preview only. No account is created.</p></div>
           </>}
-          <div className="flex items-center gap-3 pt-4"><Button type="button" variant="secondary" aria-label="Back" className="size-11 shrink-0 rounded-lg" onClick={() => setStep(step - 1)}><ArrowLeft /></Button><Button type="submit" className="signup-primary flex-1">{step === 1 ? "Continue" : "Review application"}<ArrowRight /></Button></div>
+          <div className="flex items-center gap-3 pt-4"><Button type="button" variant="secondary" aria-label="Back" className="size-11 shrink-0 rounded-full" onClick={() => setStep(step - 1)}><ArrowLeft /></Button><Button type="submit" className="signup-primary flex-1">{step === 1 ? "Continue" : "Review application"}<ArrowRight /></Button></div>
         </form>}
         {step === 3 && <div>
           <ReviewSection title="Your application" onEdit={() => setStep(0)}><ReviewRow label="Plan" value={selectedPlan.name} /><ReviewRow label="Service fee" value={`$${selectedPlan.monthlyFee} / month`} /><ReviewRow label="Assigned monthly hours" value={`${selectedPlan.monthlyHours} hours shared across all services; not unlimited`} /><ReviewRow label="Included services" value="Marketing, design & development" /><ReviewRow label="Money-back guarantee" value="90 days if no sales are received. Service fees only; advertising budgets excluded." /></ReviewSection>
@@ -184,7 +184,7 @@ function Signup() {
           <div className="-mx-5 mt-6 bg-secondary px-5 py-4 sm:mx-0 sm:px-6"><h2 className="text-xl font-medium">Conditions & information</h2></div>
           {documents.slice(2).map((doc, index) => <DocumentRow key={doc.title} title={doc.title} onRead={() => setDocumentIndex(index + 2)} onDownload={() => downloadDocument(index + 2)} />)}
           <p className="mt-6 text-xs leading-relaxed text-muted-foreground">The documents summarise the supplied subscription terms; they are not final legal contracts. By continuing, you can confirm this demonstration application.</p>
-          <div className="mt-6 flex gap-3"><Button variant="secondary" aria-label="Back to review" className="size-11 shrink-0 rounded-lg" onClick={() => setStep(3)}><ArrowLeft /></Button><Button className="signup-primary flex-1" onClick={openConfirmation}>Accept & continue <PenLine /></Button></div>
+          <div className="mt-6 flex gap-3"><Button variant="secondary" aria-label="Back to review" className="size-11 shrink-0 rounded-full" onClick={() => setStep(3)}><ArrowLeft /></Button><Button className="signup-primary flex-1" onClick={openConfirmation}>Accept & continue <PenLine /></Button></div>
         </div>}
       </div>
     </> : step === 5 ? <ProcessingScreen hours={selectedPlan.monthlyHours} onDone={() => { setAccount((a) => ({ ...a, password: "", confirmPassword: "" })); setStep(6); }} /> : <SuccessScreen name={personal.firstName} plan={selectedPlan} signedAt={signature?.at ?? new Date().toISOString()} email={account.email} />}
@@ -192,21 +192,18 @@ function Signup() {
       </section>
     </div>
     <Dialog.Root open={confirmOpen} onOpenChange={setConfirmOpen}>
-      <Dialog.Portal><Dialog.Overlay className="fixed inset-0 z-30 bg-foreground/40 backdrop-blur-sm" /><Dialog.Content className="signature-dialog">
+      <Dialog.Portal><Dialog.Overlay className="fixed inset-0 z-40 bg-foreground/40 backdrop-blur-sm" /><Dialog.Content className="app-modal">
                 <Dialog.Close asChild><Button variant="ghost" size="icon" aria-label="Close confirmation" className="absolute right-4 top-4"><X /></Button></Dialog.Close>
-        <div className="flex flex-1 flex-col justify-center"><span className="mb-6 grid size-14 place-items-center rounded-full bg-secondary"><PenLine className="size-6" /></span><Dialog.Title className="max-w-sm text-2xl font-bold leading-tight sm:text-3xl">Confirm your application</Dialog.Title><Dialog.Description className="mt-4 text-sm leading-relaxed text-muted-foreground">Enter the code below to accept the subscription terms and confirm your application as {personal.firstName} {personal.lastName}.</Dialog.Description>
-          <div className="mt-7 rounded-2xl border bg-secondary/60 px-4 py-5">
-            <p className="text-center text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">Your signature code</p>
-            <div data-testid="signature-code" aria-label={`Confirmation code ${code}`} className="mt-3 flex items-center justify-center gap-2 font-mono text-3xl font-semibold tabular-nums tracking-[0.15em] sm:text-4xl"><span>{code.slice(0, 3)}</span><span className="text-muted-foreground">–</span><span>{code.slice(3)}</span></div>
-          </div>
-          <div className="mt-6"><InputOTP maxLength={6} value={entered} onChange={setEntered} aria-label="Enter six-digit confirmation code" inputMode="numeric" pattern="[0-9]*" containerClassName="w-full justify-center"><InputOTPGroup className="grid w-full grid-cols-6 gap-2">{Array.from({ length: 6 }, (_, index) => <InputOTPSlot key={index} index={index} className="h-12 w-full rounded-lg border border-input bg-background text-lg first:rounded-lg first:border-l last:rounded-lg" />)}</InputOTPGroup></InputOTP></div>
-          <div className="relative z-10 mt-5 flex items-center justify-between gap-3 text-sm"><span className="text-muted-foreground">Code not working?</span><Button type="button" variant="outline" size="sm" className="relative z-10 rounded-full" onClick={newCode}><RefreshCw /> Use a new code</Button></div>
-          <p className="mt-5 text-xs leading-relaxed text-muted-foreground">Entering this code confirms your acceptance as your digital signature. Every attempt uses a new code.</p>
-        </div>
-        <div className="mt-8 space-y-3"><Button className="signup-primary relative z-10" disabled={entered.length !== 6} onClick={accept}>Accept & sign</Button><Button variant="secondary" className="h-11 w-full rounded-lg" onClick={() => setConfirmOpen(false)}>Cancel</Button></div>
+        <span className="mx-auto grid size-12 place-items-center rounded-full bg-secondary"><PenLine className="size-5" /></span>
+        <Dialog.Title className="mt-4 text-center text-xl font-bold leading-snug">Confirm your application</Dialog.Title>
+        <Dialog.Description className="mt-1.5 text-center text-sm text-muted-foreground">Enter the code shown below as your digital signature.</Dialog.Description>
+        <SignatureCode code={code} />
+        <InputOTP maxLength={6} value={entered} onChange={setEntered} aria-label="Enter six-digit confirmation code" inputMode="numeric" pattern="[0-9]*" autoComplete="off" containerClassName="mt-4 w-full justify-center"><InputOTPGroup className="grid w-full grid-cols-6 gap-2">{Array.from({ length: 6 }, (_, index) => <InputOTPSlot key={index} index={index} className="signup-input h-11 justify-center rounded-lg border p-0 text-base shadow-none first:rounded-lg first:border-l last:rounded-lg data-[active=true]:border-foreground data-[active=true]:ring-[3px] data-[active=true]:ring-foreground/10" />)}</InputOTPGroup></InputOTP>
+        <button type="button" onClick={newCode} className="relative z-10 mx-auto mt-3 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground"><RefreshCw className="size-3.5" /> Use a new code</button>
+        <div className="relative z-10 mt-6 space-y-2"><Button className="signup-primary text-sm" disabled={entered.length !== 6} onClick={accept}>Accept & sign</Button><button type="button" className="app-modal-secondary" onClick={() => setConfirmOpen(false)}>Cancel</button></div>
       </Dialog.Content></Dialog.Portal>
     </Dialog.Root>
-    <Dialog.Root open={selectedDoc !== null} onOpenChange={(open) => { if (!open) setDocumentIndex(null); }}><Dialog.Portal><Dialog.Overlay className="fixed inset-0 z-30 bg-foreground/40 backdrop-blur-sm" /><Dialog.Content className="signature-dialog"><Dialog.Title className="pr-8 text-2xl font-bold">{selectedDoc?.title}</Dialog.Title><Dialog.Description className="mt-6 whitespace-pre-line text-base leading-relaxed text-muted-foreground">{selectedDoc?.body}</Dialog.Description><p className="mt-6 text-xs text-muted-foreground">Summary for this demonstration; not a final legal contract.</p><div className="mt-auto space-y-3 pt-8"><Button className="signup-primary" onClick={() => { if (documentIndex !== null) downloadDocument(documentIndex); }}><Download /> Save a copy</Button><Dialog.Close asChild><Button variant="secondary" className="h-11 w-full rounded-lg">Close</Button></Dialog.Close></div></Dialog.Content></Dialog.Portal></Dialog.Root>
+    <Dialog.Root open={selectedDoc !== null} onOpenChange={(open) => { if (!open) setDocumentIndex(null); }}><Dialog.Portal><Dialog.Overlay className="fixed inset-0 z-40 bg-foreground/40 backdrop-blur-sm" /><Dialog.Content className="app-modal"><Dialog.Title className="pr-8 text-xl font-bold">{selectedDoc?.title}</Dialog.Title><Dialog.Description className="mt-4 whitespace-pre-line text-sm leading-relaxed text-muted-foreground">{selectedDoc?.body}</Dialog.Description><p className="mt-6 text-xs text-muted-foreground">Summary for this demonstration; not a final legal contract.</p><div className="mt-6 space-y-2"><Button className="signup-primary text-sm" onClick={() => { if (documentIndex !== null) downloadDocument(documentIndex); }}><Download /> Save a copy</Button><Dialog.Close asChild><Button variant="secondary" className="app-modal-secondary">Close</Button></Dialog.Close></div></Dialog.Content></Dialog.Portal></Dialog.Root>
   </main>;
 }
 
@@ -284,4 +281,34 @@ function SuccessScreen({ name, plan, signedAt, email }: { name: string; plan: Pl
     <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl border p-4 text-sm"><span className="min-w-0"><span className="block font-semibold">{plan.name} Plan</span><span className="text-muted-foreground">{plan.monthlyHours} hours / month</span></span><span className="shrink-0 font-semibold">${plan.monthlyFee}<span className="font-normal text-muted-foreground">/month</span></span></div>
     <Button asChild className="signup-primary mt-8"><Link to="/">Close</Link></Button>
   </section>;
+}
+
+/** Draws the signature code on a canvas after a short load, so the digits never appear as page text. */
+function SignatureCode({ code }: { code: string }) {
+  const canvas = useRef<HTMLCanvasElement>(null);
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    setReady(false);
+    const timer = window.setTimeout(() => setReady(true), 1400 + Math.random() * 1200);
+    return () => window.clearTimeout(timer);
+  }, [code]);
+  useEffect(() => {
+    const el = canvas.current; if (!ready || !el) return;
+    const ctx = el.getContext("2d"); if (!ctx) return;
+    const dpr = window.devicePixelRatio || 1, w = el.clientWidth, h = el.clientHeight;
+    el.width = w * dpr; el.height = h * dpr; ctx.scale(dpr, dpr);
+    const css = getComputedStyle(el), fg = css.color, muted = css.getPropertyValue("--muted-foreground");
+    ctx.clearRect(0, 0, w, h);
+    ctx.strokeStyle = muted; ctx.globalAlpha = 0.35;
+    for (let i = 0; i < 5; i++) { ctx.beginPath(); ctx.moveTo(Math.random() * w, Math.random() * h); ctx.bezierCurveTo(Math.random() * w, Math.random() * h, Math.random() * w, Math.random() * h, Math.random() * w, Math.random() * h); ctx.stroke(); }
+    ctx.globalAlpha = 1; ctx.fillStyle = fg; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    const step = w / 7;
+    [...code].forEach((digit, i) => {
+      ctx.save(); ctx.translate(step * (i + 1) + (i > 2 ? step * 0.15 : -step * 0.15), h / 2 + (Math.random() - 0.5) * 6); ctx.rotate((Math.random() - 0.5) * 0.35);
+      ctx.font = `600 ${26 + Math.random() * 6}px ui-monospace, monospace`; ctx.fillText(digit, 0, 0); ctx.restore();
+    });
+  }, [ready, code]);
+  return <div className="mt-5 grid h-16 place-items-center overflow-hidden rounded-xl border bg-secondary/60" aria-live="polite">
+    {ready ? <canvas ref={canvas} role="img" aria-label="Signature code image" className="block h-16 w-full text-foreground" /> : <span className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="size-4 animate-spin" /> Generating secure code…</span>}
+  </div>;
 }

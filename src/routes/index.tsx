@@ -20,8 +20,7 @@ export const Route = createFileRoute("/")({
   component: Login,
 });
 
-const input =
-  "h-12 w-full rounded-xl border border-transparent bg-secondary pl-11 pr-5 text-[0.95rem] text-foreground outline-none transition placeholder:text-muted-foreground hover:border-input focus:border-foreground focus:bg-background focus:ring-4 focus:ring-foreground/5 sm:h-14 sm:rounded-2xl sm:pl-14 sm:text-base";
+const input = "signup-input pl-10";
 
 function Login() {
   const [remember, setRemember] = useState(false);
@@ -71,20 +70,20 @@ function Login() {
           </div>
 
           <form className="mt-5 w-full max-w-md space-y-4 sm:mt-8 sm:space-y-5" onSubmit={onSubmit} noValidate>
-            <div className="space-y-1.5 sm:space-y-2">
-              <label htmlFor="email" className="pl-1 text-sm font-semibold text-foreground">Email Address</label>
+            <div className="space-y-1.5">
+              <label htmlFor="email" className="block text-[13px] font-medium text-foreground">Email Address<span className="text-primary">*</span></label>
               <div className="relative">
-                <Mail className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground sm:left-5" />
+                <Mail className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <input id="email" name="email" type="email" autoComplete="email" inputMode="email" placeholder="Enter your email" className={input} />
               </div>
             </div>
-            <div className="space-y-2">
-              <label htmlFor="password" className="pl-1 text-sm font-semibold text-foreground">Password</label>
+            <div className="space-y-1.5">
+              <label htmlFor="password" className="block text-[13px] font-medium text-foreground">Password<span className="text-primary">*</span></label>
               <div className="relative">
-                <Lock className="pointer-events-none absolute left-5 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                <input id="password" name="password" type={show ? "text" : "password"} autoComplete="current-password" placeholder="Enter your password" className={`${input} pr-14`} />
-                <button type="button" onClick={() => setShow((v) => !v)} aria-label={show ? "Hide password" : "Show password"} className="absolute right-2 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground">
-                  {show ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                <Lock className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <input id="password" name="password" type={show ? "text" : "password"} autoComplete="current-password" placeholder="Enter your password" className={`${input} pr-11`} />
+                <button type="button" onClick={() => setShow((v) => !v)} aria-label={show ? "Hide password" : "Show password"} className="absolute right-1 top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground">
+                  {show ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                 </button>
               </div>
             </div>
@@ -95,7 +94,7 @@ function Login() {
               </label>
               <button type="button" onClick={() => soon("Password reset")} className="font-semibold text-foreground hover:text-primary">Forgot Password?</button>
             </div>
-            <button type="submit" className="group flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground text-[0.95rem] font-semibold text-background transition hover:bg-primary active:scale-[0.99] sm:h-14 sm:text-base">
+            <button type="submit" className="signup-primary group flex items-center justify-center gap-2 text-sm">
               Log In <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
             </button>
           </form>
