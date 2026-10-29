@@ -38,7 +38,7 @@ export const recordKinds: Record<RecordKind, KindConfig> = {
     edit: [{ name: "plan_name", label: "Plan name", required: true }, { name: "monthly_fee", label: "Monthly fee (USD)", type: "number", required: true },
       { name: "monthly_hours", label: "Monthly hours", type: "number", required: true }, sel("status", "Status", ["pending", "active", "paused", "cancelled"]),
       sel("sales_received", "Sales received", ["no", "yes"]), sel("guarantee_status", "Guarantee", ["not_started", "running", "claimed", "refunded", "expired", "denied"]),
-      { name: "renews_at", label: "Renews", type: "date" }, { name: "notes", label: "Notes", type: "textarea" }],
+      { name: "renews_at", label: "Renews", type: "date" }, { name: "guarantee_ends_at", label: "Guarantee ends", type: "date" }, { name: "notes", label: "Notes", type: "textarea" }],
     parents: [{ label: "Application", kind: "applications", fk: "application_id" }],
     children: [
       { label: "Projects", kind: "projects", fk: "subscription_id", columns: [["Project", "name", "text"], ["Status", "status", "status"], ["Hours", "hours", "hours"], ["Due", "due_at", "day"]] },
