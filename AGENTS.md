@@ -21,3 +21,6 @@
 - After every code or database change, do a focused security-audit-skill review (guidance mode) of the changed trust boundaries before finishing; the owner requires security checks on every change.
 - Admin record pages are one generic route (/admin/records/$kind/$id) driven by src/lib/records.ts; add a record type there instead of writing a new page, so every table row opens a consistent details page.
 - Financial and legal records (applications, subscriptions, invoices, transactions, audit) are archived or voided, never deleted; only tables listed in deletableTables in src/lib/admin.ts get DELETE policies.
+- Stripe is called through the fetch-based client in src/lib/stripe.server.ts (Worker compatible, no SDK); billing workflows live in src/lib/billing.server.ts and pure rules in src/lib/billing.ts with tests, so the webhook, cron and server functions share one implementation.
+- Local invoices and transactions mirror Stripe and are updated by the signed webhook at /api/public/stripe/webhook (idempotent via stripe_events); never mark invoices paid from the UI.
+- Interest and fees accrue in invoice_charges via the daily /api/public/cron/collections job and are billed to Stripe only when staff issue an arrears invoice, to avoid sweeping them into subscription renewals.

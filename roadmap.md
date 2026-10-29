@@ -14,4 +14,9 @@
 - [x] Details page for every record with client strip, linked records and audit history.
 - [x] Create, edit, archive/void and delete (operational records only); bulk select and actions on tables.
 - [x] Removed dot separators across the admin.
-- [ ] Second pass (awaiting go-ahead): client portal, emails, real payments, staff permission levels, documents, dashboard and global search.
+- [x] Client dashboard and Stripe payments.
+- [ ] Still open (awaiting go-ahead): app emails (needs an email domain), staff permission levels, documents, global search.
+# Stripe billing
+- [x] Stripe invoices, orders activating on payment, pause/resume/cancel, guarantee refunds, failed-payment suspension.
+- [x] Overage billing, debt recovery stages, compound interest, legal and court fees, daily job.
+- [x] Taskforce, Support, Billing rules pages; client dashboard; closed tickets locked.
