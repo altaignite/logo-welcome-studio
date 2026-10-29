@@ -94,12 +94,12 @@ function Login() {
               </label>
               <button type="button" onClick={() => soon("Password reset")} className="font-semibold text-foreground hover:text-primary">Forgot Password?</button>
             </div>
-            <button type="submit" className="group flex h-14 w-full items-center justify-center gap-2 rounded-full bg-foreground text-base font-semibold text-background transition hover:bg-primary active:scale-[0.99]">
+            <button type="submit" className="group flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground text-[0.95rem] font-semibold text-background transition hover:bg-primary active:scale-[0.99] sm:h-14 sm:text-base">
               Log In <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
             </button>
           </form>
 
-          <p className="mt-auto pt-10 text-sm text-muted-foreground">
+          <p className="mt-auto pt-5 text-sm text-muted-foreground sm:pt-10">
             Don't have an account? <button type="button" onClick={() => soon("Sign up")} className="ml-1 font-semibold text-foreground hover:text-primary">Sign up</button>
           </p>
         </section>
