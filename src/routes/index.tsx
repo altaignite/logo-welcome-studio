@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
 import { Mail, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
 import { usePopup } from "@/components/popup";
@@ -27,6 +27,7 @@ function Login() {
   const [remember, setRemember] = useState(false);
   const [show, setShow] = useState(false);
   const popup = usePopup();
+  const navigate = useNavigate();
   const soon = (what: string) =>
     popup({ type: "info", title: `${what} is coming soon`, description: "This option isn't available yet.", primaryLabel: "Got it", secondaryLabel: null });
   const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
@@ -44,7 +45,7 @@ function Login() {
       else popup({ type: "error", title: "Something went wrong while trying to log you in", description: error.message });
       return;
     }
-    popup({ type: "success", title: "Welcome back!", description: "You're logged in successfully.", primaryLabel: "Continue", secondaryLabel: null });
+    navigate({ to: "/dashboard" });
   };
   return (
     <main className="min-h-dvh bg-background lg:flex lg:items-center lg:justify-center lg:bg-secondary lg:p-8">
