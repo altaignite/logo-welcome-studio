@@ -20,7 +20,7 @@ export const Route = createFileRoute("/")({
 });
 
 const input =
-  "h-14 w-full rounded-2xl border border-transparent bg-secondary pl-14 pr-5 text-base text-foreground outline-none transition placeholder:text-muted-foreground hover:border-input focus:border-foreground focus:bg-background focus:ring-4 focus:ring-foreground/5";
+  "h-12 w-full rounded-xl border border-transparent bg-secondary pl-11 pr-5 text-[0.95rem] text-foreground outline-none transition placeholder:text-muted-foreground hover:border-input focus:border-foreground focus:bg-background focus:ring-4 focus:ring-foreground/5 sm:h-14 sm:rounded-2xl sm:pl-14 sm:text-base";
 
 function Login() {
   const [remember, setRemember] = useState(false);
