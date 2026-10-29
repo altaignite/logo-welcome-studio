@@ -103,11 +103,11 @@ function Details() {
       <Section title="Application"><FieldGrid items={[["Plan", r.plan_name], ["Monthly fee", money(r.monthly_fee)], ["Monthly hours", r.monthly_hours], ["Submitted", formatDate(r.created_at)], ["Signed", formatDate(r.signed_at)], ["Decided", formatDate(r.decided_at)], ["Subscription", sub ? subLink(sub.id) : "—"]]} /></Section>
     </>;
   }
-  const msgs = data.messages.filter((m) => m.ticket_id === r.id);
+  const msgs = data.messages.filter((m: R) => m.ticket_id === r.id);
   return <>
     {header(r.subject, <StatusBadge status={r.status} />, r.status !== "closed" ? <ActBtn dark onClick={() => a.reply(r)}>Reply</ActBtn> : null)}
     <Section title="Conversation">
-      <ul className="space-y-3 p-5">{msgs.map((m) => (
+      <ul className="space-y-3 p-5">{msgs.map((m: R) => (
         <li key={m.id} className={`rounded-xl p-3 text-sm ${m.actor_id === userId ? "ml-8 bg-secondary" : "mr-8 border"}`}><p className="whitespace-pre-wrap">{m.body}</p><p className="mt-1 text-xs text-muted-foreground">{m.actor_id === userId ? "You" : "FP team"}, {formatDate(m.created_at)}</p></li>
       ))}</ul>
       {r.status === "closed" && <p className="border-t p-4 text-sm text-muted-foreground">This ticket is closed and can't be reopened or replied to. Open a new request if you need more help.</p>}
