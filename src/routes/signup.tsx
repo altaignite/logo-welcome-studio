@@ -1,14 +1,13 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { ArrowLeft, ArrowRight, Check, ChevronDown, Download, Eye, EyeOff, LockKeyhole, PenLine, Rocket, ShieldCheck, X, Clock3 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, ChevronDown, Download, Eye, EyeOff, LockKeyhole, PenLine, Rocket, ShieldCheck, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CountryField, CountryFlag } from "@/components/country-field";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { usePopup } from "@/components/popup";
 import { accountSchema, countries, createSignatureCode, isSignatureMatch, personalSchema, plans, planTerms, type Plan, type CountryCode, type PersonalDetails } from "@/lib/signup";
 import logo from "@/assets/logo.png.asset.json";
-import hero from "@/assets/login-hero.jpg";
 
 export const Route = createFileRoute("/signup")({
   head: () => ({ meta: [
@@ -125,13 +124,8 @@ function Signup() {
   const selectedDoc = documentIndex === null ? null : documents[documentIndex];
 
   return <main className="min-h-dvh bg-background text-foreground md:flex md:items-start md:justify-center md:bg-secondary md:p-5 lg:items-center lg:p-8">
-    <div className="relative mx-auto w-full max-w-6xl md:grid md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] md:rounded-[2rem] md:bg-card md:p-4 md:shadow-2xl lg:grid-cols-2">
-      <aside className="sticky top-9 order-2 hidden h-[min(860px,calc(100dvh-4.5rem))] min-h-[680px] overflow-hidden rounded-3xl md:block">
-        <img src={hero} alt="Entrepreneur working late in a high-rise marketing office overlooking the city" width={896} height={1152} className="absolute inset-0 h-full w-full object-cover object-[60%_30%]" />
-        <div className="absolute inset-0 bg-gradient-to-t from-foreground/80 via-foreground/10 to-transparent" />
-        <div className="absolute inset-x-0 bottom-10 px-7 lg:px-10"><p className="text-sm font-medium uppercase tracking-[0.25em] text-background/70">Marketing Accelerator</p><p className="mt-3 max-w-sm text-3xl font-bold leading-tight text-background">Grow faster.<br />Market smarter.</p><div className="mt-6 flex items-start gap-2 text-sm leading-relaxed text-background/80"><ShieldCheck className="mt-0.5 size-5 shrink-0" /><p>90-day money-back guarantee<br />if no sales are received.<br /><span className="text-xs">Service fees only. Advertising excluded.</span></p></div></div>
-      </aside>
-      <section className="min-w-0 md:px-3 lg:px-8">
+    <div className="relative mx-auto w-full max-w-2xl md:rounded-[2rem] md:bg-card md:p-4 md:shadow-2xl lg:p-6">
+      <section className="min-w-0 md:px-3 lg:px-6">
     <header className="border-b bg-background md:border-none">
       <div className="mx-auto flex h-16 items-center justify-between px-5 sm:h-20 md:px-2">
         <Link to="/" aria-label="FP home"><img src={logo.url} alt="FP" className="size-9 object-contain sm:size-11" /></Link>
@@ -148,15 +142,17 @@ function Signup() {
       <div className="mx-auto max-w-lg px-5 pb-8 pt-6 md:px-2 md:pt-8">
         <div className="mb-6 text-center"><h1 className="text-2xl font-extrabold leading-tight lg:text-3xl">{titles[step]}</h1><p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">{subtitles[step]}</p></div>
         {step === 0 && <div>
-          <div className="grid gap-3" role="group" aria-label="Subscription plans">{plans.map((plan) => <Button key={plan.id} variant="outline" aria-pressed={selectedPlan.id === plan.id} onClick={() => setSelectedPlan(plan)} className={`h-auto w-full justify-start whitespace-normal rounded-lg border p-4 text-left shadow-none ${selectedPlan.id === plan.id ? "border-foreground bg-secondary hover:bg-secondary" : "border-border bg-background hover:bg-secondary/60"}`}>
-            <span className={`mr-3 grid size-5 shrink-0 place-items-center rounded-full border ${selectedPlan.id === plan.id ? "border-foreground bg-foreground text-background" : "border-input"}`}>{selectedPlan.id === plan.id && <Check className="size-3" />}</span>
-            <span className="min-w-0 flex-1"><span className="flex flex-wrap items-center gap-2"><span className="text-base font-bold">{plan.name}</span>{plan.id === "growth" && <span className="text-[10px] font-semibold uppercase text-primary">Popular</span>}</span><span className="mt-1 flex items-center gap-1.5 text-xs font-medium text-muted-foreground"><Clock3 className="size-3.5 shrink-0" />{plan.monthlyHours} hours / month</span></span>
-            <span className="shrink-0 text-right"><span className="block text-2xl font-bold">${plan.monthlyFee}</span><span className="block text-xs font-normal text-muted-foreground">/ month</span></span>
-          </Button>)}</div>
-          <p className="mt-4 text-sm font-medium">{selectedPlan.description}</p>
-          <ul className="mt-3 space-y-2 text-sm text-muted-foreground">{["Marketing, design & development", `${selectedPlan.monthlyHours} assigned service hours per month`, "Advertising budgets billed separately"].map((text) => <li key={text} className="flex items-start gap-2"><Check className="mt-0.5 size-4 shrink-0 text-primary" />{text}</li>)}</ul>
-          <p className="mt-3 text-xs leading-relaxed text-muted-foreground">Your hours are shared across all three services. Service delivery is not unlimited.</p>
-          <Button className="signup-primary mt-5" onClick={() => setStep(1)}>Continue with {selectedPlan.name}<ArrowRight /></Button>
+          <div className="grid gap-5 pt-2" role="group" aria-label="Subscription plans">{plans.map((plan) => <div key={plan.id} aria-pressed={selectedPlan.id === plan.id} className={`relative rounded-2xl border bg-background p-5 shadow-sm sm:p-6 ${selectedPlan.id === plan.id ? "border-foreground ring-2 ring-foreground/10" : "border-border"}`}>
+            {plan.id === "growth" && <span className="absolute -top-3 left-5 rounded-full bg-primary px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-background">Popular</span>}
+            <div className="flex items-start justify-between gap-3">
+              <h2 className="text-xl font-bold">{plan.name}</h2>
+              <p className="text-right"><span className="text-3xl font-extrabold">${plan.monthlyFee}</span><span className="text-sm text-muted-foreground"> / month</span></p>
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">{plan.description}</p>
+            <ul className="mt-4 space-y-2 text-sm text-muted-foreground">{["Marketing, design & development", `${plan.monthlyHours} assigned service hours per month`, "Advertising budgets billed separately"].map((text) => <li key={text} className="flex items-start gap-2"><Check className="mt-0.5 size-4 shrink-0 text-primary" />{text}</li>)}</ul>
+            <Button className="signup-primary mt-5 w-full" aria-pressed={selectedPlan.id === plan.id} onClick={() => { setSelectedPlan(plan); setStep(1); }}>{selectedPlan.id === plan.id ? "Continue with" : "Choose"} {plan.name}<ArrowRight /></Button>
+          </div>)}</div>
+          <p className="mt-4 text-xs leading-relaxed text-muted-foreground">Your hours are shared across all services. Service delivery is not unlimited.</p>
           <div className="mt-4 flex items-start justify-center gap-2 text-center text-xs leading-relaxed text-muted-foreground"><ShieldCheck className="size-4 shrink-0 text-primary" /><p>90-day money-back guarantee if no sales are received.<br />Service fees only.</p></div>
           <p className="mt-5 text-center text-sm text-muted-foreground">Already have an account? <Button asChild variant="link" className="h-auto p-0 font-semibold text-foreground"><Link to="/">Log in</Link></Button></p>
         </div>}
