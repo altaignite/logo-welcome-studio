@@ -70,7 +70,7 @@ export const subscriptionAction = createServerFn({ method: "POST" })
     if (sub.status === "cancelled") throw new Error("This subscription is already cancelled.");
     if (!staff && sub.status === "suspended") throw new Error("Please settle the outstanding invoice or contact support.");
     const sid = sub.stripe_subscription_id as string | null;
-    const patch: Record<string, unknown> = {};
+    const patch: any = {};
     const note = `${new Date().toISOString().slice(0, 10)} ${data.action.replace("_", " ")} by ${staff ? "staff" : "client"}: ${data.reason}`;
     if (data.action === "pause") {
       if (sub.status !== "active" && sub.status !== "past_due") throw new Error("Only active subscriptions can be paused.");
@@ -160,7 +160,7 @@ export const collectionAction = createServerFn({ method: "POST" })
     const { data: inv } = await admin.from("invoices").select("*").eq("id", data.invoiceId).single();
     if (!inv) throw new Error("Invoice not found.");
     const stamp = `${new Date().toISOString().slice(0, 10)} ${actorLabel(context)}: ${data.note}`;
-    const patch: Record<string, unknown> = { collection_notes: [inv.collection_notes, stamp].filter(Boolean).join("\n") };
+    const patch: any = { collection_notes: [inv.collection_notes, stamp].filter(Boolean).join("\n") };
     const setStage = (s: string) => { patch.collection_stage = s; patch.stage_changed_at = new Date().toISOString(); };
     switch (data.action) {
       case "flag": setStage("debt_recovery"); break;

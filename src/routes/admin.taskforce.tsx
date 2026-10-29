@@ -18,7 +18,7 @@ function Taskforce() {
   const qc = useQueryClient();
   const [view, setView] = useState<"list" | "board">("board");
   const [filter, setFilter] = useState({ client: "", assignee: "", priority: "", overdue: false });
-  const [modal, setModal] = useState<{ title: string; fields: FieldDef[]; submit: (v: Record<string, string>) => Promise<string | null> } | null>(null);
+  const [modal, setModal] = useState<{ title: string; fields: FieldDef[]; submit: (v: any) => Promise<string | null> } | null>(null);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["admin", "taskforce"],

@@ -30,13 +30,13 @@ function Support() {
       });
     },
   });
-  const shown = tab === "all" ? data : data.filter((t) => t.status === tab);
+  const shown = tab === "all" ? data : data.filter((t: Ticket) => t.status === tab);
   const update = async (rows: Ticket[], patch: Record<string, unknown>) => { await db.from("support_tickets").update({ ...patch, updated_at: new Date().toISOString() }).in("id", rows.map((r) => r.id)); await qc.invalidateQueries({ queryKey: ["admin"] }); };
   return (
     <div className="space-y-6">
       <div><h1 className="text-2xl font-extrabold sm:text-3xl">Support</h1><p className="mt-1 text-sm text-muted-foreground">Every client inquiry. Closed tickets are locked for clients and can't be reopened or replied to by them.</p></div>
       <div className="flex flex-wrap gap-2">
-        {tabs.map((t) => <button key={t} type="button" onClick={() => setTab(t)} className={`rounded-full border px-4 py-1.5 text-sm capitalize ${tab === t ? "border-foreground bg-foreground text-background" : "bg-card"}`}>{t.replace("_", " ")} <span className="opacity-60">{t === "all" ? data.length : data.filter((d) => d.status === t).length}</span></button>)}
+        {tabs.map((t) => <button key={t} type="button" onClick={() => setTab(t)} className={`rounded-full border px-4 py-1.5 text-sm capitalize ${tab === t ? "border-foreground bg-foreground text-background" : "bg-card"}`}>{t.replace("_", " ")} <span className="opacity-60">{t === "all" ? data.length : data.filter((d: Ticket) => d.status === t).length}</span></button>)}
       </div>
       {error ? <p className="text-sm text-destructive">{(error as Error).message}</p> : isLoading ? <p className="text-sm text-muted-foreground">Loading tickets…</p> :
         <DataTable<Ticket> title="Support tickets" rows={shown} getId={(r) => r.id} empty="No tickets here."

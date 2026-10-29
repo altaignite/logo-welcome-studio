@@ -35,8 +35,8 @@ export const Route = createFileRoute("/dashboard")({
 });
 
 const tabs = ["Overview", "Projects and tasks", "Subscriptions", "Applications", "Billing", "Support", "Profile"] as const;
-type R = Record<string, any>;
-type Modal = { title: string; description?: string; fields: FieldDef[]; submitLabel: string; onSubmit: (v: Record<string, string>) => Promise<string | null> };
+type R = any;
+type Modal = { title: string; description?: string; fields: FieldDef[]; submitLabel: string; onSubmit: (v: any) => Promise<string | null> };
 
 function Dashboard() {
   const { userId, email } = Route.useRouteContext();
