@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { AlertTriangle } from "lucide-react";
 import { Section } from "@/components/admin/record-bits";
 import { StatusBadge } from "@/components/admin/data-table";
-import { ActBtn, invoiceTotal, useClient, useClientActions } from "@/components/client/portal";
+import { ActBtn, invoiceTotal, useClient, useClientActions, type R } from "@/components/client/portal";
 import { formatDate, formatDay, money } from "@/lib/admin";
 
 export const Route = createFileRoute("/dashboard/")({ component: Overview });
@@ -15,7 +15,7 @@ function Overview() {
   const live = data.subs.filter((s) => ["active", "past_due", "paused", "suspended"].includes(s.status));
   const unpaid = data.invoices.filter((i) => i.status === "open" || i.status === "overdue");
   const approvals = data.tasks.filter((t) => t.over_allowance && !t.overage_approved && !["completed", "cancelled"].includes(t.status));
-  const replies = data.messages.filter((m) => m.actor_id !== userId).slice(-3).reverse();
+  const replies = data.messages.filter((m: R) => m.actor_id !== userId).slice(-3).reverse();
   const warnings = [
     ...data.subs.filter((s) => s.payment_warning).map((s) => `${s.plan_name} plan: ${s.payment_warning}`),
     ...live.filter((s) => Number(s.hours_used) > Number(s.monthly_hours)).map((s) => `${s.plan_name} plan is ${Number(s.hours_used) - Number(s.monthly_hours)} hours over its monthly allowance. Extra hours are billed separately.`),
@@ -48,7 +48,7 @@ function Overview() {
         <ul className="divide-y text-sm">
           {unpaid.map((i) => <li key={i.id} className="flex items-center justify-between gap-3 px-5 py-3"><span>Invoice {i.number}, {money(invoiceTotal(i))}, due {formatDay(i.due_at)}</span>{i.hosted_url && <a href={i.hosted_url} target="_blank" rel="noopener noreferrer" className="h-8 shrink-0 rounded-full bg-foreground px-3 text-xs font-semibold leading-8 text-background">Pay now</a>}</li>)}
           {approvals.map((t) => <li key={t.id} className="flex items-center justify-between gap-3 px-5 py-3"><span>Extra hours needed for {t.title}</span><ActBtn dark onClick={() => a.approve(t)}>Approve</ActBtn></li>)}
-          {replies.map((m) => <li key={m.id} className="px-5 py-3"><Link to="/dashboard/$kind/$id" params={{ kind: "ticket", id: m.ticket_id }} className="hover:underline">New reply from the FP team, {formatDate(m.created_at)}</Link></li>)}
+          {replies.map((m: R) => <li key={m.id} className="px-5 py-3"><Link to="/dashboard/$kind/$id" params={{ kind: "ticket", id: m.ticket_id }} className="hover:underline">New reply from the FP team, {formatDate(m.created_at)}</Link></li>)}
           {unpaid.length + approvals.length + replies.length === 0 && <li className="px-5 py-6 text-muted-foreground">You're all caught up.</li>}
         </ul>
       </Section>
