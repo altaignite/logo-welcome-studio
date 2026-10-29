@@ -309,6 +309,6 @@ function SignatureCode({ code }: { code: string }) {
     });
   }, [ready, code]);
   return <div className="mt-5 grid h-16 place-items-center overflow-hidden rounded-xl border bg-secondary/60" aria-live="polite">
-    {ready ? <canvas ref={canvas} role="img" aria-label="Signature code image" className="size-full text-foreground" /> : <span className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="size-4 animate-spin" /> Generating secure code…</span>}
+    {ready ? <canvas ref={canvas} role="img" aria-label="Signature code image" className="block h-16 w-full text-foreground" /> : <span className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="size-4 animate-spin" /> Generating secure code…</span>}
   </div>;
 }
