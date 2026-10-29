@@ -26,6 +26,7 @@ import { Route as AdminAccountsIndexRouteImport } from './routes/admin.accounts.
 import { Route as AdminAccountsIdRouteImport } from './routes/admin.accounts.$id'
 import { Route as AdminApplicationsIndexRouteImport } from './routes/admin.applications.index'
 import { Route as AdminApplicationsIdRouteImport } from './routes/admin.applications.$id'
+import { Route as DashboardKindIdRouteImport } from './routes/dashboard.$kind.$id'
 import { Route as AdminRecordsKindIdRouteImport } from './routes/admin.records.$kind.$id'
 import { Route as ApiPublicCronCollectionsRouteImport } from './routes/api/public/cron/collections'
 import { Route as ApiPublicStripeWebhookRouteImport } from './routes/api/public/stripe/webhook'
@@ -115,6 +116,11 @@ const AdminApplicationsIdRoute = AdminApplicationsIdRouteImport.update({
   path: '/applications/$id',
   getParentRoute: () => AdminRoute,
 } as any)
+const DashboardKindIdRoute = DashboardKindIdRouteImport.update({
+  id: '/$kind/$id',
+  path: '/$kind/$id',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const AdminRecordsKindIdRoute = AdminRecordsKindIdRouteImport.update({
   id: '/records/$kind/$id',
   path: '/records/$kind/$id',
@@ -148,6 +154,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/': typeof DashboardIndexRoute
   '/admin/accounts/$id': typeof AdminAccountsIdRoute
   '/admin/applications/$id': typeof AdminApplicationsIdRoute
+  '/dashboard/$kind/$id': typeof DashboardKindIdRoute
   '/admin/accounts/': typeof AdminAccountsIndexRoute
   '/admin/applications/': typeof AdminApplicationsIndexRoute
   '/admin/records/$kind/$id': typeof AdminRecordsKindIdRoute
@@ -168,6 +175,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardIndexRoute
   '/admin/accounts/$id': typeof AdminAccountsIdRoute
   '/admin/applications/$id': typeof AdminApplicationsIdRoute
+  '/dashboard/$kind/$id': typeof DashboardKindIdRoute
   '/admin/accounts': typeof AdminAccountsIndexRoute
   '/admin/applications': typeof AdminApplicationsIndexRoute
   '/admin/records/$kind/$id': typeof AdminRecordsKindIdRoute
@@ -191,6 +199,7 @@ export interface FileRoutesById {
   '/dashboard/': typeof DashboardIndexRoute
   '/admin/accounts/$id': typeof AdminAccountsIdRoute
   '/admin/applications/$id': typeof AdminApplicationsIdRoute
+  '/dashboard/$kind/$id': typeof DashboardKindIdRoute
   '/admin/accounts/': typeof AdminAccountsIndexRoute
   '/admin/applications/': typeof AdminApplicationsIndexRoute
   '/admin/records/$kind/$id': typeof AdminRecordsKindIdRoute
@@ -215,6 +224,7 @@ export interface FileRouteTypes {
     | '/dashboard/'
     | '/admin/accounts/$id'
     | '/admin/applications/$id'
+    | '/dashboard/$kind/$id'
     | '/admin/accounts/'
     | '/admin/applications/'
     | '/admin/records/$kind/$id'
@@ -235,6 +245,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/admin/accounts/$id'
     | '/admin/applications/$id'
+    | '/dashboard/$kind/$id'
     | '/admin/accounts'
     | '/admin/applications'
     | '/admin/records/$kind/$id'
@@ -257,6 +268,7 @@ export interface FileRouteTypes {
     | '/dashboard/'
     | '/admin/accounts/$id'
     | '/admin/applications/$id'
+    | '/dashboard/$kind/$id'
     | '/admin/accounts/'
     | '/admin/applications/'
     | '/admin/records/$kind/$id'
@@ -397,6 +409,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminApplicationsIdRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/dashboard/$kind/$id': {
+      id: '/dashboard/$kind/$id'
+      path: '/$kind/$id'
+      fullPath: '/dashboard/$kind/$id'
+      preLoaderRoute: typeof DashboardKindIdRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/admin/records/$kind/$id': {
       id: '/admin/records/$kind/$id'
       path: '/records/$kind/$id'
@@ -450,11 +469,13 @@ const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 interface DashboardRouteChildren {
   DashboardSectionRoute: typeof DashboardSectionRoute
   DashboardIndexRoute: typeof DashboardIndexRoute
+  DashboardKindIdRoute: typeof DashboardKindIdRoute
 }
 
 const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardSectionRoute: DashboardSectionRoute,
   DashboardIndexRoute: DashboardIndexRoute,
+  DashboardKindIdRoute: DashboardKindIdRoute,
 }
 
 const DashboardRouteWithChildren = DashboardRoute._addFileChildren(
