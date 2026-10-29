@@ -19,7 +19,7 @@ export function CountryField({ value, onChange, phone = false }: {
   const filtered = countries.filter((c) => `${c.name} ${c.code} ${c.dial}`.toLowerCase().includes(search.toLowerCase()));
   return <Popover open={open} onOpenChange={(v) => { setOpen(v); setSearch(""); }}>
     <PopoverTrigger asChild>
-      <Button variant="ghost" type="button" aria-label={phone ? "Mobile country code" : "Country"} className={phone ? "h-12 shrink-0 rounded-none border-r px-3 sm:h-14" : "signup-input justify-between font-normal"}>
+      <Button variant="ghost" type="button" aria-label={phone ? "Mobile country code" : "Country"} className={phone ? "h-full shrink-0 rounded-none border-r px-4 font-normal hover:bg-secondary" : "signup-input justify-between font-normal"}>
         <span className="flex min-w-0 items-center gap-2">{selected && <CountryFlag key={selected.code} code={selected.code} />}<span className="truncate">{phone ? selected?.code ?? "Code" : selected?.name ?? "Select country"}</span></span><ChevronDown className="size-4 shrink-0 text-muted-foreground" />
       </Button>
     </PopoverTrigger>

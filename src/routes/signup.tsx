@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { ArrowLeft, ArrowRight, Check, Clock, Code2, Megaphone, Palette, ChevronDown, Download, Eye, EyeOff, LockKeyhole, PenLine, Rocket, ShieldCheck, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Clock, Code2, Megaphone, Palette, ChevronDown, Download, Eye, EyeOff, LockKeyhole, Loader2, PenLine, RefreshCw, Rocket, ShieldCheck, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CountryField, CountryFlag } from "@/components/country-field";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
@@ -27,7 +27,7 @@ const baseDocuments = [
   { title: "Client Agreement", body: "FP Marketing Accelerator\n\nYour monthly subscription covers marketing, design and development services within your assigned monthly service hours. Services are not unlimited. Advertising budgets are excluded and are separate from service fees." },
   { title: "Subscription Agreement", body: "Marketing Accelerator subscription\n\nService fee: $199 per month. Includes marketing, design and development. Does not include advertising budgets." },
   { title: "90-day Money-back Guarantee", body: "90-day money-back guarantee\n\nIf no sales are received within 90 days, the money-back guarantee applies to service fees only. Advertising budgets are not covered." },
-  { title: "Country & Privacy Information", body: "Country preselection\n\nWe use ipapi.co to suggest your country based on your IP address. The request shares your IP with that provider. You may change the suggested country. Personal details and passwords in this demonstration stay in this browser page, are not submitted, and clear when the page is refreshed." },
+  { title: "Privacy Information", body: "Privacy\n\nPersonal details and passwords in this demonstration stay in this browser page, are not submitted, and clear when the page is refreshed." },
 ];
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
@@ -46,7 +46,6 @@ function Signup() {
   const [code, setCode] = useState("");
   const [entered, setEntered] = useState("");
   const [documentIndex, setDocumentIndex] = useState<number | null>(null);
-  const [progress, setProgress] = useState(0);
   const [signature, setSignature] = useState<{ name: string; at: string; code: string } | null>(null);
   const usedCodes = useRef(new Set<string>());
   const phoneTouched = useRef(false);
@@ -74,15 +73,6 @@ function Signup() {
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "instant" });
-    if (step !== 5) return;
-    setProgress(0);
-    const start = performance.now();
-    const timer = window.setInterval(() => {
-      const value = Math.min(100, ((performance.now() - start) / 2400) * 100);
-      setProgress(value);
-      if (value === 100) { window.clearInterval(timer); setAccount((a) => ({ ...a, password: "", confirmPassword: "" })); setStep(6); }
-    }, 80);
-    return () => window.clearInterval(timer);
   }, [step]);
 
   const setCountry = (country: CountryCode) => {
@@ -168,8 +158,7 @@ function Signup() {
             <div className="grid gap-5 lg:grid-cols-2"><Field label="First name"><input className="signup-input" autoComplete="given-name" value={personal.firstName} onChange={(e) => setPersonal({ ...personal, firstName: e.target.value })} maxLength={80} /></Field><Field label="Last name"><input className="signup-input" autoComplete="family-name" value={personal.lastName} onChange={(e) => setPersonal({ ...personal, lastName: e.target.value })} maxLength={80} /></Field></div>
             <Field label="Business name"><input className="signup-input" autoComplete="organization" value={personal.company} onChange={(e) => setPersonal({ ...personal, company: e.target.value })} maxLength={160} /></Field>
             <div className="space-y-2"><span className="text-sm font-medium">Country</span><CountryField value={personal.country} onChange={setCountry} /></div>
-            <div className="space-y-2"><label htmlFor="mobile" className="text-sm font-medium">Mobile number</label><div className="flex min-w-0 items-center overflow-hidden rounded-xl border border-transparent bg-secondary sm:rounded-2xl focus-within:border-foreground focus-within:ring-2 focus-within:ring-foreground/5"><CountryField phone value={phoneCountry} onChange={(v) => { phoneTouched.current = true; changePhoneCountry(v); }} /><input id="mobile" aria-label="Mobile number" autoComplete="tel" type="tel" inputMode="tel" placeholder="+31 6 1234 5678" value={personal.phone} maxLength={30} onChange={(e) => { phoneTouched.current = true; setPersonal({ ...personal, phone: e.target.value.replace(/[^\d+\s()-]/g, "") }); }} className="h-12 min-w-0 flex-1 bg-transparent px-3 text-base outline-none sm:h-14" /></div></div>
-            <p className="text-xs leading-relaxed text-muted-foreground">Your country may be suggested using ipapi.co. You can change it. <Button variant="link" type="button" className="h-auto p-0 text-xs" onClick={() => setDocumentIndex(3)}>Privacy information</Button></p>
+            <div className="space-y-2"><label htmlFor="mobile" className="text-sm font-medium">Mobile number</label><div className="signup-group"><CountryField phone value={phoneCountry} onChange={(v) => { phoneTouched.current = true; changePhoneCountry(v); }} /><input id="mobile" aria-label="Mobile number" autoComplete="tel" type="tel" inputMode="tel" placeholder="+31 6 1234 5678" value={personal.phone} maxLength={30} onChange={(e) => { phoneTouched.current = true; setPersonal({ ...personal, phone: e.target.value.replace(/[^\d+\s()-]/g, "") }); }} className="h-full min-w-0 flex-1 bg-transparent px-4 text-base outline-none" /></div></div>
           </> : <>
             <Field label="Email Address"><input className="signup-input" type="email" inputMode="email" autoComplete="email" value={account.email} maxLength={254} onChange={(e) => setAccount({ ...account, email: e.target.value })} /></Field>
             <Field label="Password"><div className="relative"><input className="signup-input pr-12" type={showPassword ? "text" : "password"} autoComplete="new-password" maxLength={128} value={account.password} onChange={(e) => setAccount({ ...account, password: e.target.value })} /><Button variant="ghost" size="icon" type="button" aria-label={showPassword ? "Hide password" : "Show password"} className="absolute right-1 top-1/2 -translate-y-1/2" onClick={() => setShowPassword((s) => !s)}>{showPassword ? <EyeOff /> : <Eye />}</Button></div></Field>
@@ -177,7 +166,7 @@ function Signup() {
             <Field label="Confirm password"><input className="signup-input" type={showPassword ? "text" : "password"} autoComplete="new-password" maxLength={128} value={account.confirmPassword} onChange={(e) => setAccount({ ...account, confirmPassword: e.target.value })} /></Field>
             <div className="flex gap-3 border-t pt-5 text-sm text-muted-foreground"><LockKeyhole className="size-5 shrink-0" /><p>These login details are for this preview only. No account is created.</p></div>
           </>}
-          <div className="flex items-center gap-3 pt-4"><Button type="button" variant="secondary" aria-label="Back" className="size-12 rounded-full" onClick={() => setStep(step - 1)}><ArrowLeft /></Button><Button type="submit" className="signup-primary flex-1">{step === 1 ? "Continue" : "Review application"}<ArrowRight /></Button></div>
+          <div className="flex items-center gap-3 pt-4"><Button type="button" variant="secondary" aria-label="Back" className="size-14 shrink-0 rounded-[14px]" onClick={() => setStep(step - 1)}><ArrowLeft /></Button><Button type="submit" className="signup-primary flex-1">{step === 1 ? "Continue" : "Review application"}<ArrowRight /></Button></div>
         </form>}
         {step === 3 && <div>
           <ReviewSection title="Your application" onEdit={() => setStep(0)}><ReviewRow label="Plan" value={selectedPlan.name} /><ReviewRow label="Service fee" value={`$${selectedPlan.monthlyFee} / month`} /><ReviewRow label="Assigned monthly hours" value={`${selectedPlan.monthlyHours} hours shared across all services; not unlimited`} /><ReviewRow label="Included services" value="Marketing, design & development" /><ReviewRow label="Money-back guarantee" value="90 days if no sales are received. Service fees only; advertising budgets excluded." /></ReviewSection>
@@ -191,27 +180,29 @@ function Signup() {
           <div className="-mx-5 mt-6 bg-secondary px-5 py-4 sm:mx-0 sm:px-6"><h2 className="text-xl font-medium">Conditions & information</h2></div>
           {documents.slice(2).map((doc, index) => <DocumentRow key={doc.title} title={doc.title} onRead={() => setDocumentIndex(index + 2)} onDownload={() => downloadDocument(index + 2)} />)}
           <p className="mt-6 text-xs leading-relaxed text-muted-foreground">The documents summarise the supplied subscription terms; they are not final legal contracts. By continuing, you can confirm this demonstration application.</p>
-          <div className="mt-6 flex gap-3"><Button variant="secondary" aria-label="Back to review" className="size-12 rounded-full" onClick={() => setStep(3)}><ArrowLeft /></Button><Button className="signup-primary flex-1" onClick={openConfirmation}>Accept & continue <PenLine /></Button></div>
+          <div className="mt-6 flex gap-3"><Button variant="secondary" aria-label="Back to review" className="size-14 shrink-0 rounded-[14px]" onClick={() => setStep(3)}><ArrowLeft /></Button><Button className="signup-primary flex-1" onClick={openConfirmation}>Accept & continue <PenLine /></Button></div>
         </div>}
       </div>
-    </> : step === 5 ? <section className="mx-auto flex min-h-[calc(100dvh-5rem)] max-w-lg flex-col justify-center px-6 pb-24 text-center" aria-live="polite"><div role="progressbar" aria-label="Processing application" aria-valuenow={Math.round(progress)} aria-valuemin={0} aria-valuemax={100} className="mb-8 h-2 overflow-hidden rounded-full border bg-secondary"><div className="h-full origin-left bg-primary transition-transform duration-100 motion-reduce:transition-none" style={{ transform: `scaleX(${progress / 100})` }} /></div><h1 className="text-2xl font-semibold sm:text-3xl">Just a moment, please…</h1><p className="mt-4 text-base leading-relaxed text-muted-foreground">Preparing your application summary.</p></section> : <section className="mx-auto flex min-h-[calc(100dvh-5rem)] max-w-lg flex-col items-center justify-center px-6 py-12 text-center"><span className="grid size-20 place-items-center rounded-full bg-primary/10 text-primary"><Check className="size-10" /></span><h1 className="mt-7 text-3xl font-bold leading-tight">You're all set, {personal.firstName}!</h1><p className="mt-3 text-sm leading-relaxed text-muted-foreground">Your demonstration application is complete.<br />No account, payment or application has been submitted.</p><div className="mt-8 w-full space-y-5 text-left"><div className="flex gap-3 border-b pb-5"><Rocket className="size-5 shrink-0 text-primary" /><div><p className="font-semibold">Your marketing accelerator</p><p className="mt-1 text-sm text-muted-foreground">{selectedPlan.name} · ${selectedPlan.monthlyFee}/month<br />{selectedPlan.monthlyHours} assigned hours / month</p></div></div><div className="flex gap-3"><ShieldCheck className="size-5 shrink-0 text-primary" /><div><p className="font-semibold">Confirmation completed</p><p className="mt-1 text-sm leading-relaxed text-muted-foreground">{signature?.name}<br />{signature ? new Date(signature.at).toLocaleString() : ""}<br />90-day service-fee guarantee if no sales are received.</p></div></div></div><Button asChild className="signup-primary mt-10"><Link to="/">Close</Link></Button></section>}
+    </> : step === 5 ? <ProcessingScreen hours={selectedPlan.monthlyHours} onDone={() => { setAccount((a) => ({ ...a, password: "", confirmPassword: "" })); setStep(6); }} /> : <SuccessScreen name={personal.firstName} plan={selectedPlan} signedAt={signature?.at ?? new Date().toISOString()} email={account.email} />}
 
       </section>
     </div>
     <Dialog.Root open={confirmOpen} onOpenChange={setConfirmOpen}>
       <Dialog.Portal><Dialog.Overlay className="fixed inset-0 z-30 bg-foreground/40 backdrop-blur-sm" /><Dialog.Content className="signature-dialog">
-        <span className="mx-auto mb-5 flex justify-center text-muted-foreground xl:hidden"><ChevronDown className="size-7" /></span>
-        <Dialog.Close asChild><Button variant="ghost" size="icon" aria-label="Close confirmation" className="absolute right-4 top-4"><X /></Button></Dialog.Close>
+                <Dialog.Close asChild><Button variant="ghost" size="icon" aria-label="Close confirmation" className="absolute right-4 top-4"><X /></Button></Dialog.Close>
         <div className="flex flex-1 flex-col justify-center"><span className="mb-6 grid size-14 place-items-center rounded-full bg-secondary"><PenLine className="size-6" /></span><Dialog.Title className="max-w-sm text-2xl font-bold leading-tight sm:text-3xl">Confirm your application</Dialog.Title><Dialog.Description className="mt-4 text-sm leading-relaxed text-muted-foreground">Enter the code below to accept the subscription terms and confirm your application as {personal.firstName} {personal.lastName}.</Dialog.Description>
-          <div data-testid="signature-code" aria-label={`Confirmation code ${code}`} className="my-8 grid grid-cols-6 gap-2 text-center text-3xl font-semibold sm:text-4xl">{code.split("").map((digit, index) => <span key={index}>{digit}</span>)}</div>
-          <InputOTP maxLength={6} value={entered} onChange={setEntered} aria-label="Enter six-digit confirmation code" inputMode="numeric" pattern="[0-9]*" containerClassName="w-full justify-center"><InputOTPGroup className="grid w-full grid-cols-6 gap-2">{Array.from({ length: 6 }, (_, index) => <InputOTPSlot key={index} index={index} className="h-12 w-full rounded-md border border-input bg-secondary text-xl first:rounded-md last:rounded-md sm:h-14" />)}</InputOTPGroup></InputOTP>
-          <Button variant="link" className="mx-auto mt-4 text-xs text-muted-foreground" onClick={newCode}>Use a new code</Button>
-          <p className="mt-3 text-xs leading-relaxed text-muted-foreground">This code records confirmation in this preview only. It does not verify your identity or create a legally authenticated signature.</p>
+          <div className="mt-7 rounded-2xl border bg-secondary/60 px-4 py-5">
+            <p className="text-center text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">Your signature code</p>
+            <div data-testid="signature-code" aria-label={`Confirmation code ${code}`} className="mt-3 flex items-center justify-center gap-2 font-mono text-3xl font-semibold tabular-nums tracking-[0.15em] sm:text-4xl"><span>{code.slice(0, 3)}</span><span className="text-muted-foreground">–</span><span>{code.slice(3)}</span></div>
+          </div>
+          <div className="mt-6"><InputOTP maxLength={6} value={entered} onChange={setEntered} aria-label="Enter six-digit confirmation code" inputMode="numeric" pattern="[0-9]*" containerClassName="w-full justify-center"><InputOTPGroup className="grid w-full grid-cols-6 gap-2">{Array.from({ length: 6 }, (_, index) => <InputOTPSlot key={index} index={index} className="h-14 w-full rounded-[14px] border border-input bg-background text-xl first:rounded-[14px] first:border-l last:rounded-[14px]" />)}</InputOTPGroup></InputOTP></div>
+          <div className="relative z-10 mt-5 flex items-center justify-between gap-3 text-sm"><span className="text-muted-foreground">Code not working?</span><Button type="button" variant="outline" size="sm" className="relative z-10 rounded-full" onClick={newCode}><RefreshCw /> Use a new code</Button></div>
+          <p className="mt-5 text-xs leading-relaxed text-muted-foreground">Entering this code confirms your acceptance as your digital signature. Every attempt uses a new code.</p>
         </div>
-        <div className="mt-8 space-y-3"><Button className="signup-primary" disabled={entered.length !== 6} onClick={accept}>Accept</Button><Button variant="secondary" className="h-12 w-full rounded-full" onClick={() => setConfirmOpen(false)}>Cancel</Button></div>
+        <div className="mt-8 space-y-3"><Button className="signup-primary relative z-10" disabled={entered.length !== 6} onClick={accept}>Accept & sign</Button><Button variant="secondary" className="h-14 w-full rounded-[14px]" onClick={() => setConfirmOpen(false)}>Cancel</Button></div>
       </Dialog.Content></Dialog.Portal>
     </Dialog.Root>
-    <Dialog.Root open={selectedDoc !== null} onOpenChange={(open) => { if (!open) setDocumentIndex(null); }}><Dialog.Portal><Dialog.Overlay className="fixed inset-0 z-30 bg-foreground/40 backdrop-blur-sm" /><Dialog.Content className="signature-dialog"><Dialog.Title className="pr-8 text-2xl font-bold">{selectedDoc?.title}</Dialog.Title><Dialog.Description className="mt-6 whitespace-pre-line text-base leading-relaxed text-muted-foreground">{selectedDoc?.body}</Dialog.Description><p className="mt-6 text-xs text-muted-foreground">Summary for this demonstration; not a final legal contract.</p><div className="mt-auto space-y-3 pt-8"><Button className="signup-primary" onClick={() => { if (documentIndex !== null) downloadDocument(documentIndex); }}><Download /> Save a copy</Button><Dialog.Close asChild><Button variant="secondary" className="h-12 w-full rounded-full">Close</Button></Dialog.Close></div></Dialog.Content></Dialog.Portal></Dialog.Root>
+    <Dialog.Root open={selectedDoc !== null} onOpenChange={(open) => { if (!open) setDocumentIndex(null); }}><Dialog.Portal><Dialog.Overlay className="fixed inset-0 z-30 bg-foreground/40 backdrop-blur-sm" /><Dialog.Content className="signature-dialog"><Dialog.Title className="pr-8 text-2xl font-bold">{selectedDoc?.title}</Dialog.Title><Dialog.Description className="mt-6 whitespace-pre-line text-base leading-relaxed text-muted-foreground">{selectedDoc?.body}</Dialog.Description><p className="mt-6 text-xs text-muted-foreground">Summary for this demonstration; not a final legal contract.</p><div className="mt-auto space-y-3 pt-8"><Button className="signup-primary" onClick={() => { if (documentIndex !== null) downloadDocument(documentIndex); }}><Download /> Save a copy</Button><Dialog.Close asChild><Button variant="secondary" className="h-14 w-full rounded-[14px]">Close</Button></Dialog.Close></div></Dialog.Content></Dialog.Portal></Dialog.Root>
   </main>;
 }
 
@@ -223,4 +214,70 @@ function ReviewRow({ label, value, country }: { label: string; value: string; co
 }
 function DocumentRow({ title, onRead, onDownload }: { title: string; onRead: () => void; onDownload: () => void }) {
   return <div className="flex items-center justify-between gap-3 border-b py-5 sm:px-6"><Button variant="link" className="h-auto whitespace-normal p-0 text-left text-base font-semibold" onClick={onRead}>{title}</Button><Button variant="ghost" size="icon" aria-label={`Download ${title}`} title={`Download ${title}`} className="shrink-0 text-primary" onClick={onDownload}><Download /></Button></div>;
+}
+const processingStages = (hours: number) => [
+  { label: "Verifying your details", ms: 3600 },
+  { label: "Securing your digital signature", ms: 3200 },
+  { label: `Reserving your ${hours} monthly service hours`, ms: 4400 },
+  { label: "Preparing your agreements", ms: 3800 },
+  { label: "Finalising your application", ms: 2600 },
+];
+
+function ProcessingScreen({ hours, onDone }: { hours: number; onDone: () => void }) {
+  const stages = processingStages(hours);
+  const total = stages.reduce((sum, s) => sum + s.ms, 0);
+  const [elapsed, setElapsed] = useState(0);
+  const done = useRef(onDone); done.current = onDone;
+  useEffect(() => {
+    const start = performance.now();
+    const timer = window.setInterval(() => {
+      const t = performance.now() - start;
+      setElapsed(t);
+      if (t >= total + 500) { window.clearInterval(timer); done.current(); }
+    }, 100);
+    return () => window.clearInterval(timer);
+  }, [total]);
+  let acc = 0; let current = stages.length; let progress = 100;
+  for (const [i, stage] of stages.entries()) {
+    if (elapsed < acc + stage.ms) {
+      current = i;
+      const t = (elapsed - acc) / stage.ms;
+      const eased = t < 0.75 ? 1 - Math.pow(1 - t / 0.75, 2) : 1; // move, then pause like real work
+      progress = ((acc + stage.ms * eased * 0.96) / total) * 100;
+      break;
+    }
+    acc += stage.ms;
+  }
+  return <section className="mx-auto max-w-lg px-5 pb-16 pt-10 md:px-2 md:pt-14" aria-live="polite">
+    <div className="text-center"><h1 className="text-2xl font-bold sm:text-3xl">Processing your application</h1><p className="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-muted-foreground">Please keep this page open. This can take up to a minute.</p></div>
+    <div className="mt-8"><div className="flex justify-between text-xs text-muted-foreground"><span>{stages[current]?.label ?? "Complete"}…</span><span className="tabular-nums">{Math.floor(progress)}%</span></div>
+      <div role="progressbar" aria-label="Processing application" aria-valuenow={Math.floor(progress)} aria-valuemin={0} aria-valuemax={100} className="relative mt-2 h-1.5 overflow-hidden rounded-full bg-secondary"><div className="h-full rounded-full bg-foreground transition-[width] duration-300 ease-out" style={{ width: `${progress}%` }} /><div className="signup-shimmer pointer-events-none absolute inset-0 bg-gradient-to-r from-transparent via-background/40 to-transparent" /></div></div>
+    <ol className="mt-8 space-y-1 rounded-2xl border p-2">{stages.map((stage, i) => {
+      const state = i < current ? "done" : i === current ? "active" : "todo";
+      return <li key={stage.label} className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm ${state === "active" ? "bg-secondary font-medium" : ""} ${state === "todo" ? "text-muted-foreground" : ""}`}>
+        <span className={`grid size-6 shrink-0 place-items-center rounded-full ${state === "done" ? "bg-foreground text-background" : "border"}`}>{state === "done" ? <Check className="size-3.5" /> : state === "active" ? <Loader2 className="size-3.5 animate-spin" /> : null}</span>{stage.label}</li>;
+    })}</ol>
+  </section>;
+}
+
+function SuccessScreen({ name, plan, signedAt, email }: { name: string; plan: Plan; signedAt: string; email: string }) {
+  const time = new Date(signedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+  const timeline = [
+    { title: "Application submitted", text: time, state: "done" },
+    { title: "Agreement signed digitally", text: "Your confirmation code was accepted.", state: "done" },
+    { title: "Account review", text: "We're checking your details. Usually within 1 business day.", state: "current" },
+    { title: "Onboarding call", text: `We'll contact you at ${email} to plan your first month.`, state: "todo" },
+    { title: "Your accelerator starts", text: `${plan.monthlyHours} service hours assigned every month.`, state: "todo" },
+  ] as const;
+  return <section className="mx-auto max-w-lg px-5 pb-12 pt-8 md:px-2 md:pt-12">
+    <div className="text-center"><span className="mx-auto grid size-16 place-items-center rounded-full bg-foreground text-background"><Check className="size-8" /></span><h1 className="mt-6 text-2xl font-bold leading-tight sm:text-3xl">Your application was successful, {name}!</h1><p className="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-muted-foreground">Here's where things stand and what happens next.</p></div>
+    <div className="mt-8 flex items-center justify-between gap-3 rounded-2xl border p-4"><div className="min-w-0"><p className="text-xs text-muted-foreground">Current status</p><p className="mt-0.5 font-semibold">In review</p></div><span className="flex shrink-0 items-center gap-2 rounded-full bg-secondary px-3 py-1.5 text-xs font-medium"><span className="size-2 animate-pulse rounded-full bg-primary" />Step 3 of 5</span></div>
+    <ol className="mt-4 rounded-2xl border p-5">{timeline.map((item, i) => <li key={item.title} className="relative flex gap-4 pb-6 last:pb-0">
+      {i < timeline.length - 1 && <span className={`absolute left-[11px] top-7 h-[calc(100%-1.5rem)] w-px ${item.state === "done" ? "bg-foreground" : "bg-border"}`} />}
+      <span className={`relative grid size-6 shrink-0 place-items-center rounded-full ${item.state === "done" ? "bg-foreground text-background" : item.state === "current" ? "border-2 border-primary bg-background" : "border bg-background"}`}>{item.state === "done" ? <Check className="size-3.5" /> : item.state === "current" ? <span className="size-2 rounded-full bg-primary" /> : null}</span>
+      <div className="min-w-0"><p className={`text-sm font-semibold ${item.state === "todo" ? "text-muted-foreground" : ""}`}>{item.title}{item.state === "current" && <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">Now</span>}</p><p className="mt-1 text-sm leading-relaxed text-muted-foreground">{item.text}</p></div>
+    </li>)}</ol>
+    <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl border p-4 text-sm"><span className="min-w-0"><span className="block font-semibold">{plan.name} Plan</span><span className="text-muted-foreground">{plan.monthlyHours} hours / month</span></span><span className="shrink-0 font-semibold">${plan.monthlyFee}<span className="font-normal text-muted-foreground">/month</span></span></div>
+    <Button asChild className="signup-primary mt-8"><Link to="/">Close</Link></Button>
+  </section>;
 }
