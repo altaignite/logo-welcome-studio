@@ -46,7 +46,7 @@ function Login() {
   return (
     <main className="min-h-dvh bg-background lg:flex lg:items-center lg:justify-center lg:bg-secondary lg:p-8">
       <div className="relative mx-auto flex min-h-dvh w-full max-w-6xl flex-col lg:grid lg:min-h-0 lg:grid-cols-2 lg:overflow-hidden lg:rounded-[2rem] lg:bg-card lg:p-4 lg:shadow-2xl">
-        <div className="relative h-[42dvh] min-h-64 shrink-0 overflow-hidden lg:order-2 lg:h-auto lg:min-h-[680px] lg:rounded-3xl">
+        <div className="relative h-[30dvh] min-h-48 shrink-0 overflow-hidden lg:order-2 lg:h-auto lg:min-h-[680px] lg:rounded-3xl">
           <img
             src={hero}
             alt="Entrepreneur working late in a high-rise office overlooking the city"
