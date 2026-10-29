@@ -15,6 +15,13 @@
       "when": 1793284419952,
       "tag": "0001_crm_full",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793285651713,
+      "tag": "0002_crm_linked_records",
+      "breakpoints": true
     }
   ]
 }

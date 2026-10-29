@@ -61,10 +61,12 @@ export type Database = {
       applications: {
         Row: {
           account_number: string
+          archived_at: string | null
           assigned_to: string | null
           created_at: string
           decided_at: string | null
           id: string
+          internal_notes: string | null
           monthly_fee: number
           monthly_hours: number
           plan_id: string
@@ -76,10 +78,12 @@ export type Database = {
         }
         Insert: {
           account_number: string
+          archived_at?: string | null
           assigned_to?: string | null
           created_at?: string
           decided_at?: string | null
           id?: string
+          internal_notes?: string | null
           monthly_fee: number
           monthly_hours: number
           plan_id: string
@@ -91,10 +95,12 @@ export type Database = {
         }
         Update: {
           account_number?: string
+          archived_at?: string | null
           assigned_to?: string | null
           created_at?: string
           decided_at?: string | null
           id?: string
+          internal_notes?: string | null
           monthly_fee?: number
           monthly_hours?: number
           plan_id?: string
@@ -151,6 +157,7 @@ export type Database = {
           due_at: string
           id: string
           kind: string
+          outcome_note: string | null
           status: string
           user_id: string
         }
@@ -162,6 +169,7 @@ export type Database = {
           due_at?: string
           id?: string
           kind: string
+          outcome_note?: string | null
           status?: string
           user_id: string
         }
@@ -173,7 +181,41 @@ export type Database = {
           due_at?: string
           id?: string
           kind?: string
+          outcome_note?: string | null
           status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      contacts: {
+        Row: {
+          created_at: string
+          email: string | null
+          id: string
+          name: string
+          notes: string | null
+          phone: string | null
+          role: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          phone?: string | null
+          role?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          role?: string
           user_id?: string
         }
         Relationships: []
@@ -229,6 +271,7 @@ export type Database = {
       invoices: {
         Row: {
           amount: number
+          archived_at: string | null
           created_at: string
           description: string | null
           due_at: string | null
@@ -237,10 +280,13 @@ export type Database = {
           number: string
           paid_at: string | null
           status: string
+          subscription_id: string | null
           user_id: string
+          void_reason: string | null
         }
         Insert: {
           amount: number
+          archived_at?: string | null
           created_at?: string
           description?: string | null
           due_at?: string | null
@@ -249,10 +295,13 @@ export type Database = {
           number: string
           paid_at?: string | null
           status?: string
+          subscription_id?: string | null
           user_id: string
+          void_reason?: string | null
         }
         Update: {
           amount?: number
+          archived_at?: string | null
           created_at?: string
           description?: string | null
           due_at?: string | null
@@ -261,9 +310,19 @@ export type Database = {
           number?: string
           paid_at?: string | null
           status?: string
+          subscription_id?: string | null
           user_id?: string
+          void_reason?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "invoices_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -272,14 +331,19 @@ export type Database = {
           address_line: string | null
           city: string | null
           company: string | null
+          company_size: string | null
           country: string | null
           created_at: string
           do_not_sell: boolean
           email: string | null
           first_name: string | null
           id: string
+          industry: string | null
+          internal_notes: string | null
           last_name: string | null
+          lead_source: string | null
           legal_hold: boolean
+          legal_name: string | null
           lifecycle_stage: string
           marketing_opt_in: boolean
           phone: string | null
@@ -289,7 +353,9 @@ export type Database = {
           status: string
           status_changed_at: string | null
           status_reason: string | null
+          tax_id: string | null
           terms_accepted_at: string | null
+          timezone: string | null
           updated_at: string
           website: string | null
         }
@@ -299,14 +365,19 @@ export type Database = {
           address_line?: string | null
           city?: string | null
           company?: string | null
+          company_size?: string | null
           country?: string | null
           created_at?: string
           do_not_sell?: boolean
           email?: string | null
           first_name?: string | null
           id: string
+          industry?: string | null
+          internal_notes?: string | null
           last_name?: string | null
+          lead_source?: string | null
           legal_hold?: boolean
+          legal_name?: string | null
           lifecycle_stage?: string
           marketing_opt_in?: boolean
           phone?: string | null
@@ -316,7 +387,9 @@ export type Database = {
           status?: string
           status_changed_at?: string | null
           status_reason?: string | null
+          tax_id?: string | null
           terms_accepted_at?: string | null
+          timezone?: string | null
           updated_at?: string
           website?: string | null
         }
@@ -326,14 +399,19 @@ export type Database = {
           address_line?: string | null
           city?: string | null
           company?: string | null
+          company_size?: string | null
           country?: string | null
           created_at?: string
           do_not_sell?: boolean
           email?: string | null
           first_name?: string | null
           id?: string
+          industry?: string | null
+          internal_notes?: string | null
           last_name?: string | null
+          lead_source?: string | null
           legal_hold?: boolean
+          legal_name?: string | null
           lifecycle_stage?: string
           marketing_opt_in?: boolean
           phone?: string | null
@@ -343,7 +421,9 @@ export type Database = {
           status?: string
           status_changed_at?: string | null
           status_reason?: string | null
+          tax_id?: string | null
           terms_accepted_at?: string | null
+          timezone?: string | null
           updated_at?: string
           website?: string | null
         }
@@ -351,6 +431,8 @@ export type Database = {
       }
       projects: {
         Row: {
+          archived_at: string | null
+          assigned_to: string | null
           completed_at: string | null
           created_at: string
           description: string | null
@@ -361,9 +443,12 @@ export type Database = {
           service: string
           started_at: string | null
           status: string
+          subscription_id: string | null
           user_id: string
         }
         Insert: {
+          archived_at?: string | null
+          assigned_to?: string | null
           completed_at?: string | null
           created_at?: string
           description?: string | null
@@ -374,9 +459,12 @@ export type Database = {
           service: string
           started_at?: string | null
           status?: string
+          subscription_id?: string | null
           user_id: string
         }
         Update: {
+          archived_at?: string | null
+          assigned_to?: string | null
           completed_at?: string | null
           created_at?: string
           description?: string | null
@@ -387,51 +475,90 @@ export type Database = {
           service?: string
           started_at?: string | null
           status?: string
+          subscription_id?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "projects_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       subscriptions: {
         Row: {
+          application_id: string | null
+          archived_at: string | null
+          cancelled_at: string | null
           created_at: string
+          guarantee_ends_at: string | null
+          guarantee_status: string
           hours_used: number
           id: string
           monthly_fee: number
           monthly_hours: number
+          notes: string | null
           plan_name: string
           renews_at: string | null
+          sales_received: boolean
           started_at: string | null
           status: string
           user_id: string
         }
         Insert: {
+          application_id?: string | null
+          archived_at?: string | null
+          cancelled_at?: string | null
           created_at?: string
+          guarantee_ends_at?: string | null
+          guarantee_status?: string
           hours_used?: number
           id?: string
           monthly_fee: number
           monthly_hours: number
+          notes?: string | null
           plan_name: string
           renews_at?: string | null
+          sales_received?: boolean
           started_at?: string | null
           status?: string
           user_id: string
         }
         Update: {
+          application_id?: string | null
+          archived_at?: string | null
+          cancelled_at?: string | null
           created_at?: string
+          guarantee_ends_at?: string | null
+          guarantee_status?: string
           hours_used?: number
           id?: string
           monthly_fee?: number
           monthly_hours?: number
+          notes?: string | null
           plan_name?: string
           renews_at?: string | null
+          sales_received?: boolean
           started_at?: string | null
           status?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       support_tickets: {
         Row: {
+          archived_at: string | null
           assigned_to: string | null
           category: string
           closed_at: string | null
@@ -440,10 +567,12 @@ export type Database = {
           priority: string
           status: string
           subject: string
+          subscription_id: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          archived_at?: string | null
           assigned_to?: string | null
           category?: string
           closed_at?: string | null
@@ -452,10 +581,12 @@ export type Database = {
           priority?: string
           status?: string
           subject: string
+          subscription_id?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          archived_at?: string | null
           assigned_to?: string | null
           category?: string
           closed_at?: string | null
@@ -464,10 +595,82 @@ export type Database = {
           priority?: string
           status?: string
           subject?: string
+          subscription_id?: string | null
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "support_tickets_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tasks: {
+        Row: {
+          actor_label: string
+          assigned_to: string | null
+          completed_at: string | null
+          created_at: string
+          details: string | null
+          due_at: string | null
+          id: string
+          priority: string
+          project_id: string | null
+          status: string
+          subscription_id: string | null
+          title: string
+          user_id: string
+        }
+        Insert: {
+          actor_label?: string
+          assigned_to?: string | null
+          completed_at?: string | null
+          created_at?: string
+          details?: string | null
+          due_at?: string | null
+          id?: string
+          priority?: string
+          project_id?: string | null
+          status?: string
+          subscription_id?: string | null
+          title: string
+          user_id: string
+        }
+        Update: {
+          actor_label?: string
+          assigned_to?: string | null
+          completed_at?: string | null
+          created_at?: string
+          details?: string | null
+          due_at?: string | null
+          id?: string
+          priority?: string
+          project_id?: string | null
+          status?: string
+          subscription_id?: string | null
+          title?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tasks_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       ticket_messages: {
         Row: {
@@ -560,32 +763,56 @@ export type Database = {
           created_at: string
           description: string
           id: string
+          invoice_id: string | null
           method: string | null
           reference: string
           status: string
+          subscription_id: string | null
           user_id: string
+          void_reason: string | null
         }
         Insert: {
           amount: number
           created_at?: string
           description: string
           id?: string
+          invoice_id?: string | null
           method?: string | null
           reference: string
           status?: string
+          subscription_id?: string | null
           user_id: string
+          void_reason?: string | null
         }
         Update: {
           amount?: number
           created_at?: string
           description?: string
           id?: string
+          invoice_id?: string | null
           method?: string | null
           reference?: string
           status?: string
+          subscription_id?: string | null
           user_id?: string
+          void_reason?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "transactions_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
