@@ -138,10 +138,10 @@ function AccountDetail() {
     fields: [{ name: "plan", label: "Plan", type: "select", options: plans.map((x) => x.name) }, { name: "project", label: "Project name", required: true, defaultValue: p.company ?? `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() }],
     onSubmit: async (v) => {
       const plan = plans.find((x) => x.name === v.plan)!;
-      const a = await supabase.from("applications").insert({ user_id: id, account_number: p.account_number, plan_id: plan.id, plan_name: plan.name, monthly_fee: plan.price, monthly_hours: plan.hours, status: "in_review", assigned_to: adminEmail }).select("id").single();
+      const a = await supabase.from("applications").insert({ user_id: id, account_number: p.account_number, plan_id: plan.id, plan_name: plan.name, monthly_fee: plan.monthlyFee, monthly_hours: plan.monthlyHours, status: "in_review", assigned_to: adminEmail }).select("id").single();
       if (a.error) return a.error.message;
       await supabase.from("application_events").insert({ application_id: a.data.id, ...actor, action: "Order created by staff", to_status: "in_review" });
-      const s = await supabase.from("subscriptions").insert({ user_id: id, plan_name: plan.name, monthly_fee: plan.price, monthly_hours: plan.hours, status: "pending", application_id: a.data.id }).select("id").single();
+      const s = await supabase.from("subscriptions").insert({ user_id: id, plan_name: plan.name, monthly_fee: plan.monthlyFee, monthly_hours: plan.monthlyHours, status: "pending", application_id: a.data.id }).select("id").single();
       if (s.error) return s.error.message;
       return done((await supabase.from("projects").insert({ user_id: id, name: v.project, service: "Marketing", status: "planned", subscription_id: s.data.id, description: `${plan.name} plan` })).error);
     },
