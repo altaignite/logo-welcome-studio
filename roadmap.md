@@ -5,7 +5,7 @@
 - [x] Test subscription rules and verify signup on desktop and mobile.
 
 # Signup corrections
-- [ ] Match desktop and tablet signup to the login layout across every step.
-- [ ] Offer Starter $199/5 hours, Growth $499/15 hours and Scale $999/35 hours monthly, carried through review, agreements and completion.
-- [ ] Add country flags using a free API, without emojis.
-- [ ] Verify all signup steps across desktop, tablet and mobile and run the relevant tests.
+- [x] Match desktop and tablet signup to the login layout across every step.
+- [x] Offer Starter $199/5 hours, Growth $499/15 hours and Scale $999/35 hours monthly, carried through review, agreements and completion.
+- [x] Add country flags using a free API, without emojis.
+- [x] Verify all signup steps across desktop, tablet and mobile and run the relevant tests.
