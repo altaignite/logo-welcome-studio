@@ -1,17 +1,18 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
 import { Mail, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
 import { usePopup } from "@/components/popup";
 import logo from "@/assets/logo.png.asset.json";
 import hero from "@/assets/login-hero.jpg";
+import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Welcome back — Sign in" },
-      { name: "description", content: "Access your personal account by logging in." },
-      { property: "og:title", content: "Welcome back — Sign in" },
-      { property: "og:description", content: "Access your personal account by logging in." },
+      { title: "FP Marketing Accelerator — Sign in" },
+      { name: "description", content: "Sign in to your FP Marketing Accelerator account." },
+      { property: "og:title", content: "FP Marketing Accelerator — Sign in" },
+      { property: "og:description", content: "Sign in to your FP Marketing Accelerator account." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
@@ -100,7 +101,7 @@ function Login() {
           </form>
 
           <p className="mt-auto pt-5 text-sm text-muted-foreground sm:pt-10">
-            Don't have an account? <button type="button" onClick={() => soon("Sign up")} className="ml-1 font-semibold text-foreground hover:text-primary">Sign up</button>
+            Don't have an account? <Button asChild variant="link" className="ml-1 h-auto p-0 font-semibold text-foreground hover:text-primary"><Link to="/signup">Sign up</Link></Button>
           </p>
         </section>
       </div>
