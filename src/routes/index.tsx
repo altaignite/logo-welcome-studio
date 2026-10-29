@@ -40,7 +40,8 @@ function Login() {
     }
     const { error } = await supabase.auth.signInWithPassword({ email, password: pw });
     if (error) {
-      popup({ type: "error", title: "Something went wrong while trying to log you in", description: error.message });
+      if (/banned/i.test(error.message)) popup({ type: "error", title: "Your account is suspended", description: "Please contact our support team to restore access." });
+      else popup({ type: "error", title: "Something went wrong while trying to log you in", description: error.message });
       return;
     }
     popup({ type: "success", title: "Welcome back!", description: "You're logged in successfully.", primaryLabel: "Continue", secondaryLabel: null });
