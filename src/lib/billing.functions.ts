@@ -210,3 +210,48 @@ export const runCollectionsNow = createServerFn({ method: "POST" })
     const { getAdmin, runCollections } = await import("@/lib/billing.server");
     return { touched: await runCollections(await getAdmin()) };
   });
+
+/** Staff issue a one-off Stripe invoice against a subscription. */
+export const createInvoice = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ subscriptionId: uuid, description: z.string().trim().min(2).max(300), amount: z.number().positive().max(1000000) }).parse(d))
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context);
+    const { getAdmin, issueStripeInvoice } = await import("@/lib/billing.server");
+    const admin = await getAdmin();
+    const { data: sub } = await admin.from("subscriptions").select("id, user_id").eq("id", data.subscriptionId).single();
+    if (!sub) throw new Error("Subscription not found.");
+    const inv = await issueStripeInvoice(admin, { userId: sub.user_id, subscriptionId: sub.id, kind: "service", description: data.description, lines: [{ description: data.description, amount: data.amount }], idem: `svc-${sub.id}-${crypto.randomUUID()}` });
+    return { invoiceId: inv.id as string };
+  });
+
+/** Refunds service fees through Stripe under the 90-day guarantee (only while it is still running). */
+export const guaranteeRefund = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ subscriptionId: uuid, amount: z.number().positive().max(100000), reason: z.string().trim().min(3).max(1000) }).parse(d))
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context);
+    const { getAdmin } = await import("@/lib/billing.server");
+    const { stripe, cents, audit } = await import("@/lib/stripe.server");
+    const { guaranteeEligible } = await import("@/lib/admin");
+    const admin = await getAdmin();
+    const { data: sub } = await admin.from("subscriptions").select("*").eq("id", data.subscriptionId).single();
+    if (!sub || sub.guarantee_status !== "running" || !guaranteeEligible(sub)) throw new Error("This subscription isn't eligible for a guarantee refund.");
+    const { data: paid } = await admin.from("invoices").select("stripe_invoice_id, amount").eq("subscription_id", sub.id).eq("status", "paid").not("stripe_invoice_id", "is", null).in("kind", ["first", "renewal", "service"]);
+    const paidTotal = (paid ?? []).reduce((s: number, i: any) => s + Number(i.amount), 0);
+    if (data.amount > paidTotal) throw new Error(`You can refund at most $${paidTotal} of paid service fees.`);
+    let left = data.amount;
+    for (const i of paid ?? []) {
+      if (left <= 0) break;
+      const inv = await stripe("GET", `invoices/${i.stripe_invoice_id}`, { "expand[]": "payments" });
+      const pi = inv.payment_intent ?? inv.payments?.data?.[0]?.payment?.payment_intent;
+      if (!pi) continue;
+      const amt = Math.min(left, Number(i.amount));
+      await stripe("POST", "refunds", { payment_intent: typeof pi === "string" ? pi : pi.id, amount: cents(amt), "metadata[reason]": "90-day guarantee" }, `refund-${i.stripe_invoice_id}-${cents(amt)}`);
+      left -= amt;
+    }
+    if (left > 0) throw new Error("Part of the refund couldn't be matched to a card payment. Please refund the rest in Stripe.");
+    await admin.from("subscriptions").update({ guarantee_status: "refunded" }).eq("id", sub.id);
+    await audit(admin, sub.user_id, "subscriptions", sub.id, "guarantee_refund", { amount: data.amount, reason: data.reason }, context.userId, actorLabel(context));
+    return { ok: true };
+  });
