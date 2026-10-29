@@ -14,7 +14,8 @@ export const Route = createFileRoute("/admin/accounts/$id")({ component: Account
 const adminRoute = getRouteApi("/admin");
 
 const tabs = ["Overview", "Activity", "Applications", "Subscriptions", "Projects", "Invoices", "Transactions", "Support tickets", "Compliance", "Audit log"] as const;
-type Modal = { title: string; description?: string; fields: FieldDef[]; submitLabel: string; onSubmit: (v: Record<string, string>) => Promise<string | null> };
+type Modal = { title: string; description?: string; fields: FieldDef[]; submitLabel: string; onSubmit: (v: V) => Promise<string | null> };
+type V = { action?: string; amount?: string; body?: string; category?: string; description?: string; details?: string; direction?: string; do_not_sell?: string; due_at?: string; duration_minutes?: string; follow_up_at?: string; kind?: string; legal_hold?: string; log_hours?: string; log_note?: string; marketing_opt_in?: string; method?: string; name?: string; outcome?: string; priority?: string; reason?: string; reset?: string; service?: string; sms_opt_in?: string; started_at?: string; status?: string; subject?: string; };
 const err = (e: { message: string } | null) => (e ? e.message : null);
 const rand = () => Math.floor(Math.random() * 1e6).toString().padStart(6, "0");
 const today = () => new Date().toISOString().slice(0, 10);
