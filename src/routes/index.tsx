@@ -20,7 +20,7 @@ export const Route = createFileRoute("/")({
 });
 
 const input =
-  "h-14 w-full rounded-2xl border border-transparent bg-secondary pl-14 pr-5 text-base text-foreground outline-none transition placeholder:text-muted-foreground hover:border-input focus:border-foreground focus:bg-background focus:ring-4 focus:ring-foreground/5";
+  "h-12 w-full rounded-xl border border-transparent bg-secondary pl-11 pr-5 text-[0.95rem] text-foreground outline-none transition placeholder:text-muted-foreground hover:border-input focus:border-foreground focus:bg-background focus:ring-4 focus:ring-foreground/5 sm:h-14 sm:rounded-2xl sm:pl-14 sm:text-base";
 
 function Login() {
   const [remember, setRemember] = useState(false);
@@ -46,7 +46,7 @@ function Login() {
   return (
     <main className="min-h-dvh bg-background lg:flex lg:items-center lg:justify-center lg:bg-secondary lg:p-8">
       <div className="relative mx-auto flex min-h-dvh w-full max-w-6xl flex-col lg:grid lg:min-h-0 lg:grid-cols-2 lg:overflow-hidden lg:rounded-[2rem] lg:bg-card lg:p-4 lg:shadow-2xl">
-        <div className="relative h-[42dvh] min-h-64 shrink-0 overflow-hidden lg:order-2 lg:h-auto lg:min-h-[680px] lg:rounded-3xl">
+        <div className="relative h-[30dvh] min-h-48 shrink-0 overflow-hidden lg:order-2 lg:h-auto lg:min-h-[680px] lg:rounded-3xl">
           <img
             src={hero}
             alt="Entrepreneur working late in a high-rise office overlooking the city"
@@ -61,20 +61,20 @@ function Login() {
           </div>
         </div>
 
-        <section className="relative -mt-8 flex flex-1 flex-col items-center rounded-t-[2rem] bg-background px-6 pb-8 pt-8 sm:px-12 lg:mt-0 lg:rounded-none lg:bg-transparent lg:px-14 lg:py-12">
-          <img src={logo.url} alt="FP logo" className="h-12 w-12 object-contain sm:h-14 sm:w-14" />
+        <section className="relative -mt-6 flex flex-1 flex-col items-center rounded-t-[1.5rem] bg-background px-5 pb-6 pt-5 sm:px-12 lg:mt-0 lg:rounded-none lg:bg-transparent lg:px-14 lg:py-12">
+          <img src={logo.url} alt="FP logo" className="h-10 w-10 object-contain sm:h-14 sm:w-14" />
 
-          <div className="mt-6 text-center lg:mt-12">
-            <h1 className="text-[1.75rem] font-extrabold tracking-tight text-foreground sm:text-4xl">WELCOME BACK!</h1>
-            <p className="mt-2 text-sm text-muted-foreground sm:text-base">Access your personal account by logging in.</p>
+          <div className="mt-3 text-center lg:mt-12">
+            <h1 className="text-2xl font-extrabold tracking-tight text-foreground sm:text-4xl">WELCOME BACK!</h1>
+            <p className="mt-1 text-sm text-muted-foreground sm:mt-2 sm:text-base">Access your personal account by logging in.</p>
           </div>
 
-          <form className="mt-8 w-full max-w-md space-y-5" onSubmit={onSubmit} noValidate>
-            <div className="space-y-2">
-              <label htmlFor="email" className="pl-1 text-sm font-semibold text-foreground">Email Address or Username</label>
+          <form className="mt-5 w-full max-w-md space-y-4 sm:mt-8 sm:space-y-5" onSubmit={onSubmit} noValidate>
+            <div className="space-y-1.5 sm:space-y-2">
+              <label htmlFor="email" className="pl-1 text-sm font-semibold text-foreground">Email Address</label>
               <div className="relative">
-                <Mail className="pointer-events-none absolute left-5 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                <input id="email" name="email" type="text" autoComplete="username" placeholder="Enter your email" className={input} />
+                <Mail className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground sm:left-5" />
+                <input id="email" name="email" type="email" autoComplete="email" inputMode="email" placeholder="Enter your email" className={input} />
               </div>
             </div>
             <div className="space-y-2">
@@ -94,12 +94,12 @@ function Login() {
               </label>
               <button type="button" onClick={() => soon("Password reset")} className="font-semibold text-foreground hover:text-primary">Forgot Password?</button>
             </div>
-            <button type="submit" className="group flex h-14 w-full items-center justify-center gap-2 rounded-full bg-foreground text-base font-semibold text-background transition hover:bg-primary active:scale-[0.99]">
+            <button type="submit" className="group flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground text-[0.95rem] font-semibold text-background transition hover:bg-primary active:scale-[0.99] sm:h-14 sm:text-base">
               Log In <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
             </button>
           </form>
 
-          <p className="mt-auto pt-10 text-sm text-muted-foreground">
+          <p className="mt-auto pt-5 text-sm text-muted-foreground sm:pt-10">
             Don't have an account? <button type="button" onClick={() => soon("Sign up")} className="ml-1 font-semibold text-foreground hover:text-primary">Sign up</button>
           </p>
         </section>
