@@ -31,7 +31,11 @@ export function DataTable<T>({ rows, columns, onRowClick, empty = "Nothing here 
   const toggle = (id: string) => setSel((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
   const exportCsv = (list: T[]) => {
-    const esc = (v: string | number) => `"${String(v).replaceAll('"', '""')}"`;
+    const esc = (v: string | number) => {
+      let s = String(v);
+      if (typeof v === "string" && /^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+      return `"${s.replaceAll('"', '""')}"`;
+    };
     const csv = [columns.map((c) => esc(c.label)).join(","), ...list.map((r) => columns.map((c) => esc(c.value(r))).join(","))].join("\n");
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
     const a = document.createElement("a"); a.href = url; a.download = `${(title ?? "export").toLowerCase().replaceAll(/\s+/g, "-")}.csv`; a.click(); URL.revokeObjectURL(url);
