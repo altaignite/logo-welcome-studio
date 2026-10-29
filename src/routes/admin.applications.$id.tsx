@@ -31,7 +31,7 @@ function ApplicationDetail() {
     },
   });
   const refresh = () => qc.invalidateQueries({ queryKey: ["admin"] });
-  const log = (action: string, extra: { from_status?: AppStatus; to_status?: AppStatus; note?: string | undefined } = {}) =>
+  const log = (action: string, extra: { from_status?: AppStatus; to_status?: AppStatus; note?: string | null } = {}) =>
     supabase.from("application_events").insert({ application_id: id, actor_id: adminId, actor_label: adminEmail, action, ...extra });
 
   if (error) return <p className="text-sm text-destructive">{(error as Error).message}</p>;
@@ -53,7 +53,7 @@ function ApplicationDetail() {
         const final = a.to === "approved" || a.to === "rejected";
         const up = await supabase.from("applications").update({ status: a.to, updated_at: new Date().toISOString(), ...(final ? { decided_at: new Date().toISOString() } : {}), assigned_to: app.assigned_to ?? adminEmail }).eq("id", id);
         if (!up.error) {
-          await log(a.label, { from_status: app.status, to_status: a.to, note: note.trim() || undefined });
+          await log(a.label, { from_status: app.status, to_status: a.to, note: note.trim() || null });
           if (a.to === "approved") {
             const now = new Date(); const renew = new Date(now); renew.setMonth(renew.getMonth() + 1);
             await supabase.from("subscriptions").update({ status: "active", started_at: now.toISOString(), renews_at: renew.toISOString() }).eq("user_id", app.user_id).eq("status", "pending");

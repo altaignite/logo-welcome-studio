@@ -9,7 +9,9 @@
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
 
-- Keep signup as a dedicated TanStack leaf route with browser-only state; this project deliberately has no account, submission or payment backend.
+- Signup creates a real Lovable Cloud account on signature; a database trigger on new users builds the profile, application, audit event and pending subscription from signup metadata so no client writes are needed.
+- Admin access is a role in user_roles granted by trigger only to verified staff-domain emails; the /admin layout gates by has_role and RLS enforces it.
+- Application status changes follow the transition map in src/lib/admin.ts, and every change or note is written to application_events as the audit log.
 - Keep selectable plan data, finite service-hour allowances, subscription terms and input validation in the shared signup module with concrete tests, so selection, review, downloaded agreements and completion use the same chosen plan.
 - Use libphonenumber-js metadata for countries and dial codes; optional browser IP preselection must not overwrite manual choices or block signup.
 - Treat displayed signature codes as local confirmation only, generated with Web Crypto and never reused within the current application, not as identity verification.
