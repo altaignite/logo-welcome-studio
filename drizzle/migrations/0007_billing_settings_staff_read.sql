@@ -1,0 +1,2 @@
+DROP POLICY IF EXISTS "signed in read billing rules" ON public.billing_settings;
+CREATE POLICY "staff read billing rules" ON public.billing_settings FOR SELECT TO authenticated USING (public.has_role(auth.uid(), 'admin'));
