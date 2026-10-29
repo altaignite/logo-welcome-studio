@@ -1,12 +1,12 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { ArrowLeft, ArrowRight, Check, ChevronDown, Download, Eye, EyeOff, LockKeyhole, PenLine, Rocket, ShieldCheck, X, Megaphone, Palette, Code2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, ChevronDown, Download, Eye, EyeOff, LockKeyhole, PenLine, Rocket, ShieldCheck, X, Clock3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { CountryField } from "@/components/country-field";
+import { CountryField, CountryFlag } from "@/components/country-field";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { usePopup } from "@/components/popup";
-import { accountSchema, countries, createSignatureCode, isSignatureMatch, personalSchema, subscription, type CountryCode, type PersonalDetails } from "@/lib/signup";
+import { accountSchema, countries, createSignatureCode, isSignatureMatch, personalSchema, plans, planTerms, type Plan, type CountryCode, type PersonalDetails } from "@/lib/signup";
 import logo from "@/assets/logo.png.asset.json";
 import hero from "@/assets/login-hero.jpg";
 
@@ -22,10 +22,10 @@ export const Route = createFileRoute("/signup")({
 });
 
 const steps = ["Your plan", "Personal details", "Create account", "Review", "Agreements"];
-const titles = ["Your next chapter starts here.", "Let's get to know you.", "Make it yours.", "Almost there!", "Your agreements"];
-const subtitles = ["One subscription. Your entire creative team.", "The person and business behind the ambition.", "Create your FP login details.", "Please check your details carefully.", "Read your agreements before proceeding. Save a copy for your records."];
-const documents = [
-  { title: "Client Agreement", body: "FP Marketing Accelerator\n\nYour monthly subscription covers marketing, design and development services. Advertising budgets are excluded and are separate from service fees." },
+const titles = ["CHOOSE YOUR PLAN", "Let's get to know you.", "Make it yours.", "Almost there!", "Your agreements"];
+const subtitles = ["Marketing, design & development. A monthly hours allowance that fits your ambition.", "The person and business behind the ambition.", "Create your FP login details.", "Please check your details carefully.", "Read your agreements before proceeding. Save a copy for your records."];
+const baseDocuments = [
+  { title: "Client Agreement", body: "FP Marketing Accelerator\n\nYour monthly subscription covers marketing, design and development services within your assigned monthly service hours. Services are not unlimited. Advertising budgets are excluded and are separate from service fees." },
   { title: "Subscription Agreement", body: "Marketing Accelerator subscription\n\nService fee: $199 per month. Includes marketing, design and development. Does not include advertising budgets." },
   { title: "90-day Money-back Guarantee", body: "90-day money-back guarantee\n\nIf no sales are received within 90 days, the money-back guarantee applies to service fees only. Advertising budgets are not covered." },
   { title: "Country & Privacy Information", body: "Country preselection\n\nWe use ipapi.co to suggest your country based on your IP address. The request shares your IP with that provider. You may change the suggested country. Personal details and passwords in this demonstration stay in this browser page, are not submitted, and clear when the page is refreshed." },
@@ -37,6 +37,8 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 
 function Signup() {
   const [step, setStep] = useState(0);
+  const [selectedPlan, setSelectedPlan] = useState<Plan>(plans[0]);
+  const documents = baseDocuments.map((doc, index) => index === 1 ? { ...doc, body: `FP Subscription Agreement\n\n${planTerms(selectedPlan)}` } : doc);
   const [personal, setPersonal] = useState<PersonalDetails>({ firstName: "", lastName: "", company: "", country: "", phone: "" });
   const [phoneCountry, setPhoneCountry] = useState<string>("");
   const [account, setAccount] = useState({ email: "", password: "", confirmPassword: "" });
@@ -122,9 +124,16 @@ function Signup() {
   };
   const selectedDoc = documentIndex === null ? null : documents[documentIndex];
 
-  return <main className="min-h-dvh bg-background text-foreground">
-    <header className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur-md">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5 sm:h-20 sm:px-8">
+  return <main className="min-h-dvh bg-background text-foreground md:flex md:items-start md:justify-center md:bg-secondary md:p-5 lg:items-center lg:p-8">
+    <div className="relative mx-auto w-full max-w-6xl md:grid md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] md:rounded-[2rem] md:bg-card md:p-4 md:shadow-2xl lg:grid-cols-2">
+      <aside className="sticky top-9 order-2 hidden h-[min(860px,calc(100dvh-4.5rem))] min-h-[680px] overflow-hidden rounded-3xl md:block">
+        <img src={hero} alt="Entrepreneur working late in a high-rise marketing office overlooking the city" width={896} height={1152} className="absolute inset-0 h-full w-full object-cover object-[60%_30%]" />
+        <div className="absolute inset-0 bg-gradient-to-t from-foreground/80 via-foreground/10 to-transparent" />
+        <div className="absolute inset-x-0 bottom-10 px-7 lg:px-10"><p className="text-sm font-medium uppercase tracking-[0.25em] text-background/70">Marketing Accelerator</p><p className="mt-3 max-w-sm text-3xl font-bold leading-tight text-background">Grow faster.<br />Market smarter.</p><div className="mt-6 flex items-start gap-2 text-sm leading-relaxed text-background/80"><ShieldCheck className="mt-0.5 size-5 shrink-0" /><p>90-day money-back guarantee<br />if no sales are received.<br /><span className="text-xs">Service fees only. Advertising excluded.</span></p></div></div>
+      </aside>
+      <section className="min-w-0 md:px-3 lg:px-8">
+    <header className="border-b bg-background md:border-none">
+      <div className="mx-auto flex h-16 items-center justify-between px-5 sm:h-20 md:px-2">
         <Link to="/" aria-label="FP home"><img src={logo.url} alt="FP" className="size-9 object-contain sm:size-11" /></Link>
         <span className="text-sm font-semibold">{step < 5 ? steps[step] : step === 5 ? "Almost there…" : "Application complete"}</span>
         {step < 5 ? <Button variant="ghost" size="icon" aria-label="Close signup" onClick={() => popup({ type: "info", title: "Leave your application?", description: "Your details won't be saved.", primaryLabel: "Leave application", onPrimary: () => { navigate({ to: "/" }); }, secondaryLabel: "Keep going" })}><X /></Button> : <div className="size-9" />}
@@ -132,31 +141,31 @@ function Signup() {
     </header>
 
     {step < 5 ? <>
-      <nav aria-label="Application progress" className="mx-auto max-w-6xl px-5 pt-5 sm:px-8 sm:pt-8">
-        <ol className="flex gap-2 sm:gap-4">{steps.map((name, index) => <li key={name} className="min-w-0 flex-1"><div className={`h-1 rounded-full ${index <= step ? "bg-primary" : "bg-secondary"}`} /><span className={`mt-2 hidden text-xs sm:block ${index === step ? "font-semibold text-foreground" : "text-muted-foreground"}`}>{index + 1}. {name}</span></li>)}</ol>
-        <p className="mt-2 text-xs text-muted-foreground sm:hidden">Step {step + 1} of 5</p>
+      <nav aria-label="Application progress" className="mx-auto px-5 pt-4 md:px-2">
+        <ol className="flex gap-2 sm:gap-4">{steps.map((name, index) => <li key={name} className="min-w-0 flex-1"><div className={`h-1 rounded-full ${index <= step ? "bg-primary" : "bg-secondary"}`} /><span className={`mt-2 hidden text-xs xl:block ${index === step ? "font-semibold text-foreground" : "text-muted-foreground"}`}>{index + 1}. {name}</span></li>)}</ol>
+        <p className="mt-2 text-xs text-muted-foreground xl:hidden">Step {step + 1} of 5</p>
       </nav>
-      <div className={`mx-auto max-w-6xl px-5 pb-10 pt-7 sm:px-8 sm:pt-12 ${step === 0 ? "" : "lg:max-w-3xl"}`}>
-        <div className="mb-7 sm:mb-10"><h1 className="text-[1.75rem] font-semibold leading-tight sm:text-4xl">{titles[step]}</h1><p className="mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground sm:text-base">{subtitles[step]}</p></div>
-        {step === 0 && <div className="grid items-stretch gap-7 lg:grid-cols-[1fr_1fr] lg:gap-12">
-          <section className="rounded-lg border bg-card p-6 sm:p-8">
-            <div className="flex items-start justify-between gap-4"><h2 className="text-xl font-semibold">Marketing Accelerator</h2><span className="shrink-0 rounded-full bg-foreground px-3 py-1 text-xs font-medium text-background">All-in-one</span></div>
-            <p className="mt-5"><strong className="text-4xl font-semibold">${subscription.monthlyFee}</strong><span className="ml-1 text-sm text-muted-foreground">/ month</span></p>
-            <p className="mt-3 text-sm text-muted-foreground">Your ambition. Our expertise.</p>
-            <div className="my-6 border-t" />
-            <ul className="space-y-5">{[{ icon: Megaphone, title: "All marketing services", text: "Strategy, campaigns & brand growth" }, { icon: Palette, title: "All design services", text: "Brand identity & creative production" }, { icon: Code2, title: "All development services", text: "Websites & digital experiences" }].map(({ icon: Icon, title, text }) => <li key={title} className="flex gap-3"><span className="grid size-10 shrink-0 place-items-center rounded-md bg-secondary"><Icon className="size-5" /></span><div><p className="text-sm font-semibold">{title}</p><p className="mt-1 text-sm text-muted-foreground">{text}</p></div></li>)}</ul>
-            <p className="mt-6 border-t pt-4 text-xs leading-relaxed text-muted-foreground">Advertising budgets are separate and are not included.</p>
-            <Button className="signup-primary mt-6" onClick={() => setStep(1)}>Select this plan <ArrowRight /></Button>
-            <div className="mt-4 flex items-start justify-center gap-2 text-center text-xs leading-relaxed text-muted-foreground"><ShieldCheck className="size-4 shrink-0 text-primary" /><p>90-day money-back guarantee if no sales are received.<br />Service fees only.</p></div>
-          </section>
-          <div className="relative hidden min-h-[510px] overflow-hidden rounded-lg lg:block"><img src={hero} alt="Entrepreneur overlooking the city from a marketing studio" className="absolute inset-0 h-full w-full object-cover" /><div className="absolute inset-0 bg-gradient-to-t from-foreground/90 via-transparent to-transparent" /><div className="absolute bottom-9 left-8 right-8 text-background"><p className="text-xs uppercase tracking-widest">FP Marketing Accelerator</p><h2 className="mt-3 text-3xl font-semibold leading-tight">Built for your<br />next big move.</h2></div></div>
+      <div className="mx-auto max-w-lg px-5 pb-8 pt-6 md:px-2 md:pt-8">
+        <div className="mb-6 text-center"><h1 className="text-2xl font-extrabold leading-tight lg:text-3xl">{titles[step]}</h1><p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">{subtitles[step]}</p></div>
+        {step === 0 && <div>
+          <div className="grid gap-3" role="group" aria-label="Subscription plans">{plans.map((plan) => <Button key={plan.id} variant="outline" aria-pressed={selectedPlan.id === plan.id} onClick={() => setSelectedPlan(plan)} className={`h-auto w-full justify-start whitespace-normal rounded-lg border p-4 text-left shadow-none ${selectedPlan.id === plan.id ? "border-foreground bg-secondary hover:bg-secondary" : "border-border bg-background hover:bg-secondary/60"}`}>
+            <span className={`mr-3 grid size-5 shrink-0 place-items-center rounded-full border ${selectedPlan.id === plan.id ? "border-foreground bg-foreground text-background" : "border-input"}`}>{selectedPlan.id === plan.id && <Check className="size-3" />}</span>
+            <span className="min-w-0 flex-1"><span className="flex flex-wrap items-center gap-2"><span className="text-base font-bold">{plan.name}</span>{plan.id === "growth" && <span className="text-[10px] font-semibold uppercase text-primary">Popular</span>}</span><span className="mt-1 flex items-center gap-1.5 text-xs font-medium text-muted-foreground"><Clock3 className="size-3.5 shrink-0" />{plan.monthlyHours} hours / month</span></span>
+            <span className="shrink-0 text-right"><span className="block text-2xl font-bold">${plan.monthlyFee}</span><span className="block text-xs font-normal text-muted-foreground">/ month</span></span>
+          </Button>)}</div>
+          <p className="mt-4 text-sm font-medium">{selectedPlan.description}</p>
+          <ul className="mt-3 space-y-2 text-sm text-muted-foreground">{["Marketing, design & development", `${selectedPlan.monthlyHours} assigned service hours per month`, "Advertising budgets billed separately"].map((text) => <li key={text} className="flex items-start gap-2"><Check className="mt-0.5 size-4 shrink-0 text-primary" />{text}</li>)}</ul>
+          <p className="mt-3 text-xs leading-relaxed text-muted-foreground">Your hours are shared across all three services. Service delivery is not unlimited.</p>
+          <Button className="signup-primary mt-5" onClick={() => setStep(1)}>Continue with {selectedPlan.name}<ArrowRight /></Button>
+          <div className="mt-4 flex items-start justify-center gap-2 text-center text-xs leading-relaxed text-muted-foreground"><ShieldCheck className="size-4 shrink-0 text-primary" /><p>90-day money-back guarantee if no sales are received.<br />Service fees only.</p></div>
+          <p className="mt-5 text-center text-sm text-muted-foreground">Already have an account? <Button asChild variant="link" className="h-auto p-0 font-semibold text-foreground"><Link to="/">Log in</Link></Button></p>
         </div>}
         {(step === 1 || step === 2) && <form onSubmit={advance} noValidate className="space-y-5">
           {step === 1 ? <>
-            <div className="grid gap-5 sm:grid-cols-2"><Field label="First name"><input className="signup-input" autoComplete="given-name" value={personal.firstName} onChange={(e) => setPersonal({ ...personal, firstName: e.target.value })} maxLength={80} /></Field><Field label="Last name"><input className="signup-input" autoComplete="family-name" value={personal.lastName} onChange={(e) => setPersonal({ ...personal, lastName: e.target.value })} maxLength={80} /></Field></div>
+            <div className="grid gap-5 lg:grid-cols-2"><Field label="First name"><input className="signup-input" autoComplete="given-name" value={personal.firstName} onChange={(e) => setPersonal({ ...personal, firstName: e.target.value })} maxLength={80} /></Field><Field label="Last name"><input className="signup-input" autoComplete="family-name" value={personal.lastName} onChange={(e) => setPersonal({ ...personal, lastName: e.target.value })} maxLength={80} /></Field></div>
             <Field label="Business name"><input className="signup-input" autoComplete="organization" value={personal.company} onChange={(e) => setPersonal({ ...personal, company: e.target.value })} maxLength={160} /></Field>
             <div className="space-y-2"><span className="text-sm font-medium">Country</span><CountryField value={personal.country} onChange={setCountry} /></div>
-            <div className="space-y-2"><label htmlFor="mobile" className="text-sm font-medium">Mobile number</label><div className="flex min-w-0 items-center overflow-hidden rounded-lg border border-input bg-secondary/40 focus-within:border-foreground focus-within:ring-2 focus-within:ring-foreground/5"><CountryField phone value={phoneCountry} onChange={(v) => { phoneTouched.current = true; changePhoneCountry(v); }} /><input id="mobile" aria-label="Mobile number" autoComplete="tel" type="tel" inputMode="tel" placeholder="+31 6 1234 5678" value={personal.phone} maxLength={30} onChange={(e) => { phoneTouched.current = true; setPersonal({ ...personal, phone: e.target.value.replace(/[^\d+\s()-]/g, "") }); }} className="h-11 min-w-0 flex-1 bg-transparent px-3 text-base outline-none sm:h-12" /></div></div>
+            <div className="space-y-2"><label htmlFor="mobile" className="text-sm font-medium">Mobile number</label><div className="flex min-w-0 items-center overflow-hidden rounded-xl border border-transparent bg-secondary sm:rounded-2xl focus-within:border-foreground focus-within:ring-2 focus-within:ring-foreground/5"><CountryField phone value={phoneCountry} onChange={(v) => { phoneTouched.current = true; changePhoneCountry(v); }} /><input id="mobile" aria-label="Mobile number" autoComplete="tel" type="tel" inputMode="tel" placeholder="+31 6 1234 5678" value={personal.phone} maxLength={30} onChange={(e) => { phoneTouched.current = true; setPersonal({ ...personal, phone: e.target.value.replace(/[^\d+\s()-]/g, "") }); }} className="h-12 min-w-0 flex-1 bg-transparent px-3 text-base outline-none sm:h-14" /></div></div>
             <p className="text-xs leading-relaxed text-muted-foreground">Your country may be suggested using ipapi.co. You can change it. <Button variant="link" type="button" className="h-auto p-0 text-xs" onClick={() => setDocumentIndex(3)}>Privacy information</Button></p>
           </> : <>
             <Field label="Email Address"><input className="signup-input" type="email" inputMode="email" autoComplete="email" value={account.email} maxLength={254} onChange={(e) => setAccount({ ...account, email: e.target.value })} /></Field>
@@ -168,8 +177,8 @@ function Signup() {
           <div className="flex items-center gap-3 pt-4"><Button type="button" variant="secondary" aria-label="Back" className="size-12 rounded-full" onClick={() => setStep(step - 1)}><ArrowLeft /></Button><Button type="submit" className="signup-primary flex-1">{step === 1 ? "Continue" : "Review application"}<ArrowRight /></Button></div>
         </form>}
         {step === 3 && <div>
-          <ReviewSection title="Your application" onEdit={() => setStep(0)}><ReviewRow label="Plan" value={subscription.name} /><ReviewRow label="Service fee" value="$199 / month" /><ReviewRow label="Included services" value="Marketing, design & development" /><ReviewRow label="Money-back guarantee" value="90 days if no sales are received. Service fees only; advertising budgets excluded." /></ReviewSection>
-          <ReviewSection title="Personal information" onEdit={() => setStep(1)}><ReviewRow label="Full name" value={`${personal.firstName} ${personal.lastName}`} /><ReviewRow label="Business" value={personal.company} /><ReviewRow label="Country" value={countries.find((c) => c.code === personal.country)?.name ?? ""} /><ReviewRow label="Mobile number" value={personal.phone} /></ReviewSection>
+          <ReviewSection title="Your application" onEdit={() => setStep(0)}><ReviewRow label="Plan" value={selectedPlan.name} /><ReviewRow label="Service fee" value={`$${selectedPlan.monthlyFee} / month`} /><ReviewRow label="Assigned monthly hours" value={`${selectedPlan.monthlyHours} hours shared across all services; not unlimited`} /><ReviewRow label="Included services" value="Marketing, design & development" /><ReviewRow label="Money-back guarantee" value="90 days if no sales are received. Service fees only; advertising budgets excluded." /></ReviewSection>
+          <ReviewSection title="Personal information" onEdit={() => setStep(1)}><ReviewRow label="Full name" value={`${personal.firstName} ${personal.lastName}`} /><ReviewRow label="Business" value={personal.company} /><ReviewRow label="Country" value={countries.find((c) => c.code === personal.country)?.name ?? ""} country={personal.country} /><ReviewRow label="Mobile number" value={personal.phone} /></ReviewSection>
           <ReviewSection title="Account details" onEdit={() => setStep(2)}><ReviewRow label="Email Address" value={account.email} /></ReviewSection>
           <Button className="signup-primary mt-6" onClick={() => setStep(4)}>To your agreements <ArrowRight /></Button>
         </div>}
@@ -182,11 +191,13 @@ function Signup() {
           <div className="mt-6 flex gap-3"><Button variant="secondary" aria-label="Back to review" className="size-12 rounded-full" onClick={() => setStep(3)}><ArrowLeft /></Button><Button className="signup-primary flex-1" onClick={openConfirmation}>Accept & continue <PenLine /></Button></div>
         </div>}
       </div>
-    </> : step === 5 ? <section className="mx-auto flex min-h-[calc(100dvh-5rem)] max-w-lg flex-col justify-center px-6 pb-24 text-center" aria-live="polite"><div role="progressbar" aria-label="Processing application" aria-valuenow={Math.round(progress)} aria-valuemin={0} aria-valuemax={100} className="mb-8 h-2 overflow-hidden rounded-full border bg-secondary"><div className="h-full origin-left bg-primary transition-transform duration-100 motion-reduce:transition-none" style={{ transform: `scaleX(${progress / 100})` }} /></div><h1 className="text-2xl font-semibold sm:text-3xl">Just a moment, please…</h1><p className="mt-4 text-base leading-relaxed text-muted-foreground">Preparing your application summary.</p></section> : <section className="mx-auto flex min-h-[calc(100dvh-5rem)] max-w-lg flex-col items-center justify-center px-6 py-12 text-center"><span className="grid size-20 place-items-center rounded-full bg-primary/10 text-primary"><Check className="size-10" /></span><h1 className="mt-7 text-3xl font-bold leading-tight">You're all set, {personal.firstName}!</h1><p className="mt-3 text-sm leading-relaxed text-muted-foreground">Your demonstration application is complete.<br />No account, payment or application has been submitted.</p><div className="mt-8 w-full space-y-5 text-left"><div className="flex gap-3 border-b pb-5"><Rocket className="size-5 shrink-0 text-primary" /><div><p className="font-semibold">Your marketing accelerator</p><p className="mt-1 text-sm text-muted-foreground">Marketing, design & development · $199/month</p></div></div><div className="flex gap-3"><ShieldCheck className="size-5 shrink-0 text-primary" /><div><p className="font-semibold">Confirmation completed</p><p className="mt-1 text-sm leading-relaxed text-muted-foreground">{signature?.name}<br />{signature ? new Date(signature.at).toLocaleString() : ""}<br />90-day service-fee guarantee if no sales are received.</p></div></div></div><Button asChild className="signup-primary mt-10"><Link to="/">Close</Link></Button></section>}
+    </> : step === 5 ? <section className="mx-auto flex min-h-[calc(100dvh-5rem)] max-w-lg flex-col justify-center px-6 pb-24 text-center" aria-live="polite"><div role="progressbar" aria-label="Processing application" aria-valuenow={Math.round(progress)} aria-valuemin={0} aria-valuemax={100} className="mb-8 h-2 overflow-hidden rounded-full border bg-secondary"><div className="h-full origin-left bg-primary transition-transform duration-100 motion-reduce:transition-none" style={{ transform: `scaleX(${progress / 100})` }} /></div><h1 className="text-2xl font-semibold sm:text-3xl">Just a moment, please…</h1><p className="mt-4 text-base leading-relaxed text-muted-foreground">Preparing your application summary.</p></section> : <section className="mx-auto flex min-h-[calc(100dvh-5rem)] max-w-lg flex-col items-center justify-center px-6 py-12 text-center"><span className="grid size-20 place-items-center rounded-full bg-primary/10 text-primary"><Check className="size-10" /></span><h1 className="mt-7 text-3xl font-bold leading-tight">You're all set, {personal.firstName}!</h1><p className="mt-3 text-sm leading-relaxed text-muted-foreground">Your demonstration application is complete.<br />No account, payment or application has been submitted.</p><div className="mt-8 w-full space-y-5 text-left"><div className="flex gap-3 border-b pb-5"><Rocket className="size-5 shrink-0 text-primary" /><div><p className="font-semibold">Your marketing accelerator</p><p className="mt-1 text-sm text-muted-foreground">{selectedPlan.name} · ${selectedPlan.monthlyFee}/month<br />{selectedPlan.monthlyHours} assigned hours / month</p></div></div><div className="flex gap-3"><ShieldCheck className="size-5 shrink-0 text-primary" /><div><p className="font-semibold">Confirmation completed</p><p className="mt-1 text-sm leading-relaxed text-muted-foreground">{signature?.name}<br />{signature ? new Date(signature.at).toLocaleString() : ""}<br />90-day service-fee guarantee if no sales are received.</p></div></div></div><Button asChild className="signup-primary mt-10"><Link to="/">Close</Link></Button></section>}
 
+      </section>
+    </div>
     <Dialog.Root open={confirmOpen} onOpenChange={setConfirmOpen}>
       <Dialog.Portal><Dialog.Overlay className="fixed inset-0 z-30 bg-foreground/40 backdrop-blur-sm" /><Dialog.Content className="signature-dialog">
-        <span className="mx-auto mb-5 flex justify-center text-muted-foreground sm:hidden"><ChevronDown className="size-7" /></span>
+        <span className="mx-auto mb-5 flex justify-center text-muted-foreground xl:hidden"><ChevronDown className="size-7" /></span>
         <Dialog.Close asChild><Button variant="ghost" size="icon" aria-label="Close confirmation" className="absolute right-4 top-4"><X /></Button></Dialog.Close>
         <div className="flex flex-1 flex-col justify-center"><span className="mb-6 grid size-14 place-items-center rounded-full bg-secondary"><PenLine className="size-6" /></span><Dialog.Title className="max-w-sm text-2xl font-bold leading-tight sm:text-3xl">Confirm your application</Dialog.Title><Dialog.Description className="mt-4 text-sm leading-relaxed text-muted-foreground">Enter the code below to accept the subscription terms and confirm your application as {personal.firstName} {personal.lastName}.</Dialog.Description>
           <div data-testid="signature-code" aria-label={`Confirmation code ${code}`} className="my-8 grid grid-cols-6 gap-2 text-center text-3xl font-semibold sm:text-4xl">{code.split("").map((digit, index) => <span key={index}>{digit}</span>)}</div>
@@ -204,8 +215,8 @@ function Signup() {
 function ReviewSection({ title, children, onEdit }: { title: string; children: ReactNode; onEdit: () => void }) {
   return <section className="mb-6"><div className="-mx-5 flex items-center justify-between bg-secondary px-5 py-4 sm:mx-0 sm:px-6"><h2 className="text-xl font-medium">{title}</h2><Button variant="link" onClick={onEdit}>Edit</Button></div><div className="divide-y px-0 sm:px-6">{children}</div></section>;
 }
-function ReviewRow({ label, value }: { label: string; value: string }) {
-  return <div className="py-4"><p className="text-sm font-semibold text-muted-foreground">{label}</p><p className="mt-1 break-words text-base leading-relaxed">{value}</p></div>;
+function ReviewRow({ label, value, country }: { label: string; value: string; country?: string }) {
+  return <div className="py-4"><p className="text-sm font-semibold text-muted-foreground">{label}</p><p className="mt-1 flex items-center gap-2 break-words text-base leading-relaxed">{country && <CountryFlag code={country} />}{value}</p></div>;
 }
 function DocumentRow({ title, onRead, onDownload }: { title: string; onRead: () => void; onDownload: () => void }) {
   return <div className="flex items-center justify-between gap-3 border-b py-5 sm:px-6"><Button variant="link" className="h-auto whitespace-normal p-0 text-left text-base font-semibold" onClick={onRead}>{title}</Button><Button variant="ghost" size="icon" aria-label={`Download ${title}`} title={`Download ${title}`} className="shrink-0 text-primary" onClick={onDownload}><Download /></Button></div>;

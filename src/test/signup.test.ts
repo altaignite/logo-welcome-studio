@@ -1,8 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { accountSchema, countries, createSignatureCode, isSignatureMatch, personalSchema, refundEligible, subscription } from "@/lib/signup";
+import { accountSchema, countries, createSignatureCode, isSignatureMatch, personalSchema, refundEligible, subscription, plans, planTerms } from "@/lib/signup";
 
 describe("Marketing subscription rules", () => {
   it("starts at $199 per month", () => expect(subscription.monthlyFee).toBe(199));
+  it("offers three plans with finite assigned monthly hours", () => {
+    expect(plans.map(({ id, monthlyFee, monthlyHours }) => ({ id, monthlyFee, monthlyHours }))).toEqual([
+      { id: "starter", monthlyFee: 199, monthlyHours: 5 },
+      { id: "growth", monthlyFee: 499, monthlyHours: 15 },
+      { id: "scale", monthlyFee: 999, monthlyHours: 35 },
+    ]);
+  });
+  it("carries each chosen plan into the agreement terms", () => {
+    for (const plan of plans) {
+      const terms = planTerms(plan);
+      expect(terms).toContain(`$${plan.monthlyFee} / month`);
+      expect(terms).toContain(`${plan.monthlyHours} assigned service hours per month`);
+    }
+  });
   it("covers marketing, design and development", () => expect(subscription.services).toEqual(["Marketing", "Design", "Development"]));
   it("excludes advertising budgets", () => expect(subscription.advertisingBudgetIncluded).toBe(false));
   it("guarantees service fees for zero sales within 90 days", () => {

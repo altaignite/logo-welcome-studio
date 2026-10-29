@@ -10,6 +10,8 @@
 <!-- LOVABLE:END -->
 
 - Keep signup as a dedicated TanStack leaf route with browser-only state; this project deliberately has no account, submission or payment backend.
-- Keep subscription rules and input validation in the shared signup module with concrete tests, so review and agreement screens use consistent terms.
+- Keep selectable plan data, finite service-hour allowances, subscription terms and input validation in the shared signup module with concrete tests, so selection, review, downloaded agreements and completion use the same chosen plan.
 - Use libphonenumber-js metadata for countries and dial codes; optional browser IP preselection must not overwrite manual choices or block signup.
 - Treat displayed signature codes as local confirmation only, generated with Web Crypto and never reused within the current application, not as identity verification.
+- Keep every signup stage inside the same login-inspired split layout, with the shared cinematic photo on tablet and desktop, to preserve visual continuity.
+- Render country flags from the free FlagCDN image API with empty alt text alongside country names and graceful image-failure fallback, so flags remain decorative rather than replacing accessible country labels.
