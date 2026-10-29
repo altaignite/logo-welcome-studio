@@ -57,6 +57,13 @@
       "when": 1793289218392,
       "tag": "0007_billing_settings_staff_read",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793289969727,
+      "tag": "0008_signup_plan_server_prices",
+      "breakpoints": true
     }
   ]
 }
