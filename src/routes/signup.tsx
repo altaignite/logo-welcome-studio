@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { CountryField, CountryFlag } from "@/components/country-field";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { usePopup } from "@/components/popup";
-import { accountSchema, countries, createSignatureCode, isSignatureMatch, personalSchema, plans, planTerms, type Plan, type CountryCode, type PersonalDetails, formatPhoneInput, switchPhoneCountry, phonePlaceholder } from "@/lib/signup";
+import { supabase } from "@/integrations/supabase/client";
+import { createAccountNumber, accountSchema, countries, createSignatureCode, isSignatureMatch, personalSchema, plans, planTerms, type Plan, type CountryCode, type PersonalDetails, formatPhoneInput, switchPhoneCountry, phonePlaceholder } from "@/lib/signup";
 import logo from "@/assets/logo.png.asset.json";
 
 export const Route = createFileRoute("/signup")({
@@ -42,6 +43,8 @@ function Signup() {
   const [phoneCountry, setPhoneCountry] = useState<string>("");
   const [account, setAccount] = useState({ email: "", password: "", confirmPassword: "" });
   const [showPassword, setShowPassword] = useState(false);
+  const [accountNumber, setAccountNumber] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [code, setCode] = useState("");
   const [entered, setEntered] = useState("");
@@ -97,14 +100,30 @@ function Signup() {
       popup({ type: "error", title: "Let's check your details", description: result.error.issues[0]?.message ?? "Please check your information.", primaryLabel: "Try again", secondaryLabel: null });
       return;
     }
+    if (step === 2 && !accountNumber) setAccountNumber(createAccountNumber());
     setStep((s) => s + 1);
   };
   const newCode = () => { const next = createSignatureCode(usedCodes.current); usedCodes.current.add(next); setCode(next); setEntered(""); };
   const openConfirmation = () => { newCode(); setConfirmOpen(true); };
-  const accept = () => {
+  const accept = async () => {
     if (!isSignatureMatch(code, entered)) {
       setConfirmOpen(false);
       popup({ type: "error", title: "The code doesn't match", description: "Please try again with a new confirmation code.", primaryLabel: "Try again", onPrimary: openConfirmation, secondaryLabel: "Cancel" });
+      return;
+    }
+    setSubmitting(true);
+    const { error } = await supabase.auth.signUp({
+      email: account.email.trim(), password: account.password,
+      options: { emailRedirectTo: window.location.origin, data: {
+        account_number: accountNumber, first_name: personal.firstName.trim(), last_name: personal.lastName.trim(), company: personal.company.trim(),
+        country: personal.country, phone: personal.phone, plan_id: selectedPlan.id, plan_name: selectedPlan.name,
+        monthly_fee: selectedPlan.monthlyFee, monthly_hours: selectedPlan.monthlyHours,
+      } },
+    });
+    setSubmitting(false);
+    if (error) {
+      setConfirmOpen(false);
+      popup({ type: "error", title: "We couldn't submit your application", description: error.message, primaryLabel: "Try again", onPrimary: openConfirmation, secondaryLabel: "Cancel" });
       return;
     }
     setSignature({ name: `${personal.firstName} ${personal.lastName}`, at: new Date().toISOString(), code });
@@ -175,14 +194,14 @@ function Signup() {
             <Field label="Password"><div className="relative"><input className="signup-input pr-12" type={showPassword ? "text" : "password"} autoComplete="new-password" maxLength={128} value={account.password} onChange={(e) => setAccount({ ...account, password: e.target.value })} /><Button variant="ghost" size="icon" type="button" aria-label={showPassword ? "Hide password" : "Show password"} className="absolute right-1 top-1/2 -translate-y-1/2" onClick={() => setShowPassword((s) => !s)}>{showPassword ? <EyeOff /> : <Eye />}</Button></div></Field>
             <p className="text-xs text-muted-foreground">At least 8 characters.</p>
             <Field label="Confirm password"><input className="signup-input" type={showPassword ? "text" : "password"} autoComplete="new-password" maxLength={128} value={account.confirmPassword} onChange={(e) => setAccount({ ...account, confirmPassword: e.target.value })} /></Field>
-            <div className="flex gap-3 border-t pt-5 text-sm text-muted-foreground"><LockKeyhole className="size-5 shrink-0" /><p>These login details are for this preview only. No account is created.</p></div>
+            <div className="flex gap-3 border-t pt-5 text-sm text-muted-foreground"><LockKeyhole className="size-5 shrink-0" /><p>Your account is created when you sign your agreement. We'll email you a link to confirm your address.</p></div>
           </>}
           <div className="flex items-center gap-3 pt-4"><Button type="button" variant="secondary" aria-label="Back" className="size-11 shrink-0 rounded-full" onClick={() => setStep(step - 1)}><ArrowLeft /></Button><Button type="submit" className="signup-primary flex-1">{step === 1 ? "Continue" : "Review application"}<ArrowRight /></Button></div>
         </form>}
         {step === 3 && <div>
           <ReviewSection title="Your application" onEdit={() => setStep(0)}><ReviewRow label="Plan" value={selectedPlan.name} /><ReviewRow label="Service fee" value={`$${selectedPlan.monthlyFee} / month`} /><ReviewRow label="Assigned monthly hours" value={`${selectedPlan.monthlyHours} hours shared across all services; not unlimited`} /><ReviewRow label="Included services" value="Marketing, design & development" /><ReviewRow label="Money-back guarantee" value="90 days if no sales are received. Service fees only; advertising budgets excluded." /></ReviewSection>
           <ReviewSection title="Personal information" onEdit={() => setStep(1)}><ReviewRow label="Full name" value={`${personal.firstName} ${personal.lastName}`} /><ReviewRow label="Business" value={personal.company} /><ReviewRow label="Country" value={countries.find((c) => c.code === personal.country)?.name ?? ""} country={personal.country} /><ReviewRow label="Mobile number" value={personal.phone} /></ReviewSection>
-          <ReviewSection title="Account details" onEdit={() => setStep(2)}><ReviewRow label="Email Address" value={account.email} /></ReviewSection>
+          <ReviewSection title="Account details" onEdit={() => setStep(2)}><ReviewRow label="Account number" value={accountNumber.replace(/(\d{4})(\d{3})(\d{3})/, "$1 $2 $3")} /><ReviewRow label="Email Address" value={account.email} /></ReviewSection>
           <Button className="signup-primary mt-6" onClick={() => setStep(4)}>To your agreements <ArrowRight /></Button>
         </div>}
         {step === 4 && <div>
@@ -207,7 +226,7 @@ function Signup() {
         <SignatureCode code={code} />
         <InputOTP maxLength={6} value={entered} onChange={setEntered} aria-label="Enter six-digit confirmation code" inputMode="numeric" pattern="[0-9]*" autoComplete="off" containerClassName="mt-4 w-full justify-center"><InputOTPGroup className="grid w-full grid-cols-6 gap-2">{Array.from({ length: 6 }, (_, index) => <InputOTPSlot key={index} index={index} className="signup-input h-11 justify-center rounded-lg border p-0 text-base shadow-none first:rounded-lg first:border-l last:rounded-lg data-[active=true]:border-foreground data-[active=true]:ring-[3px] data-[active=true]:ring-foreground/10" />)}</InputOTPGroup></InputOTP>
         <button type="button" onClick={newCode} className="relative z-10 mx-auto mt-3 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground"><RefreshCw className="size-3.5" /> Use a new code</button>
-        <div className="relative z-10 mt-6 space-y-2"><Button className="signup-primary text-sm" disabled={entered.length !== 6} onClick={accept}>Accept & sign</Button><button type="button" className="app-modal-secondary" onClick={() => setConfirmOpen(false)}>Cancel</button></div>
+        <div className="relative z-10 mt-6 space-y-2"><Button className="signup-primary text-sm" disabled={entered.length !== 6 || submitting} onClick={accept}>{submitting ? "Submitting…" : "Accept & sign"}</Button><button type="button" className="app-modal-secondary" onClick={() => setConfirmOpen(false)}>Cancel</button></div>
       </Dialog.Content></Dialog.Portal>
     </Dialog.Root>
     <Dialog.Root open={selectedDoc !== null} onOpenChange={(open) => { if (!open) setDocumentIndex(null); }}><Dialog.Portal><Dialog.Overlay className="fixed inset-0 z-40 bg-foreground/40 backdrop-blur-sm" /><Dialog.Content className="app-modal"><Dialog.Title className="pr-8 text-xl font-bold">{selectedDoc?.title}</Dialog.Title><Dialog.Description className="mt-4 whitespace-pre-line text-sm leading-relaxed text-muted-foreground">{selectedDoc?.body}</Dialog.Description><p className="mt-6 text-xs text-muted-foreground">Summary for this demonstration; not a final legal contract.</p><div className="mt-6 space-y-2"><Button className="signup-primary text-sm" onClick={() => { if (documentIndex !== null) downloadDocument(documentIndex); }}><Download /> Save a copy</Button><Dialog.Close asChild><Button variant="secondary" className="app-modal-secondary">Close</Button></Dialog.Close></div></Dialog.Content></Dialog.Portal></Dialog.Root>

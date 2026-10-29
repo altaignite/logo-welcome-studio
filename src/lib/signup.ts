@@ -102,3 +102,9 @@ export function refundEligible(days: number, sales: number, feeType: "service" |
 
 export type PersonalDetails = z.infer<typeof personalSchema>;
 export type { CountryCode };
+/** Random 10-digit account number (first digit never 0), issued once account details are completed. */
+export function createAccountNumber() {
+  const bytes = new Uint32Array(10);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b, i) => String(i === 0 ? 1 + (b % 9) : b % 10)).join("");
+}
