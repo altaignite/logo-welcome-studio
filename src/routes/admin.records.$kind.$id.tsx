@@ -1,5 +1,8 @@
 import { createFileRoute, Link, getRouteApi, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { approveOverage, billOverage, collectionAction, sendFirstInvoice, subscriptionAction } from "@/lib/billing.functions";
+import { stageLabel, unbilledOverage, type CollectionStage } from "@/lib/billing";
 import { useState } from "react";
 import { Archive, ArchiveRestore, Ban, Clock, CreditCard, MessageSquare, Pencil, Plus, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
 import { DataTable } from "@/components/admin/data-table";
@@ -23,6 +26,7 @@ function RecordPage() {
   const popup = usePopup();
   const [modal, setModal] = useState<Modal | null>(null);
   const cfg = isRecordKind(kind) ? recordKinds[kind] : null;
+  const fnFirst = useServerFn(sendFirstInvoice), fnSub = useServerFn(subscriptionAction), fnOver = useServerFn(billOverage), fnColl = useServerFn(collectionAction), fnApprove = useServerFn(approveOverage);
 
   const { data, isLoading, error } = useQuery({
     enabled: !!cfg,
@@ -158,6 +162,35 @@ function RecordPage() {
     },
   });
 
+  const attempt = async (title: string, description: string, fn: () => Promise<unknown>) => {
+    try { await fn(); await refresh(); popup({ type: "success", title, description, primaryLabel: "Done", secondaryLabel: null }); }
+    catch (e) { popup({ type: "error", title: "Something went wrong", description: (e as Error).message, primaryLabel: "Close", secondaryLabel: null }); }
+  };
+  const subAct = (action: "pause" | "resume" | "cancel_now" | "cancel_end") => setModal({
+    title: { pause: "Pause subscription", resume: "Resume subscription", cancel_now: "Cancel immediately", cancel_end: "Cancel at period end" }[action], submitLabel: "Confirm",
+    description: action === "pause" && row.guarantee_status === "running" ? "Pausing within the first 90 days voids the money-back guarantee. Billing in Stripe stops while paused." : "This is applied in Stripe and saved in the audit log.",
+    fields: [{ name: "reason", label: "Reason", type: "textarea", required: true }],
+    onSubmit: async (v) => { try { await fnSub({ data: { subscriptionId: id, action, reason: v.reason } }); await refresh(); return null; } catch (e) { return (e as Error).message; } },
+  });
+  const overage = () => setModal({
+    title: "Bill extra hours", submitLabel: "Bill", description: `${unbilledOverage(Number(row.hours_used), Number(row.monthly_hours), Number(row.overage_billed_hours ?? 0))} hours beyond the ${row.monthly_hours} hour allowance.`,
+    fields: [{ name: "when", label: "When", type: "select", options: ["next_invoice", "now"] }],
+    onSubmit: async (v) => { try { await fnOver({ data: { subscriptionId: id, when: v.when as "now" | "next_invoice" } }); await refresh(); return null; } catch (e) { return (e as Error).message; } },
+  });
+  const collections = () => setModal({
+    title: "Debt recovery", submitLabel: "Apply", description: `Stage: ${stageLabel[(row.collection_stage as CollectionStage) ?? "none"]}. Interest ${money(Number(row.interest_accrued ?? 0))}, fees ${money(Number(row.fees_accrued ?? 0))}.`,
+    fields: [
+      { name: "action", label: "Action", type: "select", options: ["flag", "court", "issue_arrears", "pause_interest", "resume_interest", "settle", "write_off"] },
+      { name: "note", label: "Note (saved in the audit log)", type: "textarea", required: true },
+    ],
+    onSubmit: async (v) => {
+      try {
+        let courtFees: { name: string; amount: number }[] | undefined;
+        if (v.action === "court") courtFees = ((await db.from("billing_settings").select("court_fees").eq("id", 1).maybeSingle()).data?.court_fees ?? []) as { name: string; amount: number }[];
+        await fnColl({ data: { invoiceId: id, action: v.action as "flag", note: v.note, ...(courtFees ? { courtFees } : {}) } }); await refresh(); return null;
+      } catch (e) { return (e as Error).message; }
+    },
+  });
   const isVoid = row.status === "void";
   return (
     <div className="space-y-6">
@@ -169,12 +202,18 @@ function RecordPage() {
           {!!row.archived_at && <p className="mt-1 text-sm text-muted-foreground">Archived on {fmtText(row.archived_at, "date")}</p>}
         </div>
         <div className="flex flex-wrap gap-2">
-          {kind === "subscriptions" && row.status === "pending" && <Btn icon={RefreshCw} onClick={activate}>Activate</Btn>}
-          {kind === "subscriptions" && row.status === "active" && <Btn icon={RefreshCw} onClick={renew}>Renew period</Btn>}
+          {kind === "subscriptions" && row.status === "pending" && <Btn icon={CreditCard} onClick={() => attempt("First invoice sent", "Stripe emailed the invoice. The subscription activates when it's paid.", () => fnFirst({ data: { subscriptionId: id } }))}>Send first invoice</Btn>}
+          {kind === "subscriptions" && (row.status === "active" || row.status === "past_due") && <Btn icon={Ban} onClick={() => subAct("pause")}>Pause</Btn>}
+          {kind === "subscriptions" && row.status === "paused" && <Btn icon={RefreshCw} onClick={() => subAct("resume")}>Resume</Btn>}
+          {kind === "subscriptions" && !["cancelled", "pending"].includes(String(row.status)) && <Btn icon={Ban} danger onClick={() => subAct("cancel_end")}>Cancel at period end</Btn>}
+          {kind === "subscriptions" && row.status !== "cancelled" && <Btn icon={Ban} danger onClick={() => subAct("cancel_now")}>Cancel now</Btn>}
+          {kind === "subscriptions" && unbilledOverage(Number(row.hours_used), Number(row.monthly_hours), Number(row.overage_billed_hours ?? 0)) > 0 && <Btn icon={Clock} onClick={overage}>Bill extra hours</Btn>}
           {kind === "subscriptions" && subProjects.length > 0 && <Btn icon={Clock} onClick={() => logHours()}>Log hours</Btn>}
-          {kind === "subscriptions" && guaranteeEligible({ guarantee_ends_at: (row.guarantee_ends_at as string) ?? null, sales_received: !!row.sales_received }) && row.guarantee_status !== "refunded" && <Btn icon={RotateCcw} onClick={refund}>Guarantee refund</Btn>}
+          {kind === "subscriptions" && guaranteeEligible({ guarantee_ends_at: (row.guarantee_ends_at as string) ?? null, sales_received: !!row.sales_received }) && row.guarantee_status === "running" && <Btn icon={RotateCcw} onClick={refund}>Guarantee refund</Btn>}
           {kind === "projects" && <Btn icon={Clock} onClick={() => logHours(id)}>Log hours</Btn>}
-          {kind === "invoices" && (row.status === "open" || row.status === "overdue") && <Btn icon={CreditCard} onClick={recordPayment}>Record payment</Btn>}
+          {kind === "tasks" && !!row.over_allowance && !row.overage_approved && <Btn icon={Clock} onClick={() => attempt("Extra hours approved", "Time can now be logged beyond the plan allowance.", () => fnApprove({ data: { taskId: id } }))}>Approve extra hours</Btn>}
+          {kind === "invoices" && !!row.hosted_url && <Btn icon={CreditCard} onClick={() => window.open(String(row.hosted_url), "_blank", "noopener")}>Open Stripe invoice</Btn>}
+          {kind === "invoices" && (row.status === "open" || row.status === "overdue") && <Btn icon={Ban} onClick={collections}>Collections</Btn>}
           {kind === "support_tickets" && <Btn icon={MessageSquare} onClick={reply}>Add message</Btn>}
           {!isVoid && <Btn icon={Pencil} onClick={edit}>Edit</Btn>}
           {cfg.archivable && <Btn icon={row.archived_at ? ArchiveRestore : Archive} onClick={archive}>{row.archived_at ? "Restore" : "Archive"}</Btn>}
