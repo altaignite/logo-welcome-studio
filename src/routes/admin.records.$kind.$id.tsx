@@ -203,10 +203,10 @@ function RecordPage() {
         const openable = isRecordKind(childKind);
         const canCreate = (kind === "subscriptions" && (childKind === "projects" || childKind === "invoices" || childKind === "tasks")) || (kind === "projects" && childKind === "tasks");
         return (
-          <DataTable<Row> key={c.label} title={c.label} rows={c.rows} empty={`No ${c.label.toLowerCase()} yet.`} searchable={c.rows.length > 5}
+          <DataTable<Row> key={c.label} title={c.label} rows={c.rows} empty={`No ${c.label.toLowerCase()} yet.`} searchable={false}
             getId={(r) => r.id}
             onRowClick={openable ? (r) => navigate({ to: "/admin/records/$kind/$id", params: { kind: childKind, id: r.id } }) : undefined}
-            toolbar={<><span className="mr-auto text-sm font-semibold">{c.label}</span>{canCreate && <Btn icon={Plus} onClick={() => newChild(childKind as "projects" | "invoices" | "tasks")}>New</Btn>}</>}
+            toolbar={canCreate ? <Btn icon={Plus} onClick={() => newChild(childKind as "projects" | "invoices" | "tasks")}>New</Btn> : undefined}
             columns={c.columns.map(([label, key, f]) => ({ key, label, value: (r: Row) => fmtText(r[key], f), render: (r: Row) => <FieldValue v={r[key]} f={f} /> }))} />
         );
       })}
