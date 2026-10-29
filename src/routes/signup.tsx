@@ -143,22 +143,22 @@ function Signup() {
       <div className="mx-auto max-w-lg px-5 pb-8 pt-6 md:px-2 md:pt-8">
         <div className="mb-6 text-center"><h1 className="text-2xl font-extrabold leading-tight lg:text-3xl">{titles[step]}</h1><p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">{subtitles[step]}</p></div>
         {step === 0 && <div>
-          <div className="grid gap-5 pt-2" role="group" aria-label="Subscription plans">{plans.map((plan) => <div key={plan.id} className={`rounded-[1.75rem] border bg-card p-6 sm:p-8 ${selectedPlan.id === plan.id ? "border-foreground/40" : "border-border"}`}>
+          <div className="grid gap-4 pt-2" role="group" aria-label="Subscription plans">{plans.map((plan) => <div key={plan.id} className={`rounded-3xl border bg-card p-5 sm:p-6 ${selectedPlan.id === plan.id ? "border-foreground/40" : "border-border"}`}>
             <div className="flex items-start justify-between gap-3">
-              <h2 className="text-2xl font-semibold tracking-tight">{plan.name} Plan</h2>
-              {plan.id === "growth" && <span className="rounded-full bg-foreground px-4 py-1.5 text-sm font-medium text-background shadow-lg">Popular</span>}
+              <h2 className="text-xl font-semibold tracking-tight">{plan.name} Plan</h2>
+              {plan.id === "growth" && <span className="rounded-full bg-foreground px-3 py-1 text-xs font-medium text-background">Popular</span>}
             </div>
-            <p className="mt-3 flex items-baseline gap-1.5"><span className="text-4xl font-bold tracking-tight">${plan.monthlyFee}</span><span className="text-base text-muted-foreground">/month</span></p>
-            <p className="mt-3 text-sm text-muted-foreground">{plan.description}</p>
-            <div className="my-5 h-px bg-border" />
-            <ul className="space-y-5">{[
+            <p className="mt-2 flex items-baseline gap-1.5"><span className="text-3xl font-bold tracking-tight">${plan.monthlyFee}</span><span className="text-sm text-muted-foreground">/month</span></p>
+            <p className="mt-2 text-sm text-muted-foreground">{plan.description}</p>
+            <div className="my-4 h-px bg-border" />
+            <ul className="space-y-4">{[
               { icon: Clock, title: `${plan.monthlyHours} Service Hours`, text: "Assigned every month." },
               { icon: Megaphone, title: "Marketing", text: "Campaigns, content and strategy." },
               { icon: Palette, title: "Design", text: "Brand, social and web visuals." },
               { icon: Code2, title: "Development", text: "Websites, landing pages and fixes." },
-            ].map(({ icon: Icon, title, text }) => <li key={title} className="flex items-center gap-4"><span className="grid size-11 shrink-0 place-items-center rounded-xl bg-secondary"><Icon className="size-5" strokeWidth={1.5} /></span><span><span className="block text-[15px] font-medium">{title}</span><span className="block text-sm text-muted-foreground">{text}</span></span></li>)}</ul>
-            <Button className="mt-7 h-14 w-full rounded-2xl bg-foreground text-base font-semibold text-background hover:bg-foreground/90" onClick={() => { setSelectedPlan(plan); setStep(1); }}>Choose {plan.name}</Button>
-            <p className="mt-4 text-center text-xs text-muted-foreground">90 days money-back guarantee ! Ads budget excluded</p>
+            ].map(({ icon: Icon, title, text }) => <li key={title} className="flex items-center gap-3.5"><span className="grid size-10 shrink-0 place-items-center rounded-xl bg-secondary"><Icon className="size-5" strokeWidth={1.5} /></span><span><span className="block text-sm font-medium">{title}</span><span className="block text-[13px] text-muted-foreground">{text}</span></span></li>)}</ul>
+            <Button className="mt-6 h-12 w-full rounded-2xl bg-foreground text-[15px] font-semibold text-background hover:bg-foreground/90" onClick={() => { setSelectedPlan(plan); setStep(1); }}>Choose {plan.name}</Button>
+            <p className="mt-3 text-center text-xs text-muted-foreground">90 days money-back guarantee ! Ads budget excluded</p>
           </div>)}</div>
           <p className="mt-4 text-xs leading-relaxed text-muted-foreground">Your hours are shared across all services. Service delivery is not unlimited.</p>
           <div className="mt-4 flex items-start justify-center gap-2 text-center text-xs leading-relaxed text-muted-foreground"><ShieldCheck className="size-4 shrink-0 text-primary" /><p>90-day money-back guarantee if no sales are received.<br />Service fees only.</p></div>
