@@ -122,9 +122,16 @@ function Signup() {
       <section className="min-w-0">
     <header className="border-b bg-background">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5 sm:h-20 sm:px-8">
-        <Link to="/" aria-label="FP home"><img src={logo.url} alt="FP" className="size-9 object-contain sm:size-11" /></Link>
-        <span className="text-sm font-semibold">{step < 5 ? steps[step] : step === 5 ? "Almost there…" : "Application complete"}</span>
-        {step < 5 ? <Button variant="ghost" size="icon" aria-label="Close signup" onClick={() => popup({ type: "info", title: "Leave your application?", description: "Your details won't be saved.", primaryLabel: "Leave application", onPrimary: () => { navigate({ to: "/" }); }, secondaryLabel: "Keep going" })}><X /></Button> : <div className="size-9" />}
+        <div className="flex items-center gap-4">
+          <Link to="/" aria-label="FP home"><img src={logo.url} alt="FP" className="size-9 object-contain sm:size-11" /></Link>
+          <span aria-hidden className="hidden h-8 w-px bg-border sm:block" />
+          <span className="hidden text-sm font-semibold tracking-tight sm:block">New Service Application</span>
+        </div>
+        <span className="text-sm font-semibold sm:hidden">{step < 5 ? steps[step] : step === 5 ? "Almost there…" : "Application complete"}</span>
+        <div className="flex items-center gap-3">
+          <span className="hidden text-sm text-muted-foreground sm:block">{step < 5 ? `${steps[step]}` : step === 5 ? "Almost there…" : "Application complete"}</span>
+          {step < 5 ? <Button variant="ghost" size="icon" aria-label="Close signup" onClick={() => popup({ type: "info", title: "Leave your application?", description: "Your details won't be saved.", primaryLabel: "Leave application", onPrimary: () => { navigate({ to: "/" }); }, secondaryLabel: "Keep going" })}><X /></Button> : <div className="size-9" />}
+        </div>
       </div>
     </header>
 
