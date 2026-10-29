@@ -112,7 +112,7 @@ function RecordPage() {
           try { await fnInvoice({ data: { subscriptionId: id, description: v.description, amount: Number(v.amount) } }); await refresh(); return null; } catch (e) { return (e as Error).message; }
         }
         if (childKind === "tasks") Object.assign(patch, { actor_label: adminEmail });
-        const ins = childKind === "projects" ? { user_id: row.user_id, subscription_id: id, ...patch } : childKind === "invoices" ? { user_id: row.user_id, subscription_id: id, ...patch } : { ...base, ...patch };
+        const ins = childKind === "projects" ? { user_id: row.user_id, subscription_id: id, ...patch } : { ...base, ...patch };
         return done((await db.from(childKind).insert(ins).select("id").single()).error);
       },
     });

@@ -114,7 +114,7 @@ export async function runCollections(admin: Admin, now = new Date()) {
   for (const inv of rows ?? []) {
     const stage = inv.collection_stage as CollectionStage;
     if (stage === "settled" || stage === "written_off") continue;
-    const patch: Record<string, unknown> = { status: "overdue" };
+    const patch: any = { status: "overdue" };
     if (!inv.interest_paused) {
       const target = compoundInterest(Number(inv.amount), monthsOverdue(inv.due_at, now), Number(rules.monthly_interest_pct));
       const delta = round2(target - Number(inv.interest_accrued));

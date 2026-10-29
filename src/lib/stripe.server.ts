@@ -14,7 +14,7 @@ export async function stripe<T = any>(method: "GET" | "POST" | "DELETE", path: s
       "Content-Type": "application/x-www-form-urlencoded",
       ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
     },
-    body: method === "GET" ? undefined : body,
+    ...(method === "GET" ? {} : { body }),
   });
   const json = (await res.json()) as any;
   if (!res.ok) {

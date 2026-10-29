@@ -70,7 +70,7 @@ export const subscriptionAction = createServerFn({ method: "POST" })
     if (sub.status === "cancelled") throw new Error("This subscription is already cancelled.");
     if (!staff && sub.status === "suspended") throw new Error("Please settle the outstanding invoice or contact support.");
     const sid = sub.stripe_subscription_id as string | null;
-    const patch: Record<string, unknown> = {};
+    const patch: any = {};
     const note = `${new Date().toISOString().slice(0, 10)} ${data.action.replace("_", " ")} by ${staff ? "staff" : "client"}: ${data.reason}`;
     if (data.action === "pause") {
       if (sub.status !== "active" && sub.status !== "past_due") throw new Error("Only active subscriptions can be paused.");
@@ -160,7 +160,7 @@ export const collectionAction = createServerFn({ method: "POST" })
     const { data: inv } = await admin.from("invoices").select("*").eq("id", data.invoiceId).single();
     if (!inv) throw new Error("Invoice not found.");
     const stamp = `${new Date().toISOString().slice(0, 10)} ${actorLabel(context)}: ${data.note}`;
-    const patch: Record<string, unknown> = { collection_notes: [inv.collection_notes, stamp].filter(Boolean).join("\n") };
+    const patch: any = { collection_notes: [inv.collection_notes, stamp].filter(Boolean).join("\n") };
     const setStage = (s: string) => { patch.collection_stage = s; patch.stage_changed_at = new Date().toISOString(); };
     switch (data.action) {
       case "flag": setStage("debt_recovery"); break;
@@ -191,12 +191,12 @@ export const collectionAction = createServerFn({ method: "POST" })
 /** Opens Stripe's hosted billing portal for the signed-in client (update card, see receipts). */
 export const billingPortal = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) => z.object({ returnUrl: z.string().url().max(500) }).parse(d))
-  .handler(async ({ data, context }) => {
+  .handler(async ({ context }) => {
     const { getAdmin } = await import("@/lib/billing.server");
     const { stripe, ensureCustomer } = await import("@/lib/stripe.server");
     const admin = await getAdmin();
-    const origin = new URL(data.returnUrl).origin;
+    const { getRequest } = await import("@tanstack/react-start/server");
+    const origin = new URL(getRequest().url).origin;
     const customer = await ensureCustomer(admin, context.userId);
     const s = await stripe("POST", "billing_portal/sessions", { customer, return_url: `${origin}/dashboard` });
     return { url: s.url as string };

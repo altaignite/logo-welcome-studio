@@ -35,8 +35,8 @@ export const Route = createFileRoute("/dashboard")({
 });
 
 const tabs = ["Overview", "Projects and tasks", "Subscriptions", "Applications", "Billing", "Support", "Profile"] as const;
-type R = Record<string, any>;
-type Modal = { title: string; description?: string; fields: FieldDef[]; submitLabel: string; onSubmit: (v: Record<string, string>) => Promise<string | null> };
+type R = any;
+type Modal = { title: string; description?: string; fields: FieldDef[]; submitLabel: string; onSubmit: (v: any) => Promise<string | null> };
 
 function Dashboard() {
   const { userId, email } = Route.useRouteContext();
@@ -82,7 +82,7 @@ function Dashboard() {
     fields: [{ name: "reason", label: "Reason", type: "textarea", required: true }],
     onSubmit: async (v) => { try { await fnSub({ data: { subscriptionId: s.id, action, reason: v.reason } }); await refresh(); return null; } catch (e) { return (e as Error).message; } },
   });
-  const openPortal = async () => { try { const r = await fnPortal({ data: { returnUrl: window.location.href } }); window.location.href = r.url; } catch (e) { fail(e); } };
+  const openPortal = async () => { try { const r = await fnPortal(); window.location.href = r.url; } catch (e) { fail(e); } };
   const newTicket = () => setModal({
     title: "New support request", submitLabel: "Send",
     fields: [{ name: "subject", label: "Subject", required: true }, { name: "category", label: "Topic", type: "select", options: ["general", "billing", "project", "technical"] }, { name: "body", label: "Message", type: "textarea", required: true }],
@@ -184,7 +184,7 @@ function Dashboard() {
 
         {tab === "Support" && (openTicket ? (
           <Section title={openTicket.subject} actions={<button type="button" className="text-sm underline" onClick={() => setTicket(null)}>All tickets</button>}>
-            <ul className="space-y-3 p-5">{data.messages.filter((m) => m.ticket_id === openTicket.id).map((m) => (
+            <ul className="space-y-3 p-5">{data.messages.filter((m: R) => m.ticket_id === openTicket.id).map((m: R) => (
               <li key={m.id} className={`rounded-xl p-3 text-sm ${m.actor_id === userId ? "ml-8 bg-secondary" : "mr-8 border"}`}><p className="whitespace-pre-wrap">{m.body}</p><p className="mt-1 text-xs text-muted-foreground">{m.actor_id === userId ? "You" : "FP team"}, {formatDate(m.created_at)}</p></li>
             ))}</ul>
             <div className="border-t p-4">{openTicket.status === "closed"
