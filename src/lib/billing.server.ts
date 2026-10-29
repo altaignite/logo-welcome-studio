@@ -109,7 +109,7 @@ export async function markPastDue(admin: Admin, subId: string, note: string) {
 /** Daily run: accrue compound interest, move stages, add legal fees. Returns number of invoices touched. */
 export async function runCollections(admin: Admin, now = new Date()) {
   const rules = await loadRules(admin);
-  const { data: rows } = await admin.from("invoices").select("*").in("status", ["open", "overdue"]).lt("due_at", now.toISOString().slice(0, 10));
+  const { data: rows } = await admin.from("invoices").select("*").in("status", ["open", "overdue"]).neq("kind", "arrears").lt("due_at", now.toISOString().slice(0, 10));
   let touched = 0;
   for (const inv of rows ?? []) {
     const stage = inv.collection_stage as CollectionStage;
