@@ -15,7 +15,7 @@ const adminRoute = getRouteApi("/admin");
 
 const tabs = ["Overview", "Activity", "Applications", "Subscriptions", "Projects", "Invoices", "Transactions", "Support tickets", "Compliance", "Audit log"] as const;
 type Modal = { title: string; description?: string; fields: FieldDef[]; submitLabel: string; onSubmit: (v: V) => Promise<string | null> };
-type V = { action?: string; amount?: string; body?: string; category?: string; description?: string; details?: string; direction?: string; do_not_sell?: string; due_at?: string; duration_minutes?: string; follow_up_at?: string; kind?: string; legal_hold?: string; log_hours?: string; log_note?: string; marketing_opt_in?: string; method?: string; name?: string; outcome?: string; priority?: string; reason?: string; reset?: string; service?: string; sms_opt_in?: string; started_at?: string; status?: string; subject?: string; };
+type V = { first_name?: string; last_name?: string; company?: string; email?: string; phone?: string; website?: string; address_line?: string; city?: string; state?: string; postal_code?: string; lifecycle_stage?: string; account_manager?: string; action?: string; amount?: string; body?: string; category?: string; description?: string; details?: string; direction?: string; do_not_sell?: string; due_at?: string; duration_minutes?: string; follow_up_at?: string; kind?: string; legal_hold?: string; log_hours?: string; log_note?: string; marketing_opt_in?: string; method?: string; name?: string; outcome?: string; priority?: string; reason?: string; reset?: string; service?: string; sms_opt_in?: string; started_at?: string; status?: string; subject?: string; };
 const err = (e: { message: string } | null) => (e ? e.message : null);
 const rand = () => Math.floor(Math.random() * 1e6).toString().padStart(6, "0");
 const today = () => new Date().toISOString().slice(0, 10);
@@ -89,7 +89,7 @@ function AccountDetail() {
       { name: "lifecycle_stage", label: "Lifecycle stage", type: "select", options: [...lifecycleStages], defaultValue: p.lifecycle_stage },
       { name: "account_manager", label: "Account manager", defaultValue: p.account_manager ?? adminEmail },
     ],
-    onSubmit: async (v) => done((await supabase.from("profiles").update({ ...v, updated_at: new Date().toISOString() }).eq("id", id)).error),
+    onSubmit: async (v) => done((await supabase.from("profiles").update({ first_name: v.first_name ?? null, last_name: v.last_name ?? null, company: v.company || null, email: v.email || null, phone: v.phone || null, website: v.website || null, address_line: v.address_line || null, city: v.city || null, state: v.state || null, postal_code: v.postal_code || null, lifecycle_stage: v.lifecycle_stage ?? p.lifecycle_stage, account_manager: v.account_manager || null, updated_at: new Date().toISOString() }).eq("id", id)).error),
   });
   const editConsent = () => setModal({
     title: "Consent & privacy preferences", submitLabel: "Save preferences",
