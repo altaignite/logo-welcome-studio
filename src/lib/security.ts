@@ -4,7 +4,8 @@ export type SignInPlace = { ip: string | null; country: string | null; region: s
 /** Where a request came from, from Cloudflare's network headers (the app runs on Cloudflare Workers) or proxy headers. */
 export function placeFromRequest(headers: Headers, cf?: { country?: string; region?: string; city?: string } | null): SignInPlace {
   const clean = (v: string | null | undefined, max = 80) => { const s = (v ?? "").trim(); return s && s !== "XX" && s !== "T1" ? s.slice(0, max) : null; };
-  const ip = clean(headers.get("cf-connecting-ip") ?? headers.get("x-real-ip") ?? headers.get("x-forwarded-for")?.split(",")[0], 64);
+  // Cloudflare sets cf-connecting-ip and strips forged copies; X-Forwarded-For is caller-controlled, so it is not trusted.
+  const ip = clean(headers.get("cf-connecting-ip"), 64);
   return { ip, country: clean(cf?.country ?? headers.get("cf-ipcountry"), 8), region: clean(cf?.region ?? headers.get("cf-region")), city: clean(cf?.city ?? headers.get("cf-ipcity")) };
 }
 

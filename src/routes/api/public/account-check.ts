@@ -11,7 +11,8 @@ export const Route = createFileRoute("/api/public/account-check")({
         try { email = String(((await request.json()) as { email?: unknown }).email ?? "").trim().toLowerCase(); } catch { return json({ error: "Invalid request." }, 400); }
         if (!/^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/.test(email) || email.length > 254) return json({ error: "Enter a valid email address." }, 400);
         const { enforceLimit, RateLimitError } = await import("@/lib/rate-limit.server");
-        const ip = request.headers.get("cf-connecting-ip") ?? request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+        // Only Cloudflare's header: X-Forwarded-For is set by the caller and would let anyone dodge the per-IP limit.
+        const ip = request.headers.get("cf-connecting-ip") ?? "unknown";
         try { await enforceLimit("accountCheck", `ip:${ip}`); await enforceLimit("accountCheckEmail", `email:${email}`); }
         catch (e) { if (e instanceof RateLimitError) return json({ error: e.message }, 429); throw e; }
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");

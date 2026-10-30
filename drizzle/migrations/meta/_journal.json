@@ -134,6 +134,13 @@
       "when": 1793326359660,
       "tag": "0018_fraud_kyc",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1793326360660,
+      "tag": "0019_staff_invites",
+      "breakpoints": true
     }
   ]
 }

@@ -10,7 +10,8 @@
 <!-- LOVABLE:END -->
 
 - Signup creates a real Lovable Cloud account on signature; a database trigger on new users builds the profile, application, audit event and pending subscription from signup metadata so no client writes are needed.
-- Admin access is a role in user_roles granted by trigger only to verified staff-domain emails; the /admin layout gates by has_role and RLS enforces it.
+- Admin access is a role in user_roles granted only by invitation: owners invite from Staff (inviteStaff, staff_invites, 7-day expiry, chosen level) and grant_admin_for_domain grants the role when the invited address confirms. An email domain never grants access. The /admin layout gates by has_role and RLS enforces it. The admin login never names the staff domain, has no self-registration and shows one generic error for every failure.
+- Client IPs come only from Cloudflare's cf-connecting-ip (never X-Forwarded-For) for rate limits, sign-in records and the shared-IP check.
 - Application status changes follow the transition map in src/lib/admin.ts, and every change or note is written to application_events as the audit log.
 - Keep selectable plan data, finite service-hour allowances, subscription terms and input validation in the shared signup module with concrete tests, so selection, review, downloaded agreements and completion use the same chosen plan.
 - Use libphonenumber-js metadata for countries and dial codes; optional browser IP preselection must not overwrite manual choices or block signup.

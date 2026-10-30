@@ -1565,6 +1565,36 @@ export type Database = {
           },
         ]
       }
+      staff_invites: {
+        Row: {
+          accepted_at: string | null
+          created_at: string
+          email: string
+          expires_at: string
+          invited_by: string | null
+          invited_by_label: string
+          level: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          created_at?: string
+          email: string
+          expires_at?: string
+          invited_by?: string | null
+          invited_by_label?: string
+          level?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          created_at?: string
+          email?: string
+          expires_at?: string
+          invited_by?: string | null
+          invited_by_label?: string
+          level?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string

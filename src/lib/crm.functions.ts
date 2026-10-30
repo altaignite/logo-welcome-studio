@@ -62,7 +62,7 @@ export const inviteClient = createServerFn({ method: "POST" })
     await requirePerm(context, "accounts");
     const { isBlockedDomain } = await import("@/lib/disposable-domains");
     if (isBlockedDomain(data.email)) throw new Error("Disposable email addresses can't be used.");
-    if (/@firstpersonmarketing\.com$/i.test(data.email)) throw new Error("Staff accounts are created from the staff sign-in page.");
+    if (/@firstpersonmarketing\.com$/i.test(data.email)) throw new Error("Staff join by invitation: invite them from Staff and security.");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { audit } = await import("@/lib/stripe.server");
     const { getRequest } = await import("@tanstack/react-start/server");

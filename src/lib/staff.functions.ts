@@ -31,6 +31,51 @@ export const setStaffLevel = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+/** Owners invite a staff member by email with a level. Staff access is invite-only: the role is granted by the database when the
+ * invited address confirms its email (an existing confirmed account is granted at once). Invites expire after 7 days. */
+export const inviteStaff = createServerFn({ method: "POST" })
+  .middleware([limited("staffAdmin")])
+  .inputValidator((d: unknown) => z.object({ email: z.string().trim().toLowerCase().email().max(254), level: z.enum(staffLevels) }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { requirePerm } = await import("@/lib/access.server");
+    await requirePerm(context, "staff");
+    const { getAdmin, must } = await import("@/lib/billing.server");
+    const { audit } = await import("@/lib/stripe.server");
+    const { getRequest } = await import("@tanstack/react-start/server");
+    const admin = await getAdmin();
+    must(await admin.from("staff_invites").upsert({ email: data.email, level: data.level, invited_by: context.userId, invited_by_label: label(context), created_at: new Date().toISOString(), expires_at: new Date(Date.now() + 7 * 864e5).toISOString(), accepted_at: null }, { onConflict: "email" }));
+    const origin = process.env["APP_URL"] ?? new URL(getRequest().url).origin;
+    const { data: existing } = await admin.from("profiles").select("id").eq("email", data.email).maybeSingle();
+    let granted = false;
+    if (existing) {
+      const { data: u } = await admin.auth.admin.getUserById(existing.id);
+      if (u?.user?.email_confirmed_at) {
+        must(await admin.from("staff_members").upsert({ user_id: existing.id, level: data.level, updated_at: new Date().toISOString() }, { onConflict: "user_id" }));
+        must(await admin.from("user_roles").upsert({ user_id: existing.id, role: "admin" }, { onConflict: "user_id,role", ignoreDuplicates: true }));
+        must(await admin.from("staff_invites").update({ accepted_at: new Date().toISOString() }).eq("email", data.email));
+        granted = true;
+      }
+    } else {
+      const r = await admin.auth.admin.inviteUserByEmail(data.email, { redirectTo: `${origin}/reset-password` });
+      if (r.error) throw new Error(`Couldn't send the invitation: ${r.error.message}`);
+    }
+    await audit(admin, context.userId, "staff_invites", context.userId, "staff_invited", { email: data.email, level: data.level, granted }, context.userId, label(context));
+    return { granted };
+  });
+
+/** Owners withdraw an invitation that hasn't been accepted. */
+export const cancelStaffInvite = createServerFn({ method: "POST" })
+  .middleware([limited("staffAdmin")])
+  .inputValidator((d: unknown) => z.object({ email: z.string().trim().toLowerCase().email().max(254) }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { requirePerm } = await import("@/lib/access.server");
+    await requirePerm(context, "staff");
+    const { getAdmin, must } = await import("@/lib/billing.server");
+    const admin = await getAdmin();
+    must(await admin.from("staff_invites").delete().eq("email", data.email).is("accepted_at", null));
+    return { ok: true };
+  });
+
 /** Owners remove someone's staff access. They keep their sign-in but lose the admin. */
 export const revokeStaff = createServerFn({ method: "POST" })
   .middleware([limited("staffAdmin")])
