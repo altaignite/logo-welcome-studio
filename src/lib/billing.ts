@@ -131,3 +131,34 @@ export function guaranteeCheck(sub: GuaranteeSub, invoices: GuaranteeInvoice[], 
   ];
   return { eligible: checks.every((c) => c.ok), opensAt, closesAt, checks };
 }
+
+/** Local invoice status for a Stripe invoice. Drafts aren't imported (null). */
+export function localInvoiceStatus(o: { status?: string | null; due_date?: number | null }, now = new Date()): string | null {
+  switch (o.status) {
+    case "paid": return "paid";
+    case "void": return "void";
+    case "uncollectible": return "overdue";
+    case "open": return o.due_date && o.due_date * 1000 < now.getTime() ? "overdue" : "open";
+    default: return null;
+  }
+}
+
+/** Local subscription status for a Stripe subscription. */
+export function localSubscriptionStatus(s: { status?: string | null; pause_collection?: unknown }): string {
+  if (s.status === "paused" || s.pause_collection) return "paused";
+  switch (s.status) {
+    case "active": case "trialing": return "active";
+    case "past_due": return "past_due";
+    case "unpaid": return "suspended";
+    case "canceled": case "incomplete_expired": return "cancelled";
+    default: return "pending";
+  }
+}
+
+/** Matches a Stripe monthly price to one of our plans by amount; anything else is kept as a custom plan with the Stripe product name. */
+export function planFromStripe(unitAmountCents: number | null | undefined, productName: string | null | undefined, plans: readonly { name: string; monthlyFee: number; monthlyHours: number }[]) {
+  const fee = round2((unitAmountCents ?? 0) / 100);
+  const match = plans.find((p) => p.monthlyFee === fee);
+  return match ? { plan_name: match.name, monthly_fee: match.monthlyFee, monthly_hours: match.monthlyHours, custom: false }
+    : { plan_name: (productName?.trim() || "Custom plan").replace(/ plan$/i, "").slice(0, 80), monthly_fee: fee, monthly_hours: 0, custom: true };
+}

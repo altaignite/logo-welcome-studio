@@ -367,3 +367,49 @@ export const stripeHealth = createServerFn({ method: "POST" })
     const waiting = (pending ?? []).filter((p: { id: string }) => !invoiced.has(p.id));
     return { checks, webhookUrl: hookUrl, events: requiredStripeEvents, waiting: waiting as { id: string; user_id: string; plan_name: string; created_at: string }[] };
   });
+
+/** Imports one page of Stripe customers (clients, subscriptions, invoices, payments). Call again with `next` until it's null. */
+export const importFromStripe = createServerFn({ method: "POST" })
+  .middleware([requireSession])
+  .inputValidator((d: unknown) => z.object({ cursor: z.string().max(100).regex(/^cus_\w+$/).optional() }).parse(d))
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context);
+    const { getAdmin } = await import("@/lib/billing.server");
+    const { importStripePage } = await import("@/lib/stripe-import.server");
+    const { audit } = await import("@/lib/stripe.server");
+    const admin = await getAdmin();
+    const r = await importStripePage(admin, data.cursor);
+    await audit(admin, context.userId, "stripe_import", context.userId, "stripe_import_page", { ...r.counts, skipped: r.counts.skipped.length }, context.userId, actorLabel(context));
+    return r;
+  });
+
+/** Brings every local subscription and unpaid invoice in line with Stripe now (the same check runs daily). */
+export const syncStripeNow = createServerFn({ method: "POST" })
+  .middleware([requireSession])
+  .handler(async ({ context }) => {
+    await requireAdmin(context);
+    const { getAdmin, reconcileStripe } = await import("@/lib/billing.server");
+    return reconcileStripe(await getAdmin(), 1000);
+  });
+
+/** Which database updates (migrations) are missing, so staff know to apply them in Lovable. */
+export const schemaStatus = createServerFn({ method: "POST" })
+  .middleware([requireSession])
+  .handler(async ({ context }) => {
+    const { isStaff } = await import("@/lib/access.server");
+    if (!(await isStaff(context))) throw new Error("Forbidden");
+    const { getAdmin } = await import("@/lib/billing.server");
+    const admin = await getAdmin();
+    // One object each migration creates; a missing one means that migration hasn't run.
+    const probes: [string, string, string][] = [
+      ["0011_client_admin_flow_gaps", "notifications", "id"],
+      ["0012_account_security_saas", "sign_in_events", "id"],
+      ["0012_account_security_saas", "subscriptions", "paused_by_account_status"],
+    ];
+    const missing = new Set<string>();
+    for (const [tag, table, column] of probes) {
+      const { error } = await admin.from(table).select(column).limit(1);
+      if (error) missing.add(tag);
+    }
+    return { missing: [...missing] };
+  });

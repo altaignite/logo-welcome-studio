@@ -66,25 +66,7 @@ export const Route = createFileRoute("/api/public/stripe/webhook")({
             case "invoice.finalized": await upsertInvoice("open"); break;
             case "invoice.paid": {
               const inv = await upsertInvoice("open");
-              if (!inv) break;
-              must(await admin.from("invoices").update({ status: "paid", paid_at: new Date().toISOString(), hosted_url: o.hosted_invoice_url, pdf_url: o.invoice_pdf, collection_stage: Number(inv.interest_accrued) + Number(inv.fees_accrued) > 0 ? inv.collection_stage : (inv.collection_stage === "none" ? "none" : "settled") }).eq("id", inv.id));
-              must(await admin.from("transactions").upsert({ user_id: inv.user_id, invoice_id: inv.id, subscription_id: inv.subscription_id, reference: o.number ?? o.id, description: `Payment for ${inv.number}`, amount: (o.amount_paid ?? 0) / 100, method: "stripe", status: "completed", stripe_id: `pay-${o.id}`, stripe_payment_intent: await paymentIntentOf() }, { onConflict: "stripe_id", ignoreDuplicates: true }));
-              if (o.metadata?.original_invoice_id) must(await admin.from("invoices").update({ collection_stage: "settled", interest_paused: true }).eq("id", o.metadata.original_invoice_id).eq("status", "paid"));
-              const subId = inv.subscription_id;
-              if (subId) {
-                if (inv.kind === "first") await B.activateSubscription(admin, subId);
-                else {
-                  // Only a billing-cycle renewal starts a new hours period; proration and one-off invoices don't.
-                  if (inv.kind === "renewal") {
-                    const cur = must(await admin.from("subscriptions").select("pending_plan_id").eq("id", subId).single());
-                    const { plans } = await import("@/lib/signup");
-                    const np = cur?.pending_plan_id ? plans.find((p) => p.id === cur.pending_plan_id) : undefined;
-                    must(await admin.from("subscriptions").update({ hours_used: 0, overage_billed_hours: 0, renews_at: nextRenewalAt(o).toISOString(), ...(np ? { plan_name: np.name, monthly_fee: np.monthlyFee, monthly_hours: np.monthlyHours, pending_plan_id: null } : {}) }).eq("id", subId));
-                  }
-                  await B.reinstateAfterPayment(admin, subId);
-                }
-              }
-              await audit(admin, inv.user_id, "invoices", inv.id, "paid", { status: { from: inv.status, to: "paid" } }, null, "Stripe");
+              if (inv) await B.recordInvoicePaid(admin, inv, o, await paymentIntentOf());
               break;
             }
             case "invoice.payment_failed": {

@@ -1,5 +1,6 @@
 /** Server-only billing workflows shared by server functions, the Stripe webhook and the daily collections job. */
 import { audit, cents, ensureCustomer, planPrice, stripe } from "@/lib/stripe.server";
+import { invoiceKind, nextRenewalAt } from "@/lib/billing";
 import { autoStage, compoundInterest, daysOverdue, defaultRules, failedPaymentVoidsGuarantee, legalFee, monthsOverdue, round2, type BillingRules, type CollectionStage } from "@/lib/billing";
 import { clientActionsBlocked, guaranteeEnd } from "@/lib/admin";
 
@@ -238,25 +239,64 @@ export async function syncSubscriptionFromStripe(admin: Admin, subId: string, s:
 }
 
 /** Daily check that local subscriptions and unpaid invoices match Stripe, for anything a missed webhook left behind.
- * A paid invoice is never marked paid here (only the signed webhook does that); staff are told to check it instead. */
-export async function reconcileStripe(admin: Admin) {
+ * Status comes from the Stripe API with the secret key, so paid invoices are recorded here too if a webhook was missed. */
+export async function reconcileStripe(admin: Admin, limit = 200) {
   let subs = 0, invoices = 0;
-  const rows = must(await admin.from("subscriptions").select("id, stripe_subscription_id").not("stripe_subscription_id", "is", null).neq("status", "cancelled").order("stripe_synced_at", { ascending: true, nullsFirst: true }).limit(200)) ?? [];
+  const rows = must(await admin.from("subscriptions").select("id, stripe_subscription_id").not("stripe_subscription_id", "is", null).neq("status", "cancelled").order("stripe_synced_at", { ascending: true, nullsFirst: true }).limit(limit)) ?? [];
   for (const r of rows) {
     try { await syncSubscriptionFromStripe(admin, r.id, await stripe("GET", `subscriptions/${r.stripe_subscription_id}`)); subs++; }
     catch (e) { console.error("Stripe subscription sync failed", r.id, e); }
   }
-  const open = must(await admin.from("invoices").select("id, user_id, number, status, stripe_invoice_id, subscription_id").in("status", ["open", "overdue"]).not("stripe_invoice_id", "is", null).limit(200)) ?? [];
+  const open = must(await admin.from("invoices").select("id, user_id, number, status, stripe_invoice_id, subscription_id").in("status", ["open", "overdue"]).not("stripe_invoice_id", "is", null).limit(limit)) ?? [];
   for (const inv of open) {
     try {
       const s = await stripe("GET", `invoices/${inv.stripe_invoice_id}`);
       must(await admin.from("invoices").update({ stripe_status: s.status, stripe_synced_at: new Date().toISOString(), hosted_url: s.hosted_invoice_url ?? undefined, pdf_url: s.invoice_pdf ?? undefined }).eq("id", inv.id));
       if (s.status === "void") must(await admin.from("invoices").update({ status: "void", void_reason: "Voided in Stripe", interest_paused: true }).eq("id", inv.id));
       else if (s.status === "uncollectible" && inv.subscription_id) await suspendForNonPayment(admin, inv.subscription_id, `Invoice ${inv.number} marked uncollectible`);
-      else if (s.status === "paid") must(await admin.rpc("notify_staff", { _perm: "billing", _assigned: null, _kind: "billing", _title: `Stripe shows invoice ${inv.number} paid`,
-        _body: "The payment wasn't recorded here. Check the Stripe webhook delivery and resend the invoice.paid event.", _link: `/admin/records/invoices/${inv.id}`, _dedupe: `unrecorded-paid:${inv.id}` }));
+      else if (s.status === "paid") {
+        const full = must(await admin.from("invoices").select("*").eq("id", inv.id).single());
+        await recordInvoicePaid(admin, full, s, typeof s.payment_intent === "string" ? s.payment_intent : s.payment_intent?.id ?? null);
+      }
       invoices++;
     } catch (e) { console.error("Stripe invoice sync failed", inv.id, e); }
   }
+  // Pick up invoices Stripe created recently for linked clients, in case their webhook was missed.
+  const { importInvoice } = await import("@/lib/stripe-import.server");
+  try {
+    const recent = await stripe("GET", "invoices", { limit: 100, "created[gte]": Math.floor(Date.now() / 1000) - 3 * 86400 });
+    for (const o of recent.data ?? []) {
+      const owner = must(await admin.from("profiles").select("id").eq("stripe_customer_id", o.customer).maybeSingle());
+      if (owner) { await importInvoice(admin, owner.id, o); invoices++; }
+    }
+  } catch (e) { console.error("Stripe recent invoice import failed", e); }
   return { subs, invoices };
+}
+
+/** Marks a local invoice paid from verified Stripe data (the signed webhook, or the Stripe API during sync and import),
+ * records the payment, and applies its effects: activation, a new hours period on renewal, reinstatement. Idempotent. */
+export async function recordInvoicePaid(admin: Admin, inv: any, o: any, paymentIntent: string | null = null) {
+  if (inv.status === "paid") return;
+  must(await admin.from("invoices").update({ status: "paid", paid_at: o.status_transitions?.paid_at ? new Date(o.status_transitions.paid_at * 1000).toISOString() : new Date().toISOString(),
+    hosted_url: o.hosted_invoice_url, pdf_url: o.invoice_pdf, stripe_status: "paid", stripe_synced_at: new Date().toISOString(),
+    collection_stage: Number(inv.interest_accrued) + Number(inv.fees_accrued) > 0 ? inv.collection_stage : (inv.collection_stage === "none" ? "none" : "settled") }).eq("id", inv.id).neq("status", "paid"));
+  must(await admin.from("transactions").upsert({ user_id: inv.user_id, invoice_id: inv.id, subscription_id: inv.subscription_id, reference: o.number ?? o.id, description: `Payment for ${inv.number}`,
+    amount: (o.amount_paid ?? 0) / 100, method: "stripe", status: "completed", stripe_id: `pay-${o.id}`, stripe_payment_intent: paymentIntent,
+    created_at: o.status_transitions?.paid_at ? new Date(o.status_transitions.paid_at * 1000).toISOString() : undefined }, { onConflict: "stripe_id", ignoreDuplicates: true }));
+  if (o.metadata?.original_invoice_id) must(await admin.from("invoices").update({ collection_stage: "settled", interest_paused: true }).eq("id", o.metadata.original_invoice_id).eq("status", "paid"));
+  const subId = inv.subscription_id;
+  if (subId) {
+    if (inv.kind === "first") await activateSubscription(admin, subId);
+    else {
+      // Only a billing-cycle renewal starts a new hours period; proration and one-off invoices don't.
+      if (inv.kind === "renewal") {
+        const cur = must(await admin.from("subscriptions").select("pending_plan_id").eq("id", subId).single());
+        const { plans } = await import("@/lib/signup");
+        const np = cur?.pending_plan_id ? plans.find((p) => p.id === cur.pending_plan_id) : undefined;
+        must(await admin.from("subscriptions").update({ hours_used: 0, overage_billed_hours: 0, renews_at: nextRenewalAt(o).toISOString(), ...(np ? { plan_name: np.name, monthly_fee: np.monthlyFee, monthly_hours: np.monthlyHours, pending_plan_id: null } : {}) }).eq("id", subId));
+      }
+      await reinstateAfterPayment(admin, subId);
+    }
+  }
+  await audit(admin, inv.user_id, "invoices", inv.id, "paid", { status: { from: inv.status, to: "paid" } }, null, "Stripe");
 }

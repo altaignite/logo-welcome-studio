@@ -9,6 +9,9 @@ import { guardStaff } from "@/lib/session-guard";
 import { AppLoader } from "@/components/loading";
 import { GlobalSearch } from "@/components/admin/search";
 import { useStaff } from "@/components/admin/staff";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { schemaStatus } from "@/lib/billing.functions";
 import { levelLabel, type StaffLevel } from "@/lib/staff";
 
 export const Route = createFileRoute("/admin")({
@@ -61,6 +64,8 @@ const nav = [
 function AdminLayout() {
   const { adminEmail, adminId } = Route.useRouteContext();
   const staff = useStaff();
+  const checkSchema = useServerFn(schemaStatus);
+  const schema = useQuery({ queryKey: ["admin", "schema-status"], queryFn: () => checkSchema(), staleTime: 10 * 60_000, retry: false });
   const path = useRouterState({ select: (s) => s.location.pathname });
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
@@ -116,6 +121,7 @@ function AdminLayout() {
           </div>
         </header>
         <main className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8">
+          {!!schema.data?.missing.length && <p role="alert" className="mb-4 rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm">The database is missing updates: {schema.data.missing.join(", ")}. Open the project in Lovable and apply the pending database migrations; some features won't work until then.</p>}
           {staff.me && staff.requireMfa && !staff.me.mfa_enabled && <p className="mb-4 rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm">Two-factor authentication is required for staff. You can view the admin but not change anything until you <Link to="/admin/staff" className="font-semibold underline">set it up</Link>.</p>}
           {staff.me?.level === "viewer" && <p className="mb-4 rounded-xl border bg-card p-3 text-sm text-muted-foreground">You have view-only access. Ask an owner to set your staff level under Staff and security.</p>}
           <Outlet />
