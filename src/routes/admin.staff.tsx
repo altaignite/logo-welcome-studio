@@ -56,7 +56,7 @@ function Staff() {
             {r.user_id !== adminId && <button type="button" onClick={() => revoke(r)} className="h-8 rounded-full border border-destructive/40 px-3 text-xs font-semibold text-destructive">Remove</button>}
           </div> : null },
         ]} />}
-      <div className="grid gap-6 xl:grid-cols-2">
+      <div className="space-y-6">
         <Section title="Your two-factor authentication"><MfaSettings onChange={refresh} /></Section>
         <Section title="Staff security rule">
           <div className="space-y-3 p-5 text-sm">

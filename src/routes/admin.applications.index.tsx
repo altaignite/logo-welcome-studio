@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { SwitchField } from "@/components/switch-field";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { usePopup } from "@/components/popup";
@@ -57,7 +58,7 @@ function Applications() {
       </div>
       {error ? <p className="text-sm text-destructive">{(error as Error).message}</p> : isLoading ? <p className="text-sm text-muted-foreground">Loading applications…</p> :
         <DataTable<Row> title="Applications" rows={rows} getId={(r) => r.id}
-          toolbar={<label className="inline-flex items-center gap-2 text-sm"><input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} className="size-4 accent-primary" />Show archived</label>}
+          toolbar={<SwitchField checked={showArchived} onCheckedChange={setShowArchived} label="Show archived" />}
           bulkActions={[bulk("Assign to me", { assigned_to: adminEmail }), bulk("Start review", { status: "in_review", assigned_to: adminEmail }, "submitted", "in_review"), bulk("Archive", { archived_at: new Date().toISOString() })]} onRowClick={(r) => navigate({ to: "/admin/applications/$id", params: { id: r.id } })} empty="No applications match." columns={[
           { key: "acct", label: "Account no.", value: (r) => r.account_number, render: (r) => <span className="font-mono">{formatAccount(r.account_number)}</span> },
           { key: "name", label: "Applicant", value: (r) => `${r.profile?.first_name ?? ""} ${r.profile?.last_name ?? ""}`.trim() },

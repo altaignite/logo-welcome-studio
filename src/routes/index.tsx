@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
 import { Mail, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
 import { usePopup } from "@/components/popup";
+import { SwitchField } from "@/components/switch-field";
 import logo from "@/assets/logo.png.asset.json";
 import hero from "@/assets/login-hero.jpg";
 import { Button } from "@/components/ui/button";
@@ -96,10 +97,7 @@ function Login() {
               </div>
             </div>
             <div className="flex items-center justify-between gap-3 text-sm">
-              <label className="flex cursor-pointer items-center gap-2 text-muted-foreground">
-                <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="h-4 w-4 accent-primary" />
-                Remember me
-              </label>
+              <SwitchField checked={remember} onCheckedChange={setRemember} label={<span className="text-muted-foreground">Remember me</span>} className="flex-row-reverse justify-end" />
               <Link to="/forgot-password" className="font-semibold text-foreground hover:text-primary">Forgot Password?</Link>
             </div>
             <button type="submit" className="signup-primary group flex items-center justify-center gap-2 text-sm">

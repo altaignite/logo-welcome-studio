@@ -51,7 +51,7 @@ function Overview() {
         <div key={l} className="rounded-2xl border bg-card p-4"><p className="text-sm text-muted-foreground">{l}</p><p className="mt-1 text-2xl font-bold">{v}</p></div>
       ))}
     </div>
-    <div className="grid gap-6 xl:grid-cols-2">
+    <div className="space-y-6">
       <Section title="Your plans">
         <ul className="divide-y">{data.subs.map((s) => {
           const pct = Math.min(100, (Number(s.hours_used) / Math.max(1, Number(s.monthly_hours))) * 100);

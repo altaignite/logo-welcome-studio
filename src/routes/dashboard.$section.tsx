@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { DataTable, StatusBadge, type Column } from "@/components/admin/data-table";
 import { Section } from "@/components/admin/record-bits";
 import { usePopup } from "@/components/popup";
+import { SwitchField } from "@/components/switch-field";
 import { ActBtn, Actions, SubButtons, invoiceTotal, useClient, useClientActions, type R, type RecordKind } from "@/components/client/portal";
 import { supabase } from "@/integrations/supabase/client";
 import { formatAccount, formatDate, formatDay, humanize, money, statusLabel, type AppStatus } from "@/lib/admin";
@@ -168,10 +169,10 @@ function ProfileForm({ p, privacyRows, refresh }: { p: R; privacyRows: R[]; refr
           {profileFields.map(([k, l, max]) => <label key={k} className="block"><span className="text-[13px] font-medium">{l}{(k === "first_name" || k === "last_name") && <span className="text-primary"> *</span>}</span>
             <input name={k} defaultValue={p[k] ?? ""} maxLength={max} className={fieldCls} /></label>)}
         </div>
-        <div className="mt-4 space-y-2 text-sm">
-          <label className="flex items-center gap-2"><input type="checkbox" name="marketing_opt_in" defaultChecked={!!p.marketing_opt_in} className="size-4 accent-primary" />Send me marketing emails</label>
-          <label className="flex items-center gap-2"><input type="checkbox" name="sms_opt_in" defaultChecked={!!p.sms_opt_in} className="size-4 accent-primary" />Send me text messages</label>
-          <label className="flex items-center gap-2"><input type="checkbox" name="email_notifications" defaultChecked={p.email_notifications !== false} className="size-4 accent-primary" />Email me about replies, reviews, invoices and account updates</label>
+        <div className="mt-4 max-w-md space-y-3">
+          <SwitchField name="marketing_opt_in" defaultChecked={!!p.marketing_opt_in} label="Send me marketing emails" />
+          <SwitchField name="sms_opt_in" defaultChecked={!!p.sms_opt_in} label="Send me text messages" />
+          <SwitchField name="email_notifications" defaultChecked={p.email_notifications !== false} label="Email me about replies, reviews, invoices and account updates" />
         </div>
         <button type="submit" disabled={busy} className="mt-5 h-10 rounded-full bg-foreground px-6 text-sm font-semibold text-background">{busy ? "Saving…" : "Save changes"}</button>
       </form>
@@ -216,7 +217,7 @@ function SecurityPanel() {
   };
   const signOutAll = () => popup({ type: "info", title: "Sign out everywhere?", description: "You'll be signed out on all devices, including this one.", primaryLabel: "Sign out", secondaryLabel: "Cancel",
     onPrimary: async () => { await supabase.auth.signOut({ scope: "global" }); navigate({ to: "/", replace: true }); } });
-  return <div className="grid gap-6 xl:grid-cols-2">
+  return <div className="space-y-6">
     <Section title="Change password">
       <form onSubmit={changePw} className="space-y-3 p-5">
         {[["current", "Current password", "current-password"], ["password", "New password", "new-password"], ["confirm", "Confirm new password", "new-password"]].map(([n, l, ac]) =>

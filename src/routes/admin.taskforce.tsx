@@ -5,6 +5,7 @@ import { DataTable, StatusBadge } from "@/components/admin/data-table";
 import { FormModal, type FieldDef } from "@/components/admin/form-modal";
 import { db } from "@/components/admin/record-bits";
 import { formatDay } from "@/lib/admin";
+import { SwitchField } from "@/components/switch-field";
 import { useStaff, withStaffPicker } from "@/components/admin/staff";
 
 export const Route = createFileRoute("/admin/taskforce")({ component: Taskforce });
@@ -99,7 +100,7 @@ function Taskforce() {
         <select aria-label="Client" className={sel} value={filter.client} onChange={(e) => setFilter({ ...filter, client: e.target.value })}><option value="">All clients</option>{clients.map((c) => <option key={c}>{c}</option>)}</select>
         <select aria-label="Assignee" className={sel} value={filter.assignee} onChange={(e) => setFilter({ ...filter, assignee: e.target.value })}><option value="">Anyone</option>{assignees.map((c) => <option key={c}>{c}</option>)}</select>
         <select aria-label="Priority" className={sel} value={filter.priority} onChange={(e) => setFilter({ ...filter, priority: e.target.value })}><option value="">Any priority</option>{priorities.map((c) => <option key={c}>{c}</option>)}</select>
-        <label className="inline-flex items-center gap-2 text-sm"><input type="checkbox" className="size-4 accent-primary" checked={filter.overdue} onChange={(e) => setFilter({ ...filter, overdue: e.target.checked })} />Overdue only</label>
+        <SwitchField checked={filter.overdue} onCheckedChange={(v) => setFilter({ ...filter, overdue: v })} label="Overdue only" />
       </div>
       {error ? <p className="text-sm text-destructive">{(error as Error).message}</p> : isLoading ? <p className="text-sm text-muted-foreground">Loading tasks…</p> : view === "board" ? (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">

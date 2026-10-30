@@ -98,7 +98,7 @@ function Overview() {
         <table className="sr-only"><caption>Payments received by month</caption><tbody>{revenue.map((m) => <tr key={m.month}><th>{m.month}</th><td>{money(m.total)}</td></tr>)}</tbody></table>
       </Section>
 
-      <div className="grid gap-6 xl:grid-cols-2">
+      <div className="space-y-6">
         {list("Applications to review", data.apps.map((a: R) => row(a.id, { app: a.id }, `${a.plan_name} plan`, <StatusBadge status={a.status} />)), "No applications waiting.", "/admin/applications")}
         {list("Replies overdue", breached.map((t: R) => row(t.id, { kind: "support_tickets", id: t.id }, t.subject, `${t.priority}${mine(t.assigned_to) ? ", yours" : ""}`)), "Every ticket is answered on time.", "/admin/support")}
         {list("Follow-ups due", dueFollow.map((f: R) => row(f.id, { kind: "crm_activities", id: f.id }, f.subject, formatDay(f.follow_up_at))), "No follow-ups due.", "/admin/records/crm_activities")}
