@@ -157,7 +157,7 @@ function Signup() {
     });
     if (error) {
       setConfirmOpen(false);
-      popup({ type: "error", title: "We couldn't submit your application", description: /database error/i.test(error.message) ? "This email address can't be used. Disposable email addresses aren't accepted; please use your business or personal email." : error.message, primaryLabel: "Try again", onPrimary: openConfirmation, secondaryLabel: "Cancel" });
+      popup({ type: "error", title: "We couldn't submit your application", description: /database error/i.test(error.message) ? "We couldn't create your account with these details. Please check your name, business, country and mobile number, and use your business or personal email (disposable addresses aren't accepted)." : error.message, primaryLabel: "Try again", onPrimary: openConfirmation, secondaryLabel: "Cancel" });
       return false;
     }
     // Supabase doesn't reveal existing emails: it returns a user with no identities and creates nothing. Send them to sign in instead.

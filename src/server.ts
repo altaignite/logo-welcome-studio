@@ -52,6 +52,22 @@ const securityHeaders: Record<string, string> = {
   "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
   "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=(self)",
   "Cross-Origin-Opener-Policy": "same-origin",
+  // Enforced: rules that can't break the app (no plugins, no framing, no base-tag hijacking, forms only to us or Stripe, HTTPS only).
+  "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://checkout.stripe.com https://billing.stripe.com; upgrade-insecure-requests",
+  // Reported, not enforced yet: the full script and connection allow-list. Lovable injects its own scripts on hosted pages, so
+  // enforce this only after the browser reports show no violations.
+  "Content-Security-Policy-Report-Only": [
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob: https://flagcdn.com https://*.supabase.co",
+    "font-src 'self' data:",
+    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://ipapi.co",
+    "frame-src 'none'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "frame-ancestors 'none'",
+  ].join("; "),
 };
 function withSecurityHeaders(response: Response) {
   try {

@@ -18,3 +18,19 @@ describe("staff access", () => {
     for (const f of ["src/lib/security.ts", "src/routes/api/public/account-check.ts"]) expect(readFileSync(f, "utf8")).not.toMatch(/headers\.get\("x-forwarded-for"\)/);
   });
 });
+
+describe("server-side guarantees", () => {
+  it("validates signup details in the database, whatever calls the signup API", () => {
+    const sql = readFileSync("drizzle/migrations/0020_signup_server_validation.sql", "utf8");
+    for (const msg of ["Enter your first and last name.", "Enter your business name.", "Choose your country.", "Enter a valid mobile number in international format.", "Choose a plan."]) expect(sql).toContain(msg);
+  });
+  it("gives signed-out visitors no table privileges", () => {
+    const sql = readFileSync("drizzle/migrations/0021_revoke_anon_tables.sql", "utf8");
+    expect(sql).toMatch(/REVOKE ALL ON public\.%I FROM anon/);
+    expect(sql).toMatch(/ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM anon/);
+  });
+  it("sends security headers including an enforced content security policy", () => {
+    const s = readFileSync("src/server.ts", "utf8");
+    expect(s).toMatch(/"Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'/);
+  });
+});

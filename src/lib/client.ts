@@ -9,7 +9,10 @@ const text = (max: number) => z.string().trim().max(max).optional().nullable();
 export const profileUpdateSchema = z.object({
   first_name: z.string().trim().min(1).max(80).optional(),
   last_name: z.string().trim().min(1).max(80).optional(),
-  company: text(160), phone: text(40), country: text(80), address_line: text(200), city: text(100), state: text(100),
+  company: text(160),
+  // A mobile number can be changed but not removed or replaced with junk: it backs the duplicate-number fraud check.
+  phone: z.string().trim().max(30).refine((v) => /^\+[0-9 ()-]{7,28}$/.test(v) && v.replace(/\D/g, "").length >= 7 && v.replace(/\D/g, "").length <= 15, "Enter your mobile number in international format, for example +31 6 12345678.").optional(),
+  country: text(80), address_line: text(200), city: text(100), state: text(100),
   postal_code: text(20), website: text(200), timezone: text(60), industry: text(100), company_size: text(40),
   marketing_opt_in: z.boolean().optional(), sms_opt_in: z.boolean().optional(), email_notifications: z.boolean().optional(),
 }).strict();

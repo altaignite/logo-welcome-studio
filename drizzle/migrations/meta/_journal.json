@@ -141,6 +141,20 @@
       "when": 1793326360660,
       "tag": "0019_staff_invites",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1793326361660,
+      "tag": "0020_signup_server_validation",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1793326362660,
+      "tag": "0021_revoke_anon_tables",
+      "breakpoints": true
     }
   ]
 }

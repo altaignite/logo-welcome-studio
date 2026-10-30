@@ -44,8 +44,9 @@ export const orderAdditionalPlan = createServerFn({ method: "POST" })
     const { getAdmin, issueStripeInvoice } = await import("@/lib/billing.server");
     const admin = await getAdmin();
     const plan = plans.find((p) => p.id === data.planId)!;
-    const { data: prof } = await admin.from("profiles").select("account_number, company, first_name, last_name, status").eq("id", context.userId).single();
+    const { data: prof } = await admin.from("profiles").select("account_number, company, first_name, last_name, status, phone").eq("id", context.userId).single();
     if (!prof || orderingBlocked(prof.status)) throw new Error("Your account can't place orders right now. Please contact support.");
+    if (!prof.first_name || !prof.last_name || !prof.phone || (prof.phone.replace(/\D/g, "").length < 7)) throw new Error("Please add your name and mobile number on your Profile page before ordering.");
     const { count } = await admin.from("subscriptions").select("id", { count: "exact", head: true }).eq("user_id", context.userId).eq("status", "pending");
     if ((count ?? 0) >= 2) throw new Error("Please pay your open plan invoices before ordering another plan.");
     // Security: the mobile number on the order must not belong to another account.
