@@ -310,7 +310,7 @@ function AccountDetail() {
 
       {tab === "Security" && <AccountSecurity userId={id} adminEmail={adminEmail} />}
 
-      {tab === "Audit log" && <Section title="Audit log"><AuditList rows={data.audit} showTable /></Section>}
+      {tab === "Audit log" && <AuditList rows={data.audit} showTable />}
 
       {modal && <FormModal {...modal} onClose={() => setModal(null)} />}
       {mail.el}

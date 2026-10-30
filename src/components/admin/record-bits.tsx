@@ -1,8 +1,9 @@
+import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { ArrowLeft, type LucideIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { StatusBadge } from "@/components/admin/data-table";
+import { DataTable, StatusBadge, type Column } from "@/components/admin/data-table";
 import { accountStatusLabel, auditRows, formatAccount, formatDate, formatDay, humanize, money, type AccountStatus } from "@/lib/admin";
 const sentence = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 import type { Fmt } from "@/lib/records";
@@ -77,32 +78,36 @@ export function FieldGrid({ items }: { items: [string, ReactNode][] }) {
 }
 
 type Audit = { id: string; action: string; changes: unknown; actor_label: string; created_at: string; table_name: string };
-export function AuditList({ rows, showTable }: { rows: Audit[]; showTable?: boolean }) {
-  return (
-    <ol className="divide-y">
-      {rows.map((r) => {
-        const changes = auditRows(r.action, r.changes);
-        const diff = changes.some((c) => c.from != null);
-        return (
-          <li key={r.id} className="px-5 py-3">
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <p className="text-sm font-medium">{sentence(`${showTable ? `${humanize(r.table_name)}: ` : ""}${humanize(r.action)}`)}</p>
-              <p className="text-xs text-muted-foreground">{r.actor_label}, {formatDate(r.created_at)}</p>
-            </div>
-            {changes.length > 0 && <div className="mt-2 overflow-x-auto rounded-lg border">
-              <table className="w-full table-fixed text-left text-xs">
-                <thead className="bg-secondary/60 text-muted-foreground"><tr><th className="w-1/4 px-3 py-1.5 font-medium">Field</th>{diff && <th className="px-3 py-1.5 font-medium">Before</th>}<th className="px-3 py-1.5 font-medium">{diff ? "After" : "Value"}</th></tr></thead>
-                <tbody className="divide-y">{changes.map((c, i) => <tr key={i} className="align-top">
-                  <td className="px-3 py-1.5 font-medium">{c.field}</td>
-                  {diff && <td className="truncate px-3 py-1.5 text-muted-foreground" title={c.from ?? ""}>{c.from ?? "—"}</td>}
-                  <td className="truncate px-3 py-1.5" title={c.to}>{c.to}</td>
-                </tr>)}</tbody>
-              </table>
-            </div>}
-          </li>
-        );
-      })}
-      {rows.length === 0 && <li className="px-5 py-6 text-sm text-muted-foreground">No changes recorded yet.</li>}
-    </ol>
-  );
+/** Audit log as a table like every other admin list; a row opens the field-by-field changes. */
+export function AuditList({ rows, showTable, title = "Audit log" }: { rows: Audit[]; showTable?: boolean; title?: string }) {
+  const [open, setOpen] = useState<Audit | null>(null);
+  const columns: Column<Audit>[] = [
+    { key: "when", label: "When", value: (r) => formatDate(r.created_at) },
+    ...(showTable ? [{ key: "record", label: "Record", value: (r: Audit) => sentence(humanize(r.table_name)) }] : []),
+    { key: "action", label: "Action", value: (r) => sentence(humanize(r.action)) },
+    { key: "changes", label: "Changes", value: (r) => auditRows(r.action, r.changes).map((c) => c.field).join(", ") || "—", render: (r) => <span className="line-clamp-1 max-w-xs text-muted-foreground">{auditRows(r.action, r.changes).map((c) => c.field).join(", ") || "—"}</span> },
+    { key: "by", label: "By", value: (r) => r.actor_label },
+  ];
+  const changes = open ? auditRows(open.action, open.changes) : [];
+  const diff = changes.some((c) => c.from != null);
+  return <>
+    <DataTable<Audit> title={title} rows={rows} getId={(r) => r.id} columns={columns} onRowClick={setOpen} empty="No changes recorded yet." />
+    {open && <div className="fixed inset-0 z-50 grid place-items-center bg-foreground/40 p-4" role="dialog" aria-modal="true" aria-label="Audit entry" onClick={() => setOpen(null)}>
+      <div className="app-modal max-w-2xl text-left" onClick={(e) => e.stopPropagation()}>
+        <h2 className="text-lg font-bold">{sentence(`${humanize(open.table_name)}: ${humanize(open.action)}`)}</h2>
+        <p className="mt-1 text-sm text-muted-foreground">{open.actor_label}, {formatDate(open.created_at)}</p>
+        {changes.length > 0 ? <div className="mt-4 max-h-[60vh] overflow-auto rounded-lg border">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-secondary/60 text-xs text-muted-foreground"><tr><th className="px-3 py-2 font-medium">Field</th>{diff && <th className="px-3 py-2 font-medium">Before</th>}<th className="px-3 py-2 font-medium">{diff ? "After" : "Value"}</th></tr></thead>
+            <tbody className="divide-y">{changes.map((c, i) => <tr key={i} className="align-top">
+              <td className="px-3 py-2 font-medium">{c.field}</td>
+              {diff && <td className="break-all px-3 py-2 text-muted-foreground">{c.from ?? "—"}</td>}
+              <td className="break-all px-3 py-2">{c.to}</td>
+            </tr>)}</tbody>
+          </table>
+        </div> : <p className="mt-4 text-sm text-muted-foreground">No field details were recorded.</p>}
+        <button type="button" onClick={() => setOpen(null)} className="app-modal-secondary mt-5">Close</button>
+      </div>
+    </div>}
+  </>;
 }

@@ -262,7 +262,7 @@ function RecordPage() {
         <DocumentList docs={data.documents} staff empty="No files attached." />
       </Section>}
 
-      <Section title="Audit history"><AuditList rows={data.audit} /></Section>
+      <AuditList rows={data.audit} title="Audit history" />
       {modal && <FormModal {...modal} onClose={() => setModal(null)} />}
     </div>
   );
