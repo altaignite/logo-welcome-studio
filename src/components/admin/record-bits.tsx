@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { ArrowLeft, type LucideIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { DataTable, StatusBadge, type Column } from "@/components/admin/data-table";
-import { accountStatusLabel, auditRows, formatAccount, formatDate, formatDay, humanize, money, type AccountStatus } from "@/lib/admin";
+import { accountStatusLabel, auditLines, auditRows, formatAccount, formatDate, formatDay, humanize, money, type AccountStatus } from "@/lib/admin";
 const sentence = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 import type { Fmt } from "@/lib/records";
 import { metricsText } from "@/lib/work";
@@ -85,7 +85,7 @@ export function AuditList({ rows, showTable, title = "Audit log" }: { rows: Audi
     { key: "when", label: "When", value: (r) => formatDate(r.created_at) },
     ...(showTable ? [{ key: "record", label: "Record", value: (r: Audit) => sentence(humanize(r.table_name)) }] : []),
     { key: "action", label: "Action", value: (r) => sentence(humanize(r.action)) },
-    { key: "changes", label: "Changes", value: (r) => auditRows(r.action, r.changes).map((c) => c.field).join(", ") || "—", render: (r) => <span className="line-clamp-1 max-w-xs text-muted-foreground">{auditRows(r.action, r.changes).map((c) => c.field).join(", ") || "—"}</span> },
+    { key: "changes", label: "Changes", value: (r) => auditLines(r.action, r.changes).join(" · "), render: (r) => <span className="line-clamp-2 max-w-md">{auditLines(r.action, r.changes).join(" · ")}</span> },
     { key: "by", label: "By", value: (r) => r.actor_label },
   ];
   const changes = open ? auditRows(open.action, open.changes) : [];

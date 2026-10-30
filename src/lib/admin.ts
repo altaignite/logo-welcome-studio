@@ -137,7 +137,8 @@ export function auditRows(action: string, changes: unknown): { field: string; fr
   const entries = action === "update" || Object.values(c).some(isChange) ? Object.entries(c)
     : ["subject", "name", "title", "number", "reference", "kind", "status", "amount", "hours", "plan_name", "reason"].filter((k) => c[k] != null).map((k) => [k, c[k]] as const);
   const val = (k: string, x: unknown) => (k === "country" && typeof x === "string" ? countryName(x) || "—" : auditValue(x));
-  return entries.map(([k, v]) => isChange(v) ? { field: fieldLabel(k), from: val(k, v.from), to: val(k, v.to) } : { field: fieldLabel(k), from: null, to: val(k, v) });
+  // A flag that's off or a blank detail says nothing; only real changes and set values are shown.
+  return entries.filter(([, v]) => isChange(v) || (v !== false && v != null && v !== "")).map(([k, v]) => isChange(v) ? { field: fieldLabel(k), from: val(k, v.from), to: val(k, v.to) } : { field: fieldLabel(k), from: null, to: val(k, v) });
 }
 export function auditLines(action: string, changes: unknown): string[] {
   const rows = auditRows(action, changes);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { countryName, placeLabel } from "@/lib/security";
-import { auditRows } from "@/lib/admin";
+import { auditLines, auditRows } from "@/lib/admin";
 
 describe("country names", () => {
   it("shows full names for codes and leaves other values alone", () => {
@@ -18,8 +18,8 @@ describe("audit rows", () => {
     expect(auditRows("status_changed", { status: { from: "suspended", to: "active" }, reason: "Restored", sessions_ended: false })).toEqual([
       { field: "Status", from: "suspended", to: "active" },
       { field: "Reason", from: null, to: "Restored" },
-      { field: "Sessions ended", from: null, to: "No" },
     ]);
+    expect(auditLines("status_changed", { status: { from: "active", to: "suspended" }, reason: "Unpaid", sessions_ended: true })).toEqual(["Status: active → suspended", "Reason: Unpaid", "Sessions ended: Yes"]);
     expect(auditRows("update", { status_reason: { from: "Test", to: null } })).toEqual([{ field: "Status reason", from: "Test", to: "—" }]);
     expect(auditRows("update", { country: { from: "NL", to: "GB" } })[0]).toEqual({ field: "Country", from: "Netherlands", to: "United Kingdom" });
     expect(auditRows("insert", { number: "INV-1", status: "open", other: 1 })).toEqual([{ field: "Number", from: null, to: "INV-1" }, { field: "Status", from: null, to: "open" }]);
