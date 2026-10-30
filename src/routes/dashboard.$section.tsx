@@ -233,7 +233,7 @@ function SecurityPanel() {
           <button type="submit" disabled={busy === "email"} className="h-10 rounded-full bg-foreground px-6 text-sm font-semibold text-background">{busy === "email" ? "Sending…" : "Send confirmation"}</button>
         </form>
       </Section>
-      <Section title="Two-factor authentication"><MfaSettings /></Section>
+      <Section title="Two-factor authentication (optional)"><MfaSettings /></Section>
       <Section title="Sessions"><div className="p-5"><ActBtn danger onClick={signOutAll}>Sign out of all devices</ActBtn></div></Section>
     </div>
   </div>;

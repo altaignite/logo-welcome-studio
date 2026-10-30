@@ -57,7 +57,7 @@ function Staff() {
           </div> : null },
         ]} />}
       <div className="space-y-6">
-        <Section title="Your two-factor authentication"><MfaSettings onChange={refresh} /></Section>
+        <Section title="Your two-factor authentication (optional)"><MfaSettings onChange={refresh} /></Section>
         <Section title="Staff security rule">
           <div className="space-y-3 p-5 text-sm">
             <p>{s.requireMfa ? "Two-factor sign-in is required. Staff without it can only view." : "Two-factor sign-in is optional for staff."} Staff who turn it on always need their code to make changes.</p>

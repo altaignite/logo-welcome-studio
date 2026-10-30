@@ -98,7 +98,7 @@ export function MfaSettings({ onChange }: { onChange?: () => void }) {
           <button type="button" onClick={() => setEnrolling(null)} className="h-10 rounded-full border px-6 text-sm font-semibold">Cancel</button>
         </div>
       </> : <>
-        <p className="text-muted-foreground">Add a second step to sign-in with a code from an authenticator app on your phone.</p>
+        <p className="text-muted-foreground">Optional. You sign in with just your password unless you turn this on. It adds a code from an authenticator app on your phone as a second step.</p>
         <button type="button" disabled={busy} onClick={start} className="h-10 rounded-full bg-foreground px-6 text-sm font-semibold text-background disabled:opacity-50">{busy ? "Starting…" : "Set up two-factor authentication"}</button>
       </>}
     </div>
