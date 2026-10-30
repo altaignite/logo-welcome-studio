@@ -14,7 +14,7 @@ import { agreementDocuments } from "@/lib/agreements";
 import { clearDraft, loadDraft, resumeStep, saveDraft } from "@/lib/signup-draft";
 import { passwordProblem, passwordRules } from "@/lib/passwords";
 import { createAccountNumber, accountSchema, countries, personalSchema, plans, type Plan, type CountryCode, type PersonalDetails, formatPhoneInput, switchPhoneCountry, phonePlaceholder, phoneNational } from "@/lib/signup";
-import logo from "@/assets/logo.png.asset.json";
+import logo from "@/lib/logo";
 import { AgreementsList, OrderWizard, PlanCards, ReviewRow, ReviewSection, SignDialog, formatAccountNumber } from "@/components/order-flow";
 
 export const Route = createFileRoute("/signup")({

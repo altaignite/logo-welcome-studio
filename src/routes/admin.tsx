@@ -2,7 +2,7 @@ import { createFileRoute, Link, Outlet, useNavigate, useRouterState } from "@tan
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { BarChart3, ClipboardList, Contact, FileCheck2, FileText, FolderKanban, LayoutDashboard, LifeBuoy, ListChecks, LogOut, Mail, Menu, PhoneCall, Receipt, Repeat, Settings, ShieldAlert, ShieldCheck, UserCog, Users, Wallet, X } from "lucide-react";
-import logo from "@/assets/logo.png.asset.json";
+import logo from "@/lib/logo";
 import { supabase } from "@/integrations/supabase/client";
 import { NotificationBell } from "@/components/notifications";
 import { guardStaff } from "@/lib/session-guard";

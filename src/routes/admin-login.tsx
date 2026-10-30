@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
 import { Lock, Mail, ShieldCheck } from "lucide-react";
-import logo from "@/assets/logo.png.asset.json";
+import logo from "@/lib/logo";
 import { supabase } from "@/integrations/supabase/client";
 import { usePopup } from "@/components/popup";
 import { isUnconfirmedEmail, unconfirmedPopup } from "@/lib/email-confirmation";

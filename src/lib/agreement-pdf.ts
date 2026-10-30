@@ -1,4 +1,4 @@
-import logo from "@/assets/logo.png.asset.json";
+import logo from "@/lib/logo";
 import { AGREEMENT_VERSION, company, parseAgreement } from "@/lib/agreements";
 
 type Signer = { name: string; accountNumber: string; signedAt: string };

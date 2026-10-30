@@ -5,7 +5,7 @@ import { usePopup } from "@/components/popup";
 import { isUnconfirmedEmail, unconfirmedPopup } from "@/lib/email-confirmation";
 import { Spinner } from "@/components/loading";
 import { SwitchField } from "@/components/switch-field";
-import logo from "@/assets/logo.png.asset.json";
+import logo from "@/lib/logo";
 import hero from "@/assets/login-hero.jpg";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
