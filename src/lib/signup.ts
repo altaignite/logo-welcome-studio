@@ -106,14 +106,14 @@ export const accountSchema = z.object({
 export function createSignatureCode(previousCodes: ReadonlySet<string> = new Set()) {
   if (previousCodes.size >= 900000) throw new Error("No unused confirmation codes remain.");
   let code: string;
-  do {
+  for (;;) {
     const bytes = new Uint32Array(1);
     crypto.getRandomValues(bytes);
     const random = bytes[0] ?? 0;
     if (random >= 4294800000) continue;
     code = String(100000 + random % 900000);
     if (!previousCodes.has(code)) return code;
-  } while (true);
+  }
 }
 
 export function isSignatureMatch(code: string, entered: string) {

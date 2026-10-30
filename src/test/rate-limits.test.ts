@@ -6,7 +6,7 @@ describe("rate limits", () => {
   it("cover every server action", () => {
     for (const f of readdirSync("src/lib").filter((x) => x.endsWith(".functions.ts"))) {
       const src = readFileSync(`src/lib/${f}`, "utf8");
-      const fns = [...src.matchAll(/export const (\w+) = createServerFn\(\{ method: "POST" \}\)\n  \.middleware\(\[(\w+)(?:\("(\w+)"\))?\]\)/g)];
+      const fns = [...src.matchAll(/export const (\w+) = createServerFn\(\{ method: "POST" \}\)\n {2}\.middleware\(\[(\w+)(?:\("(\w+)"\))?\]\)/g)];
       for (const [, name, mw, limit] of fns) {
         if (name === "touchSession") { expect(mw).toBe("requireSession"); continue; }
         expect([f, name, mw]).toEqual([f, name, "limited"]);

@@ -1,5 +1,4 @@
 import js from "@eslint/js";
-import eslintPluginPrettier from "eslint-plugin-prettier/recommended";
 import globals from "globals";
 import reactHooks from "eslint-plugin-react-hooks";
 import reactRefresh from "eslint-plugin-react-refresh";
@@ -34,7 +33,10 @@ export default tseslint.config(
       ],
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
       "@typescript-eslint/no-unused-vars": "off",
+      // Untyped boundaries (the service-role client, Stripe replies, joined rows) still use any; shown so they shrink over time.
+      "@typescript-eslint/no-explicit-any": "warn",
     },
   },
-  eslintPluginPrettier,
+  // Generated shadcn components and modules that pair components with their helpers; Fast Refresh just reloads them fully.
+  { files: ["src/components/**/*.tsx", "src/routes/**/*.tsx"], rules: { "react-refresh/only-export-components": "off" } },
 );
