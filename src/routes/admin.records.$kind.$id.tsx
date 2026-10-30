@@ -200,7 +200,7 @@ function RecordPage() {
           {!!row.archived_at && <p className="mt-1 text-sm text-muted-foreground">Archived on {fmtText(row.archived_at, "date")}</p>}
         </div>
         <div className="flex flex-wrap gap-2">
-          {kind === "subscriptions" && row.status === "pending" && <Btn icon={CreditCard} onClick={() => attempt("First invoice sent", "Stripe emailed the invoice. The subscription activates when it's paid.", () => fnFirst({ data: { subscriptionId: id } }))}>Send first invoice</Btn>}
+          {kind === "subscriptions" && row.status === "pending" && !(data.children.find((c) => c.kind === "invoices")?.rows ?? []).some((i) => i.kind === "first" && i.status !== "void") && <Btn icon={CreditCard} onClick={() => attempt("First invoice sent", "Stripe emailed the invoice. The subscription activates when it's paid.", () => fnFirst({ data: { subscriptionId: id } }))}>Send first invoice</Btn>}
           {kind === "subscriptions" && (row.status === "active" || row.status === "past_due") && <Btn icon={Ban} onClick={() => subAct("pause")}>Pause</Btn>}
           {kind === "subscriptions" && row.status === "paused" && <Btn icon={RefreshCw} onClick={() => subAct("resume")}>Resume</Btn>}
           {kind === "subscriptions" && !["cancelled", "pending"].includes(String(row.status)) && <Btn icon={Ban} danger onClick={() => subAct("cancel_end")}>Cancel at period end</Btn>}
