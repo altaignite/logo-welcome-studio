@@ -49,21 +49,25 @@ export const sharedWithClient = (to: AppStatus) => clientVisibleStatuses.include
 export const clientResponse = { from: "info_requested", to: "in_review" } as const satisfies { from: AppStatus; to: AppStatus };
 
 /** Client account statuses, in lifecycle order. */
-export const accountStatuses = ["prospect", "onboarding", "active", "past_due", "on_hold", "suspended", "cancelled", "closed"] as const;
+export const accountStatuses = ["prospect", "onboarding", "active", "past_due", "on_hold", "suspended", "fraud_kyc", "cancelled", "closed"] as const;
 export type AccountStatus = (typeof accountStatuses)[number];
 export const accountStatusLabel: Record<AccountStatus, string> = {
   prospect: "Prospect", onboarding: "Onboarding", active: "Active", past_due: "Past due",
-  on_hold: "On hold", suspended: "Suspended", cancelled: "Cancelled", closed: "Closed",
+  on_hold: "On hold", suspended: "Suspended", fraud_kyc: "Fraud - KYC", cancelled: "Cancelled", closed: "Closed",
 };
 /** Statuses that block the client from signing in. */
 export const signInBlocked = (s: string) => s === "suspended" || s === "closed";
 /** Statuses in which the client can't change their own plans (staff hold, suspension or closure). */
-export const clientActionsBlocked = (s: string) => ["on_hold", "suspended", "cancelled", "closed"].includes(s);
+export const clientActionsBlocked = (s: string) => ["on_hold", "suspended", "fraud_kyc", "cancelled", "closed"].includes(s);
+/** Restricted for identity verification: the client may sign in only to see the KYC page; every server action and table is closed. */
+export const kycRestricted = (s: string) => s === "fraud_kyc";
+export const KYC_EMAIL = "kyc@firstpersonmarketing.com";
+export const KYC_ERROR = "KYC_REQUIRED: Your account is restricted until you complete identity verification.";
 /** Statuses in which the client can't order another plan. */
 export const orderingBlocked = (s: string) => s === "past_due" || clientActionsBlocked(s);
 /** What happens to running subscriptions when an account moves to a status. */
 export function subscriptionEffect(s: string): "paused" | "cancelled" | null {
-  if (s === "on_hold" || s === "suspended") return "paused";
+  if (s === "on_hold" || s === "suspended" || s === "fraud_kyc") return "paused";
   if (s === "cancelled" || s === "closed") return "cancelled";
   return null;
 }

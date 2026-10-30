@@ -152,7 +152,11 @@ export function OrderWizard({ client, mode, onPlace, onDone, doneLabel, initialP
   const documents = agreementDocuments(plan, client, placedAt ?? undefined);
   const place = async (): Promise<boolean> => {
     try { await onPlace(plan); setPlacedAt(new Date().toISOString()); setStep(3); return true; }
-    catch (e) { popup({ type: "error", title: "The order wasn't placed", description: (e as Error).message, primaryLabel: "Close", secondaryLabel: null }); return false; }
+    catch (e) {
+      // A security check restricted the account: the client completes verification first.
+      if (/KYC_REQUIRED/.test((e as Error).message) && mode === "client") { window.location.assign("/kyc"); return false; }
+      popup({ type: "error", title: "The order wasn't placed", description: (e as Error).message, primaryLabel: "Close", secondaryLabel: null }); return false;
+    }
   };
   const confirmStaff = () => popup({ type: "info", title: `Place a ${plan.name} order?`, description: `Stripe emails the first invoice of ${money(plan.monthlyFee)} to ${client.email ?? "the client"}. The plan starts when it's paid.`, primaryLabel: "Place order", onPrimary: async () => { await place(); }, secondaryLabel: "Cancel" });
   const titles = ["Choose a plan", "Review the order", "Agreements", "Order placed"];

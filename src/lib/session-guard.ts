@@ -20,6 +20,7 @@ async function sessionUser(loginTo: "/" | "/admin-login") {
   if (touched !== sid) {
     touched = sid;
     void touchSession().catch(async (e: Error) => {
+      if (/KYC_REQUIRED/.test(e.message)) { window.location.assign("/kyc"); return; }
       if (/suspended|closed|expired|unauthorized/i.test(e.message)) { await supabase.auth.signOut(); window.location.assign(loginTo); }
     });
   }

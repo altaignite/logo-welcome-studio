@@ -3,7 +3,7 @@ import { z } from "zod";
 import { limited, requireSession } from "@/lib/session.middleware";
 import { plans } from "@/lib/signup";
 import { planChangeTiming, profileUpdateSchema } from "@/lib/client";
-import { orderingBlocked } from "@/lib/admin";
+import { KYC_ERROR, orderingBlocked } from "@/lib/admin";
 
 const uuid = z.string().uuid();
 const label = (c: { claims: any }) => String(c.claims?.email ?? "Client");
@@ -23,6 +23,15 @@ export const updateMyProfile = createServerFn({ method: "POST" })
     const admin = await getAdmin();
     const up = await admin.from("profiles").update({ ...data, updated_at: new Date().toISOString() }).eq("id", context.userId);
     if (up.error) throw new Error("Couldn't save your details.");
+    // A database trigger restricts the account if the new mobile number belongs to another account.
+    if (data.phone !== undefined) {
+      const { data: p } = await admin.from("profiles").select("status, status_reason").eq("id", context.userId).maybeSingle();
+      if (p?.status === "fraud_kyc") {
+        const { applyAccountStatusEffects } = await import("@/lib/account-status.server");
+        await applyAccountStatusEffects(admin, context.userId, "fraud_kyc", `Account restricted for KYC review: ${p.status_reason ?? "duplicate phone number"}`, null, "Security");
+        throw new Error(KYC_ERROR);
+      }
+    }
     return { ok: true };
   });
 
@@ -39,6 +48,9 @@ export const orderAdditionalPlan = createServerFn({ method: "POST" })
     if (!prof || orderingBlocked(prof.status)) throw new Error("Your account can't place orders right now. Please contact support.");
     const { count } = await admin.from("subscriptions").select("id", { count: "exact", head: true }).eq("user_id", context.userId).eq("status", "pending");
     if ((count ?? 0) >= 2) throw new Error("Please pay your open plan invoices before ordering another plan.");
+    // Security: the mobile number on the order must not belong to another account.
+    const { checkDuplicatePhone } = await import("@/lib/kyc.server");
+    if (await checkDuplicatePhone(admin, context.userId)) throw new Error(KYC_ERROR);
     // Make sure Stripe is reachable and the client has a Stripe customer before anything is created locally.
     const { ensureCustomer } = await import("@/lib/stripe.server");
     await ensureCustomer(admin, context.userId);

@@ -19,7 +19,7 @@ export const companyLine = `${company.legalName}, ${company.entity} doing busine
 export type AgreementClient = { name: string; company?: string | null; email?: string | null; phone?: string | null; country?: string | null; address?: string | null; accountNumber?: string | null };
 
 /** Bump when agreement wording changes; signed copies record the version they were rendered from. */
-export const AGREEMENT_VERSION = "2026-10-30.5";
+export const AGREEMENT_VERSION = "2026-10-30.6";
 
 /**
  * Agreement body markup, shared by the reading dialog and the PDF:
@@ -339,6 +339,7 @@ ${Object.entries(firstResponseHours).map(([k, h]) => `| ${k.charAt(0).toUpperCas
 | Past due | An invoice is overdue. New orders and plan changes are blocked until it is paid.
 | On hold | Paused by us, for example at your request or pending information. Plans are paused in Stripe and resume when the hold ends.
 | Suspended | Sign-in is blocked, every session is ended and Plans are paused, typically for unpaid debt or a serious breach.
+| Fraud - KYC | Restricted by our security checks, for example a mobile number already used by another account, a card fraud warning or a chargeback. Plans are paused and only the verification page is available until you email proof of identity and proof of residence (not older than 3 months) to kyc@firstpersonmarketing.com and we reinstate the account.
 | Cancelled | Plans have been cancelled in Stripe. Records remain available on request.
 | Closed | The account is closed and sign-in is blocked. Financial and legal records are kept as the law requires.
 

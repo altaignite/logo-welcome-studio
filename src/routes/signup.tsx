@@ -163,6 +163,11 @@ function Signup() {
       popup({ type: "info", title: "You already have an account", description: `Sign in to add the ${selectedPlan.name} plan to your existing account.`, primaryLabel: "Sign in", onPrimary: () => { setStep(1); setGate("password"); }, secondaryLabel: null });
       return false;
     }
+    // Security checks run when the account is created (for example a mobile number already used by another account).
+    try {
+      const r = await fetch("/api/public/account-check", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: account.email.trim() }) });
+      if (r.ok && ((await r.json()) as { restricted?: boolean }).restricted) { setConfirmOpen(false); window.location.assign("/kyc"); return true; }
+    } catch { /* the check is best effort; staff still see the flag */ }
     setSignature({ name: `${personal.firstName} ${personal.lastName}`, at: new Date().toISOString() });
     setStep(5);
     return true;

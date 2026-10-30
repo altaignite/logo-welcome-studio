@@ -15,9 +15,13 @@ export const Route = createFileRoute("/api/public/account-check")({
         try { await enforceLimit("accountCheck", `ip:${ip}`); await enforceLimit("accountCheckEmail", `email:${email}`); }
         catch (e) { if (e instanceof RateLimitError) return json({ error: e.message }, 429); throw e; }
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-        const { data, error } = await supabaseAdmin.from("profiles").select("id").ilike("email", email.replace(/[\\%_]/g, (c) => `\\${c}`)).limit(1);
+        const { data, error } = await supabaseAdmin.from("profiles").select("id, status, created_at").ilike("email", email.replace(/[\\%_]/g, (c) => `\\${c}`)).limit(1);
         if (error) return json({ error: "We couldn't check that email. Please try again." }, 503);
-        return json({ exists: (data ?? []).length > 0 });
+        const row = (data ?? [])[0] as { status: string; created_at: string } | undefined;
+        // Right after signup, the flow asks whether security checks restricted the new account so it can show the KYC page.
+        // Only accounts created in the last 10 minutes answer, so this can't be used to probe existing accounts.
+        const fresh = !!row && Date.now() - new Date(row.created_at).getTime() < 10 * 60_000;
+        return json({ exists: !!row, ...(fresh ? { restricted: row!.status === "fraud_kyc" } : {}) });
       },
     },
   },

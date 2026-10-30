@@ -43,7 +43,9 @@ export const departments = [
   { id: "complaints", label: "Complaints", help: "Something went wrong and you'd like it reviewed.", category: "complaint" },
 ] as const;
 export type DepartmentId = (typeof departments)[number]["id"];
-export const departmentLabel = (id: string) => departments.find((d) => d.id === id)?.label ?? id;
+/** Staff-only department for automatic security and KYC reviews (not offered to clients). */
+export const securityDepartment = { id: "security", label: "Security and KYC" } as const;
+export const departmentLabel = (id: string) => (id === securityDepartment.id ? securityDepartment.label : departments.find((d) => d.id === id)?.label ?? id);
 export const clientPriorities = [
   { id: "low", label: "Low", help: "A question or idea, no rush." },
   { id: "normal", label: "Normal", help: "Needs an answer within a day." },

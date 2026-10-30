@@ -14,6 +14,7 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AdminLoginRouteImport } from './routes/admin-login'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
+import { Route as KycRouteImport } from './routes/kyc'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
@@ -61,6 +62,11 @@ const DashboardRoute = DashboardRouteImport.update({
 const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
   id: '/forgot-password',
   path: '/forgot-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const KycRoute = KycRouteImport.update({
+  id: '/kyc',
+  path: '/kyc',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
@@ -187,6 +193,7 @@ export interface FileRoutesByFullPath {
   '/admin-login': typeof AdminLoginRoute
   '/dashboard': typeof DashboardRouteWithChildren
   '/forgot-password': typeof ForgotPasswordRoute
+  '/kyc': typeof KycRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/admin/settings': typeof AdminSettingsRoute
@@ -215,6 +222,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin-login': typeof AdminLoginRoute
   '/forgot-password': typeof ForgotPasswordRoute
+  '/kyc': typeof KycRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/admin/settings': typeof AdminSettingsRoute
@@ -246,6 +254,7 @@ export interface FileRoutesById {
   '/admin-login': typeof AdminLoginRoute
   '/dashboard': typeof DashboardRouteWithChildren
   '/forgot-password': typeof ForgotPasswordRoute
+  '/kyc': typeof KycRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/admin/settings': typeof AdminSettingsRoute
@@ -278,6 +287,7 @@ export interface FileRouteTypes {
     | '/admin-login'
     | '/dashboard'
     | '/forgot-password'
+    | '/kyc'
     | '/reset-password'
     | '/signup'
     | '/admin/settings'
@@ -306,6 +316,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin-login'
     | '/forgot-password'
+    | '/kyc'
     | '/reset-password'
     | '/signup'
     | '/admin/settings'
@@ -336,6 +347,7 @@ export interface FileRouteTypes {
     | '/admin-login'
     | '/dashboard'
     | '/forgot-password'
+    | '/kyc'
     | '/reset-password'
     | '/signup'
     | '/admin/settings'
@@ -367,6 +379,7 @@ export interface RootRouteChildren {
   AdminLoginRoute: typeof AdminLoginRoute
   DashboardRoute: typeof DashboardRouteWithChildren
   ForgotPasswordRoute: typeof ForgotPasswordRoute
+  KycRoute: typeof KycRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SignupRoute: typeof SignupRoute
   ApiPublicAccountCheckRoute: typeof ApiPublicAccountCheckRoute
@@ -410,6 +423,13 @@ declare module '@tanstack/react-router' {
       path: '/forgot-password'
       fullPath: '/forgot-password'
       preLoaderRoute: typeof ForgotPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/kyc': {
+      id: '/kyc'
+      path: '/kyc'
+      fullPath: '/kyc'
+      preLoaderRoute: typeof KycRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reset-password': {
@@ -634,6 +654,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminLoginRoute: AdminLoginRoute,
   DashboardRoute: DashboardRouteWithChildren,
   ForgotPasswordRoute: ForgotPasswordRoute,
+  KycRoute: KycRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SignupRoute: SignupRoute,
   ApiPublicAccountCheckRoute: ApiPublicAccountCheckRoute,

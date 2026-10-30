@@ -15,4 +15,7 @@ export async function recordSignIn(admin: Admin, userId: string, sessionId: stri
     user_id: userId, session_id: sessionId, ...place, user_agent: (req.headers.get("user-agent") ?? "").slice(0, 300) || null,
     new_location: isNewLocation(place, prev),
   }, { onConflict: "session_id", ignoreDuplicates: true });
+  // Security pattern: many accounts from one network in a day.
+  const { checkSharedIp } = await import("@/lib/kyc.server");
+  await checkSharedIp(admin, userId, place.ip);
 }

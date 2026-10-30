@@ -7,6 +7,7 @@ export function friendlyError(e: unknown): string {
   if (raw.trim().startsWith("[")) {
     try { const issues = JSON.parse(raw) as { message?: string }[]; if (issues[0]?.message) return issues[0].message; } catch { /* not JSON */ }
   }
+  if (/KYC_REQUIRED/.test(raw)) return "Your account is restricted until you complete identity verification.";
   if (/failed to fetch|networkerror|load failed|network request failed/i.test(raw)) return "We couldn't reach the server. Check your connection and try again.";
   if (/unauthorized|jwt expired|invalid token|no authorization/i.test(raw)) return "Your session has expired. Please sign in again.";
   if (/row-level security|permission denied/i.test(raw)) return "You don't have permission to do that.";

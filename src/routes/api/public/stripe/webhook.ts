@@ -58,6 +58,23 @@ export const Route = createFileRoute("/api/public/stripe/webhook")({
             if (subId) await B.syncSubscriptionFromStripe(admin, subId, o);
           }
           switch (event.type) {
+            // Security patterns from Stripe: a card issuer's early fraud warning or a chargeback restricts the account for KYC.
+            case "radar.early_fraud_warning.created":
+            case "charge.dispute.created": {
+              const chargeId = idOf(o.charge);
+              const charge = chargeId ? await stripe("GET", `charges/${chargeId}`) : null;
+              const customer = idOf(charge?.customer ?? o.customer);
+              const owner = customer ? must(await admin.from("profiles").select("id").eq("stripe_customer_id", customer).maybeSingle()) : null;
+              if (owner) {
+                const { flagForKyc } = await import("@/lib/kyc.server");
+                const amount = Number(o.amount ?? charge?.amount ?? 0) / 100;
+                await flagForKyc(admin, owner.id, event.type === "charge.dispute.created"
+                  ? `A chargeback (dispute ${o.id}, reason: ${String(o.reason ?? "unknown").replaceAll("_", " ")}) was opened for US$${amount.toFixed(2)} on charge ${chargeId ?? "unknown"}.`
+                  : `Stripe reported an early fraud warning (${String(o.fraud_type ?? "unknown").replaceAll("_", " ")}) on charge ${chargeId ?? "unknown"}.`,
+                  event.type === "charge.dispute.created" ? "chargeback" : "Stripe fraud warning");
+              }
+              break;
+            }
             case "charge.refunded": {
               const pi = idOf(o.payment_intent);
               const stripeInv = idOf(o.invoice);

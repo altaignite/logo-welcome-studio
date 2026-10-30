@@ -29,8 +29,9 @@ export const createOrder = createServerFn({ method: "POST" })
     const admin = await getAdmin();
     const plan = plans.find((p) => p.id === data.planId);
     if (!plan) throw new Error("Unknown plan.");
-    const { data: prof } = await admin.from("profiles").select("account_number, company, first_name, last_name").eq("id", data.userId).single();
+    const { data: prof } = await admin.from("profiles").select("account_number, company, first_name, last_name, status").eq("id", data.userId).single();
     if (!prof) throw new Error("Client not found.");
+    if (prof.status === "fraud_kyc") throw new Error("This account is restricted for KYC review. Reinstate it before placing orders.");
     // Make sure Stripe is reachable and the client has a Stripe customer before anything is created locally.
     const { ensureCustomer } = await import("@/lib/stripe.server");
     await ensureCustomer(admin, data.userId);
@@ -66,6 +67,8 @@ export const sendFirstInvoice = createServerFn({ method: "POST" })
     const admin = await getAdmin();
     const { data: sub } = await admin.from("subscriptions").select("*").eq("id", data.subscriptionId).single();
     if (!sub || sub.status !== "pending") throw new Error("Only pending subscriptions can be invoiced.");
+    const { data: owner } = await admin.from("profiles").select("status").eq("id", sub.user_id).maybeSingle();
+    if (owner?.status === "fraud_kyc") throw new Error("This account is restricted for KYC review. Reinstate it before sending invoices.");
     const { data: existing } = await admin.from("invoices").select("id").eq("subscription_id", sub.id).eq("kind", "first").neq("status", "void").maybeSingle();
     if (existing) throw new Error("A first invoice was already sent.");
     const inv = await issueStripeInvoice(admin, {
@@ -338,7 +341,7 @@ export const voidInvoices = createServerFn({ method: "POST" })
 export const requiredStripeEvents = [
   "invoice.finalized", "invoice.paid", "invoice.payment_failed", "invoice.marked_uncollectible", "invoice.voided", "invoice.updated",
   "customer.subscription.created", "customer.subscription.updated", "customer.subscription.paused", "customer.subscription.resumed", "customer.subscription.deleted",
-  "charge.refunded",
+  "charge.refunded", "radar.early_fraud_warning.created", "charge.dispute.created",
 ];
 
 /** Billing setup check for staff: key, account, webhook endpoint and events, and plans left waiting for an invoice. */

@@ -4,7 +4,7 @@ import { guaranteeCheck } from "@/lib/billing";
 import { toPatch } from "@/lib/records";
 
 describe("account statuses", () => {
-  it("offers the eight lifecycle statuses", () => expect(accountStatuses).toEqual(["prospect", "onboarding", "active", "past_due", "on_hold", "suspended", "cancelled", "closed"]));
+  it("offers the lifecycle statuses, including the KYC restriction", () => expect(accountStatuses).toEqual(["prospect", "onboarding", "active", "past_due", "on_hold", "suspended", "fraud_kyc", "cancelled", "closed"]));
   it("blocks sign-in only when suspended or closed", () => {
     expect(accountStatuses.filter(signInBlocked)).toEqual(["suspended", "closed"]);
   });
