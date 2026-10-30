@@ -5,13 +5,13 @@ import { Button } from "@/components/ui/button";
 import { CountryField } from "@/components/country-field";
 import { MfaChallenge, mfaNeeded } from "@/components/mfa";
 import { Spinner } from "@/components/loading";
-import { useTurnstile } from "@/components/turnstile";
 import { useServerFn } from "@tanstack/react-start";
 import { orderAdditionalPlan } from "@/lib/client.functions";
 import { usePopup } from "@/components/popup";
 import { isUnconfirmedEmail, unconfirmedPopup } from "@/lib/email-confirmation";
 import { supabase } from "@/integrations/supabase/client";
 import { agreementDocuments } from "@/lib/agreements";
+import { clearDraft, loadDraft, resumeStep, saveDraft } from "@/lib/signup-draft";
 import { passwordProblem, passwordRules } from "@/lib/passwords";
 import { createAccountNumber, accountSchema, countries, personalSchema, plans, type Plan, type CountryCode, type PersonalDetails, formatPhoneInput, switchPhoneCountry, phonePlaceholder, phoneNational } from "@/lib/signup";
 import logo from "@/assets/logo.png.asset.json";
@@ -49,8 +49,6 @@ function Signup() {
   const [existing, setExisting] = useState(false);
   const [gateBusy, setGateBusy] = useState(false);
   const [loginPassword, setLoginPassword] = useState("");
-  // Cloudflare Turnstile: tokens for the email check and Supabase sign-up, sign-in and reset (no-op until configured).
-  const bot = useTurnstile();
   const [selectedPlan, setSelectedPlan] = useState<Plan>(plans[0]);
   const [personal, setPersonal] = useState<PersonalDetails>({ firstName: "", lastName: "", company: "", country: "", phone: "" });
   const [phoneCountry, setPhoneCountry] = useState<string>("");
@@ -83,6 +81,31 @@ function Signup() {
     return () => { controller.abort(); window.clearTimeout(timeout); };
   }, []);
 
+  // Saved progress: offer to continue where the visitor left off (this browser only, never the password).
+  useEffect(() => {
+    const d = loadDraft();
+    if (!d) return;
+    const plan = plans.find((x) => x.id === d.planId)!;
+    popup({ type: "info", title: "Continue where you left off?", description: `We saved your ${plan.name} plan application on this device on ${new Date(d.savedAt).toLocaleDateString(undefined, { dateStyle: "medium" })}. For your security your password isn't saved, so you'll enter it again.`,
+      primaryLabel: "Continue", secondaryLabel: "Start over", onSecondary: () => clearDraft(),
+      onPrimary: async () => {
+        setSelectedPlan(plan); setPersonal(d.personal); setPhoneCountry(d.phoneCountry); setAccountNumber(d.accountNumber);
+        setAccount((a) => ({ ...a, email: d.email }));
+        if (d.personal.country) countryTouched.current = true;
+        if (d.personal.phone) phoneTouched.current = true;
+        const { data } = await supabase.auth.getSession();
+        if (d.existingAccount && data.session && !(await mfaNeeded())) { setExisting(true); return; }
+        const r = resumeStep(d); setGate(r.gate); setStep(r.step);
+      } });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    if (existing || step < 1 || step > 4) return;
+    saveDraft({ step, planId: selectedPlan.id, personal, phoneCountry, email: account.email.trim(), accountNumber, existingAccount: gate === "password" || gate === "mfa" });
+  }, [step, gate, selectedPlan, personal, phoneCountry, account.email, accountNumber, existing]);
+  // Finished: nothing left to resume.
+  useEffect(() => { if (step >= 5) clearDraft(); }, [step]);
+
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "instant" });
   }, [step]);
@@ -109,12 +132,7 @@ function Signup() {
     if (!valid.success) { popup({ type: "error", title: "Let's check your email", description: valid.error.issues[0]?.message ?? "Enter a valid email address.", primaryLabel: "Try again", secondaryLabel: null }); return; }
     setGateBusy(true);
     try {
-      const captcha = await bot.getToken();
-      if (bot.enabled && !captcha) {
-        popup({ type: "error", title: "The security check didn't load", description: "Our bot protection (Cloudflare) couldn't run in this browser. Turn off content blockers or VPN for this site, or try another browser, then press Continue again.", primaryLabel: "Try again", secondaryLabel: null });
-        return;
-      }
-      const r = await fetch("/api/public/account-check", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email, turnstile: captcha }) });
+      const r = await fetch("/api/public/account-check", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email }) });
       const body = (await r.json().catch(() => ({}))) as { exists?: boolean; error?: string; risk?: { suggestion?: string } };
       if (!r.ok) {
         const fix = body.risk?.suggestion;
@@ -133,8 +151,7 @@ function Signup() {
     event.preventDefault();
     if (!loginPassword) return;
     setGateBusy(true);
-    const captcha = await bot.getToken();
-    const { error } = await supabase.auth.signInWithPassword({ email: account.email.trim(), password: loginPassword, ...(captcha ? { options: { captchaToken: captcha } } : {}) });
+    const { error } = await supabase.auth.signInWithPassword({ email: account.email.trim(), password: loginPassword });
     if (error) {
       setGateBusy(false);
       // The plan is kept: after confirming, the client comes back to this tab and signs in.
@@ -150,8 +167,7 @@ function Signup() {
     finally { setGateBusy(false); }
   };
   const forgot = async () => {
-    const captcha = await bot.getToken();
-    await supabase.auth.resetPasswordForEmail(account.email.trim(), { redirectTo: `${window.location.origin}/reset-password`, ...(captcha ? { captchaToken: captcha } : {}) });
+    await supabase.auth.resetPasswordForEmail(account.email.trim(), { redirectTo: `${window.location.origin}/reset-password` });
     popup({ type: "success", title: "Check your email", description: `We sent a reset link to ${account.email.trim()}. Set a new password in the tab it opens, then come back here and sign in. Your order is kept on this page.`, primaryLabel: "Got it", secondaryLabel: null });
   };
   const advance = async (event: FormEvent) => {
@@ -172,10 +188,9 @@ function Signup() {
   };
   const openConfirmation = () => setConfirmOpen(true);
   const accept = async (): Promise<boolean> => {
-    const captcha = await bot.getToken();
     const { data, error } = await supabase.auth.signUp({
       email: account.email.trim(), password: account.password,
-      options: { ...(captcha ? { captchaToken: captcha } : {}), emailRedirectTo: window.location.origin, data: {
+      options: { emailRedirectTo: window.location.origin, data: {
         account_number: accountNumber, first_name: personal.firstName.trim(), last_name: personal.lastName.trim(), company: personal.company.trim(),
         country: personal.country, phone: personal.phone, plan_id: selectedPlan.id, plan_name: selectedPlan.name,
         monthly_fee: selectedPlan.monthlyFee, monthly_hours: selectedPlan.monthlyHours,
@@ -194,7 +209,7 @@ function Signup() {
     }
     // Security checks run when the account is created (for example a mobile number already used by another account).
     try {
-      const r = await fetch("/api/public/account-check", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: account.email.trim(), turnstile: await bot.getToken() }) });
+      const r = await fetch("/api/public/account-check", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: account.email.trim(), }) });
       if (r.ok && ((await r.json()) as { restricted?: boolean }).restricted) { setConfirmOpen(false); window.location.assign("/kyc"); return true; }
     } catch { /* the check is best effort; staff still see the flag */ }
     setSignature({ name: `${personal.firstName} ${personal.lastName}`, at: new Date().toISOString() });
@@ -216,12 +231,12 @@ function Signup() {
         <span className="text-sm font-semibold sm:hidden">{existing ? "Add a plan" : step === 1 && gate ? (gate === "email" ? "Your email" : "Sign in") : step < 5 ? steps[step] : step === 5 ? "Almost there…" : "Application complete"}</span>
         <div className="flex items-center gap-3">
           <span className="hidden text-sm text-muted-foreground sm:block">{existing ? "Add a plan" : step === 1 && gate ? (gate === "email" ? "Your email" : "Sign in") : step < 5 ? `${steps[step]} · ${step + 1} of 5` : step === 5 ? "Almost there…" : "Application complete"}</span>
-          {step < 5 ? <Button variant="ghost" size="icon" aria-label="Close signup" onClick={() => popup({ type: "info", title: "Leave your application?", description: "Your details won't be saved.", primaryLabel: "Leave application", onPrimary: () => { navigate({ to: "/" }); }, secondaryLabel: "Keep going" })}><X /></Button> : <div className="size-9" />}
+          {step < 5 ? <Button variant="ghost" size="icon" aria-label="Close signup" onClick={() => popup({ type: "info", title: "Leave your application?", description: "Your progress is saved on this device for 7 days, so you can continue later. Your password isn't saved.", primaryLabel: "Leave application", onPrimary: () => { navigate({ to: "/" }); }, secondaryLabel: "Keep going" })}><X /></Button> : <div className="size-9" />}
         </div>
       </div>
     </header>
 
-    {existing ? <ExistingClientOrder plan={selectedPlan} onDone={() => navigate({ to: "/dashboard" })} /> : step < 5 ? <>
+    {existing ? <ExistingClientOrder plan={selectedPlan} onDone={() => { clearDraft(); void navigate({ to: "/dashboard" }); }} /> : step < 5 ? <>
       <div className={`mx-auto px-5 pb-8 pt-6 md:px-6 md:pt-8 ${step === 0 ? "max-w-4xl" : "max-w-lg"}`}>
         <div className="mb-6 text-center"><h1 className="text-2xl font-extrabold leading-tight lg:text-3xl">{step === 1 && gate ? gateTitles[gate][0] : titles[step]}</h1><p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">{step === 1 && gate ? gateTitles[gate][1] : subtitles[step]}</p></div>
         {step === 0 && <div>
@@ -278,7 +293,6 @@ function Signup() {
       </section>
     </div>
     <SignDialog open={confirmOpen} onOpenChange={setConfirmOpen} title="Confirm your application" onSign={accept} />
-    <div className="pb-6">{bot.widget}</div>
   </main>;
 }
 

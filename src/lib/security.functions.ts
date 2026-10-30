@@ -37,7 +37,6 @@ export const securityOverview = createServerFn({ method: "POST" })
       heaviestUsers: top.map(([id, count]) => { const p = names.find((n: { id: string }) => n.id === id) as { account_number?: string; email?: string } | undefined; return { id, count, account: p?.account_number ?? null, email: p?.email ?? null }; }),
       signIns: { total: signInRows.length, newLocations: (signIns.data ?? []).filter((s: { new_location: boolean }) => s.new_location), distinctIps: new Set(signInRows.map((s) => s.ip).filter(Boolean)).size },
       restricted: restricted.data ?? [],
-      botProtection: await (await import("@/lib/turnstile.server")).turnstileConfigured(),
     };
   });
 
@@ -66,22 +65,3 @@ export const recordDataExport = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-/** Owners save the Cloudflare Turnstile keys. The secret is checked with Cloudflare, stored server-side in app_secrets and never
- * sent back to the browser. Lovable secrets (TURNSTILE_*), when set, take precedence. */
-export const saveTurnstileKeys = createServerFn({ method: "POST" })
-  .middleware([limited("staffAdmin")])
-  .inputValidator((d: unknown) => z.object({ secretKey: z.string().trim().regex(/^0x[A-Za-z0-9_-]{10,200}$/, "The secret key starts with 0x.") }).parse(d))
-  .handler(async ({ data, context }) => {
-    const { requirePerm } = await import("@/lib/access.server");
-    await requirePerm(context, "staff");
-    const { secretKeyValid, clearTurnstileCache } = await import("@/lib/turnstile.server");
-    if (!(await secretKeyValid(data.secretKey))) throw new Error("Cloudflare didn't accept that secret key. Copy it again from Turnstile, Settings.");
-    const { getAdmin, must } = await import("@/lib/billing.server");
-    const { audit } = await import("@/lib/stripe.server");
-    const admin = await getAdmin();
-    const now = new Date().toISOString();
-    must(await admin.from("app_secrets").upsert({ name: "turnstile_secret_key", value: data.secretKey, updated_at: now }));
-    clearTurnstileCache();
-    await audit(admin, context.userId, "app_secrets", context.userId, "turnstile_keys_saved", { secret: "replaced" }, context.userId, label(context));
-    return { ok: true };
-  });

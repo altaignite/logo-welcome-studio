@@ -9,8 +9,7 @@ import { usePopup } from "@/components/popup";
 import { formatDate } from "@/lib/admin";
 import { countryName } from "@/lib/security";
 import { guideFor, severityRank } from "@/lib/security-guide";
-import { resolveSecurityEvent, saveTurnstileKeys, securityOverview } from "@/lib/security.functions";
-import { FormModal, type FieldDef } from "@/components/admin/form-modal";
+import { resolveSecurityEvent, securityOverview } from "@/lib/security.functions";
 
 export const Route = createFileRoute("/admin/security")({
   head: () => ({ meta: [{ title: "Security log — FP admin" }] }),
@@ -28,11 +27,6 @@ function SecurityPage() {
   const q = useQuery({ queryKey: ["admin", "security"], queryFn: () => load(), refetchInterval: 60_000 });
   const [open, setOpen] = useState<Ev | null>(null);
   const [showResolved, setShowResolved] = useState(false);
-  const saveKey = useServerFn(saveTurnstileKeys);
-  const [modal, setModal] = useState<{ title: string; description: string; fields: FieldDef[]; submitLabel: string; onSubmit: (v: { secretKey: string }) => Promise<string | null> } | null>(null);
-  const setSecret = () => setModal({ title: "Turnstile secret key", submitLabel: "Check and save", description: "Paste the secret key of your Turnstile widget. It's checked with Cloudflare, stored on the server only and never shown again.",
-    fields: [{ name: "secretKey", label: "Secret key", required: true, placeholder: "0x…" }],
-    onSubmit: async (v) => { try { await saveKey({ data: { secretKey: v.secretKey } }); await qc.invalidateQueries({ queryKey: ["admin", "security"] }); return null; } catch (e) { return (e as Error).message; } } });
   if (q.isLoading) return <PageSkeleton />;
   if (q.error || !q.data) return <ErrorState error={q.error ?? new Error("Couldn't load the security log.")} retry={() => void q.refetch()} />;
   const d = q.data;
@@ -54,9 +48,6 @@ function SecurityPage() {
     <div className="space-y-6">
       <div><h1 className="text-2xl font-extrabold sm:text-3xl">Security log</h1>
         <p className="mt-1 text-sm text-muted-foreground">What the server blocked or flagged, possible data leaks, and what to do. Repeats are grouped per source and hour. Network floods stopped by Cloudflare before reaching the app appear in your hosting analytics, not here.</p></div>
-      <div className={`rounded-xl border p-3 text-sm ${d.botProtection ? "" : "border-destructive/30 bg-destructive/5"}`}>{d.botProtection ? <span className="flex flex-wrap items-center justify-between gap-2"><span>Bot protection (Cloudflare Turnstile) is on for signup, login and password resets.</span><button type="button" onClick={setSecret} className="text-xs font-medium underline underline-offset-4">Replace secret key</button></span>
-          : <span className="flex flex-wrap items-center justify-between gap-2"><span>Bot protection is off. Add your Turnstile secret key (Cloudflare, Turnstile, your widget, Settings) to turn it on.</span><button type="button" onClick={setSecret} className="h-8 rounded-full bg-foreground px-4 text-xs font-semibold text-background">Add secret key</button></span>}</div>
-      {modal && <FormModal {...modal} onClose={() => setModal(null)} />}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {stat("Open events", openEvents.length, `${openEvents.filter((e) => severityRank[e.severity]! >= 3).length} high or critical`)}
         {stat("Blocked attempts, 24 h", attacks24, "Rate limits, probes, fakes and refusals")}

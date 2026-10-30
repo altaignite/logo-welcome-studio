@@ -35,7 +35,6 @@ import { Route as AdminApplicationsIdRouteImport } from './routes/admin.applicat
 import { Route as AdminOrderUserIdRouteImport } from './routes/admin.order.$userId'
 import { Route as ApiPublicAccountCheckRouteImport } from './routes/api/public/account-check'
 import { Route as ApiPublicCspReportRouteImport } from './routes/api/public/csp-report'
-import { Route as ApiPublicTurnstileConfigRouteImport } from './routes/api/public/turnstile-config'
 import { Route as DashboardKindIdRouteImport } from './routes/dashboard.$kind.$id'
 import { Route as DashboardChangeIdRouteImport } from './routes/dashboard.change.$id'
 import { Route as AdminRecordsKindIndexRouteImport } from './routes/admin.records.$kind.index'
@@ -174,12 +173,6 @@ const ApiPublicCspReportRoute = ApiPublicCspReportRouteImport.update({
   path: '/api/public/csp-report',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiPublicTurnstileConfigRoute =
-  ApiPublicTurnstileConfigRouteImport.update({
-    id: '/api/public/turnstile-config',
-    path: '/api/public/turnstile-config',
-    getParentRoute: () => rootRouteImport,
-  } as any)
 const DashboardKindIdRoute = DashboardKindIdRouteImport.update({
   id: '/$kind/$id',
   path: '/$kind/$id',
@@ -243,7 +236,6 @@ export interface FileRoutesByFullPath {
   '/admin/order/$userId': typeof AdminOrderUserIdRoute
   '/api/public/account-check': typeof ApiPublicAccountCheckRoute
   '/api/public/csp-report': typeof ApiPublicCspReportRoute
-  '/api/public/turnstile-config': typeof ApiPublicTurnstileConfigRoute
   '/dashboard/$kind/$id': typeof DashboardKindIdRoute
   '/dashboard/change/$id': typeof DashboardChangeIdRoute
   '/admin/accounts/': typeof AdminAccountsIndexRoute
@@ -277,7 +269,6 @@ export interface FileRoutesByTo {
   '/admin/order/$userId': typeof AdminOrderUserIdRoute
   '/api/public/account-check': typeof ApiPublicAccountCheckRoute
   '/api/public/csp-report': typeof ApiPublicCspReportRoute
-  '/api/public/turnstile-config': typeof ApiPublicTurnstileConfigRoute
   '/dashboard/$kind/$id': typeof DashboardKindIdRoute
   '/dashboard/change/$id': typeof DashboardChangeIdRoute
   '/admin/accounts': typeof AdminAccountsIndexRoute
@@ -314,7 +305,6 @@ export interface FileRoutesById {
   '/admin/order/$userId': typeof AdminOrderUserIdRoute
   '/api/public/account-check': typeof ApiPublicAccountCheckRoute
   '/api/public/csp-report': typeof ApiPublicCspReportRoute
-  '/api/public/turnstile-config': typeof ApiPublicTurnstileConfigRoute
   '/dashboard/$kind/$id': typeof DashboardKindIdRoute
   '/dashboard/change/$id': typeof DashboardChangeIdRoute
   '/admin/accounts/': typeof AdminAccountsIndexRoute
@@ -352,7 +342,6 @@ export interface FileRouteTypes {
     | '/admin/order/$userId'
     | '/api/public/account-check'
     | '/api/public/csp-report'
-    | '/api/public/turnstile-config'
     | '/dashboard/$kind/$id'
     | '/dashboard/change/$id'
     | '/admin/accounts/'
@@ -386,7 +375,6 @@ export interface FileRouteTypes {
     | '/admin/order/$userId'
     | '/api/public/account-check'
     | '/api/public/csp-report'
-    | '/api/public/turnstile-config'
     | '/dashboard/$kind/$id'
     | '/dashboard/change/$id'
     | '/admin/accounts'
@@ -422,7 +410,6 @@ export interface FileRouteTypes {
     | '/admin/order/$userId'
     | '/api/public/account-check'
     | '/api/public/csp-report'
-    | '/api/public/turnstile-config'
     | '/dashboard/$kind/$id'
     | '/dashboard/change/$id'
     | '/admin/accounts/'
@@ -445,7 +432,6 @@ export interface RootRouteChildren {
   SignupRoute: typeof SignupRoute
   ApiPublicAccountCheckRoute: typeof ApiPublicAccountCheckRoute
   ApiPublicCspReportRoute: typeof ApiPublicCspReportRoute
-  ApiPublicTurnstileConfigRoute: typeof ApiPublicTurnstileConfigRoute
   ApiPublicCronCollectionsRoute: typeof ApiPublicCronCollectionsRoute
   ApiPublicCronNotificationsRoute: typeof ApiPublicCronNotificationsRoute
   ApiPublicStripeWebhookRoute: typeof ApiPublicStripeWebhookRoute
@@ -635,13 +621,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicCspReportRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/turnstile-config': {
-      id: '/api/public/turnstile-config'
-      path: '/api/public/turnstile-config'
-      fullPath: '/api/public/turnstile-config'
-      preLoaderRoute: typeof ApiPublicTurnstileConfigRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/dashboard/$kind/$id': {
       id: '/dashboard/$kind/$id'
       path: '/$kind/$id'
@@ -763,7 +742,6 @@ const rootRouteChildren: RootRouteChildren = {
   SignupRoute: SignupRoute,
   ApiPublicAccountCheckRoute: ApiPublicAccountCheckRoute,
   ApiPublicCspReportRoute: ApiPublicCspReportRoute,
-  ApiPublicTurnstileConfigRoute: ApiPublicTurnstileConfigRoute,
   ApiPublicCronCollectionsRoute: ApiPublicCronCollectionsRoute,
   ApiPublicCronNotificationsRoute: ApiPublicCronNotificationsRoute,
   ApiPublicStripeWebhookRoute: ApiPublicStripeWebhookRoute,

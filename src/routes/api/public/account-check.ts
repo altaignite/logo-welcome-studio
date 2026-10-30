@@ -7,20 +7,12 @@ export const Route = createFileRoute("/api/public/account-check")({
     handlers: {
       POST: async ({ request }) => {
         const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
-        let email = "", token: string | null = null;
-        try { const b = (await request.json()) as { email?: unknown; turnstile?: unknown }; email = String(b.email ?? "").trim().toLowerCase(); token = typeof b.turnstile === "string" ? b.turnstile : null; } catch { return json({ error: "Invalid request." }, 400); }
+        let email = "";
+        try { email = String(((await request.json()) as { email?: unknown }).email ?? "").trim().toLowerCase(); } catch { return json({ error: "Invalid request." }, 400); }
         if (!/^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/.test(email) || email.length > 254) return json({ error: "Enter a valid email address." }, 400);
         const { enforceLimit, RateLimitError } = await import("@/lib/rate-limit.server");
         // Only Cloudflare's header: X-Forwarded-For is set by the caller and would let anyone dodge the per-IP limit.
         const ip = request.headers.get("cf-connecting-ip") ?? "unknown";
-        // Bot check first (Cloudflare Turnstile), so automated email scanning never reaches the lookup.
-        const { verifyTurnstile } = await import("@/lib/turnstile.server");
-        const bot = await verifyTurnstile(token, ip === "unknown" ? null : ip);
-        if (!bot.ok) {
-          const { logSecurityEvent } = await import("@/lib/security-log.server");
-          await logSecurityEvent({ kind: "bot_blocked", severity: "medium", request, summary: `The bot check failed on the signup email step (${bot.reason}).`, detail: { reason: bot.reason } });
-          return json({ error: "Please complete the security check and try again." }, 403);
-        }
         try { await enforceLimit("accountCheck", `ip:${ip}`); await enforceLimit("accountCheckEmail", `email:${email}`); }
         catch (e) { if (e instanceof RateLimitError) return json({ error: e.message }, 429); throw e; }
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");

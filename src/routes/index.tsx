@@ -2,7 +2,6 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
 import { Mail, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
 import { usePopup } from "@/components/popup";
-import { useTurnstile } from "@/components/turnstile";
 import { isUnconfirmedEmail, unconfirmedPopup } from "@/lib/email-confirmation";
 import { Spinner } from "@/components/loading";
 import { SwitchField } from "@/components/switch-field";
@@ -37,7 +36,6 @@ function Login() {
   const [mfa, setMfa] = useState(false);
   const [busy, setBusy] = useState(false);
   const popup = usePopup();
-  const bot = useTurnstile();
   const navigate = useNavigate();
   const { plan } = Route.useSearch();
   const next = () => (plan ? navigate({ to: "/dashboard/order", search: { plan } }) : navigate({ to: "/dashboard" }));
@@ -53,8 +51,7 @@ function Login() {
       return;
     }
     setBusy(true);
-    const captcha = await bot.getToken();
-    const { error } = await supabase.auth.signInWithPassword({ email, password: pw, ...(captcha ? { options: { captchaToken: captcha } } : {}) });
+    const { error } = await supabase.auth.signInWithPassword({ email, password: pw });
     if (error) {
       setBusy(false);
       if (isUnconfirmedEmail(error)) popup(unconfirmedPopup(email, popup));
@@ -119,7 +116,6 @@ function Login() {
             <button type="submit" disabled={busy} aria-busy={busy} className="signup-primary group flex items-center justify-center gap-2 text-sm disabled:opacity-80">
               {busy ? <><Spinner />Signing in…</> : <>Log In <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" /></>}
             </button>
-            {bot.widget}
           </form>}
 
           <p className="mt-auto pt-5 text-sm text-muted-foreground sm:pt-10">

@@ -58,13 +58,13 @@ const securityHeaders: Record<string, string> = {
   // enforce this only after the browser reports show no violations.
   "Content-Security-Policy-Report-Only": [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com https://cdn.gpteng.co",
+    "script-src 'self' 'unsafe-inline' https://cdn.gpteng.co",
     "worker-src 'self' blob:",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https://flagcdn.com https://*.supabase.co",
     "font-src 'self' data:",
-    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://ipapi.co https://api.pwnedpasswords.com https://challenges.cloudflare.com",
-    "frame-src https://challenges.cloudflare.com",
+    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://ipapi.co https://api.pwnedpasswords.com",
+    "frame-src 'none'",
     "object-src 'none'",
     "base-uri 'self'",
     "frame-ancestors 'none'",
