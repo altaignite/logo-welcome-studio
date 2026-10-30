@@ -15,7 +15,8 @@
 - Keep selectable plan data, finite service-hour allowances, subscription terms and input validation in the shared signup module with concrete tests, so selection, review, downloaded agreements and completion use the same chosen plan.
 - Use libphonenumber-js metadata for countries and dial codes; optional browser IP preselection must not overwrite manual choices or block signup.
 - Treat displayed signature codes as local confirmation only, generated with Web Crypto and never reused within the current application, not as identity verification.
-- Keep every signup stage inside the same login-inspired split layout, with the shared cinematic photo on tablet and desktop, to preserve visual continuity.
+- Signup is a single centred column on every screen size (no photo panel), with minimal boxes: plain headings and dividers, cards only for plan choice.
+- Agreement PDFs (signup "Save as PDF" and signed copies in the dashboard) are generated client-side by downloadAgreementPdf in src/lib/agreement-pdf.ts with the logo letterhead; agreement wording and the company name live in src/lib/signup.ts.
 - Render country flags from the free FlagCDN image API with empty alt text alongside country names and graceful image-failure fallback, so flags remain decorative rather than replacing accessible country labels.
 
 - After every code or database change, do a focused security-audit-skill review (guidance mode) of the changed trust boundaries before finishing; the owner requires security checks on every change.

@@ -250,7 +250,7 @@ describe("client actions", () => {
   it("store the signed agreements for the chosen plan", () => {
     const scale = plans[2];
     const docs = agreementDocuments(scale);
-    expect(docs.find((d) => d.title === "Subscription Agreement")?.body).toContain(planTerms(scale));
+    expect(docs.find((d) => d.title === "Subscription and Billing Terms")?.body).toContain(planTerms(scale));
     expect(docs.some((d) => /demonstration|not submitted/i.test(d.body))).toBe(false);
     const signed = signedAgreementText(docs[0]!, { name: "Cal Client", accountNumber: "1234567890", signedAt: "2026-10-29T10:00:00Z" });
     expect(signed).toContain("Signed digitally by Cal Client (account 1234567890) on 2026-10-29T10:00:00.000Z.");

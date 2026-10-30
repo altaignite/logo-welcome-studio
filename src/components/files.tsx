@@ -1,3 +1,4 @@
+import { downloadAgreementPdf } from "@/lib/agreement-pdf";
 import { useServerFn } from "@tanstack/react-start";
 import { useRef, useState } from "react";
 import { Download, FileText, Loader2, Upload } from "lucide-react";
@@ -74,10 +75,6 @@ export function DocumentList({ docs, empty = "No files yet.", staff }: { docs: D
 }
 
 type Agreement = { id: string; title: string; body: string; version: string; signed_at: string };
-const downloadText = (title: string, body: string) => {
-  const url = URL.createObjectURL(new Blob([body], { type: "text/plain" }));
-  const a = document.createElement("a"); a.href = url; a.download = `${title.toLowerCase().replaceAll(/[^a-z0-9]+/g, "-")}.txt`; a.click(); URL.revokeObjectURL(url);
-};
 export function AgreementList({ agreements, empty = "No signed agreements." }: { agreements: Agreement[]; empty?: string }) {
   const [openId, setOpenId] = useState<string | null>(null);
   return (
@@ -88,7 +85,7 @@ export function AgreementList({ agreements, empty = "No signed agreements." }: {
             <span><span className="block font-medium">{a.title}</span><span className="text-xs text-muted-foreground">Signed {formatDate(a.signed_at)}, version {a.version}</span></span>
             <span className="flex gap-1.5">
               <button type="button" onClick={() => setOpenId(openId === a.id ? null : a.id)} className="h-8 rounded-full border px-3 text-xs font-semibold hover:bg-secondary">{openId === a.id ? "Hide" : "Read"}</button>
-              <button type="button" onClick={() => downloadText(a.title, a.body)} className="inline-flex h-8 items-center gap-1 rounded-full border px-3 text-xs font-semibold hover:bg-secondary"><Download className="size-3.5" />Download</button>
+              <button type="button" onClick={() => void downloadAgreementPdf(a)} className="inline-flex h-8 items-center gap-1 rounded-full border px-3 text-xs font-semibold hover:bg-secondary"><Download className="size-3.5" />Download</button>
             </span>
           </div>
           {openId === a.id && <pre className="mt-3 max-h-80 overflow-auto whitespace-pre-wrap rounded-lg bg-secondary/60 p-3 font-sans text-sm">{a.body}</pre>}

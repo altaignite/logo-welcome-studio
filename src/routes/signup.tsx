@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { ArrowLeft, ArrowRight, Check, Clock, Code2, Megaphone, Palette, ChevronDown, Download, Eye, EyeOff, LockKeyhole, Loader2, PenLine, RefreshCw, Rocket, ShieldCheck, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Clock, ChevronDown, Download, Eye, EyeOff, LockKeyhole, Loader2, PenLine, RefreshCw, ShieldCheck, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CountryField, CountryFlag } from "@/components/country-field";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
@@ -9,7 +9,7 @@ import { usePopup } from "@/components/popup";
 import { supabase } from "@/integrations/supabase/client";
 import { agreementDocuments, createAccountNumber, accountSchema, countries, createSignatureCode, isSignatureMatch, personalSchema, plans, type Plan, type CountryCode, type PersonalDetails, formatPhoneInput, switchPhoneCountry, phonePlaceholder } from "@/lib/signup";
 import logo from "@/assets/logo.png.asset.json";
-import hero from "@/assets/login-hero.jpg";
+import { downloadAgreementPdf } from "@/lib/agreement-pdf";
 
 export const Route = createFileRoute("/signup")({
   head: () => ({ meta: [
@@ -124,22 +124,19 @@ function Signup() {
     setSignature({ name: `${personal.firstName} ${personal.lastName}`, at: new Date().toISOString(), code });
     setConfirmOpen(false); setStep(5);
   };
-  const downloadDocument = (index: number) => {
-    const doc = documents[index]; if (!doc) return;
-    const url = URL.createObjectURL(new Blob([doc.body], { type: "text/plain" }));
-    const link = document.createElement("a"); link.href = url; link.download = `${doc.title.toLowerCase().replaceAll(/[^a-z0-9]+/g, "-")}.txt`; link.click(); URL.revokeObjectURL(url);
-  };
+  const downloadDocument = (index: number) => { const doc = documents[index]; if (doc) void downloadAgreementPdf(doc).catch((e: Error) => popup({ type: "error", title: "Couldn't create the PDF", description: e.message, primaryLabel: "Close", secondaryLabel: null })); };
+
   const selectedDoc = documentIndex === null ? null : documents[documentIndex];
 
-  return <main className="min-h-dvh bg-background text-foreground md:grid md:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)] lg:grid-cols-[minmax(0,1fr)_minmax(0,0.75fr)]">
-    <div className="relative w-full min-w-0">
+  return <main className="min-h-dvh bg-background text-foreground">
+    <div className="relative w-full">
       <section className="min-w-0">
     <header className="border-b bg-background">
-      <div className="mx-auto flex h-16 max-w-3xl items-center justify-between px-5 sm:h-20 sm:px-8">
+      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5 sm:h-20 sm:px-8">
         <div className="flex items-center gap-4">
           <Link to="/" aria-label="FP home"><img src={logo.url} alt="FP" className="size-9 object-contain sm:size-11" /></Link>
-          <span aria-hidden className="hidden h-8 w-px bg-border lg:block" />
-          <span className="hidden text-sm font-semibold tracking-tight lg:block">New Service Application</span>
+          <span aria-hidden className="hidden h-8 w-px bg-border sm:block" />
+          <span className="hidden text-sm font-semibold tracking-tight sm:block">New Service Application</span>
         </div>
         <span className="text-sm font-semibold sm:hidden">{step < 5 ? steps[step] : step === 5 ? "Almost there…" : "Application complete"}</span>
         <div className="flex items-center gap-3">
@@ -157,25 +154,20 @@ function Signup() {
       <div className="mx-auto max-w-lg px-5 pb-8 pt-6 md:px-6 md:pt-8">
         <div className="mb-6 text-center"><h1 className="text-2xl font-extrabold leading-tight lg:text-3xl">{titles[step]}</h1><p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">{subtitles[step]}</p></div>
         {step === 0 && <div>
-          <div className="grid gap-4 pt-2" role="group" aria-label="Subscription plans">{plans.map((plan) => <div key={plan.id} className={`rounded-3xl border bg-card p-5 sm:p-6 ${selectedPlan.id === plan.id ? "border-foreground/40" : "border-border"}`}>
+          <div className="grid gap-4 pt-2" role="group" aria-label="Subscription plans">{plans.map((plan) => <div key={plan.id} className="rounded-2xl border p-5 sm:p-6">
             <div className="flex items-start justify-between gap-3">
               <h2 className="text-xl font-semibold tracking-tight">{plan.name} Plan</h2>
               {plan.id === "growth" && <span className="rounded-full bg-foreground px-3 py-1 text-xs font-medium text-background">Popular</span>}
             </div>
             <p className="mt-2 flex items-baseline gap-1.5"><span className="text-3xl font-bold tracking-tight">${plan.monthlyFee}</span><span className="text-sm text-muted-foreground">/month</span></p>
             <p className="mt-2 text-sm text-muted-foreground">{plan.description}</p>
-            <div className="my-4 h-px bg-border" />
-            <ul className="space-y-4">{[
-              { icon: Clock, title: `${plan.monthlyHours} Service Hours`, text: "Assigned every month." },
-              { icon: Megaphone, title: "Marketing", text: "Campaigns, content and strategy." },
-              { icon: Palette, title: "Design", text: "Brand, social and web visuals." },
-              { icon: Code2, title: "Development", text: "Websites, landing pages and fixes." },
-            ].map(({ icon: Icon, title, text }) => <li key={title} className="flex items-center gap-3.5"><span className="grid size-10 shrink-0 place-items-center rounded-xl bg-secondary"><Icon className="size-5" strokeWidth={1.5} /></span><span><span className="block text-sm font-medium">{title}</span><span className="block text-[13px] text-muted-foreground">{text}</span></span></li>)}</ul>
-            <Button className="mt-6 h-12 w-full rounded-2xl bg-foreground text-[15px] font-semibold text-background hover:bg-foreground/90" onClick={() => { setSelectedPlan(plan); setStep(1); }}>Choose {plan.name}</Button>
-            <p className="mt-3 text-center text-xs text-muted-foreground">90 days money-back guarantee ! Ads budget excluded</p>
+            <ul className="mt-4 space-y-2 border-t pt-4 text-sm">
+              <li className="flex items-center gap-2.5"><Clock className="size-4 shrink-0 text-muted-foreground" /><span><span className="font-medium">{plan.monthlyHours} service hours</span> assigned every month</span></li>
+              <li className="flex items-center gap-2.5"><Check className="size-4 shrink-0 text-muted-foreground" />Marketing, design and development</li>
+            </ul>
+            <Button className="mt-5 h-12 w-full rounded-2xl bg-foreground text-[15px] font-semibold text-background hover:bg-foreground/90" onClick={() => { setSelectedPlan(plan); setStep(1); }}>Choose {plan.name}</Button>
           </div>)}</div>
-          <p className="mt-4 text-xs leading-relaxed text-muted-foreground">Your hours are shared across all services. Service delivery is not unlimited.</p>
-          <div className="mt-4 flex items-start justify-center gap-2 text-center text-xs leading-relaxed text-muted-foreground"><ShieldCheck className="size-4 shrink-0 text-primary" /><p>90-day money-back guarantee if no sales are received.<br />Service fees only.</p></div>
+          <div className="mt-5 flex items-start justify-center gap-2 text-center text-xs leading-relaxed text-muted-foreground"><ShieldCheck className="size-4 shrink-0 text-primary" /><p>Hours are shared across all services and are not unlimited. 90-day money-back guarantee on service fees if no sales are received; advertising budgets excluded.</p></div>
           <p className="mt-5 text-center text-sm text-muted-foreground">Already have an account? <Button asChild variant="link" className="h-auto p-0 font-semibold text-foreground"><Link to="/">Log in</Link></Button></p>
         </div>}
         {(step === 1 || step === 2) && <form onSubmit={advance} noValidate className="space-y-4">
@@ -200,11 +192,11 @@ function Signup() {
           <Button className="signup-primary mt-6" onClick={() => setStep(4)}>To your agreements <ArrowRight /></Button>
         </div>}
         {step === 4 && <div>
-          <div className="-mx-5 bg-secondary px-5 py-4 sm:mx-0 sm:px-6"><h2 className="text-xl font-medium">Agreements</h2></div>
+          <h2 className="border-b pb-2 text-lg font-semibold">Agreements</h2>
           {documents.slice(0, 2).map((doc, index) => <DocumentRow key={doc.title} title={doc.title} onRead={() => setDocumentIndex(index)} onDownload={() => downloadDocument(index)} />)}
-          <div className="-mx-5 mt-6 bg-secondary px-5 py-4 sm:mx-0 sm:px-6"><h2 className="text-xl font-medium">Conditions & information</h2></div>
+          <h2 className="mt-8 border-b pb-2 text-lg font-semibold">Guarantee & privacy</h2>
           {documents.slice(2).map((doc, index) => <DocumentRow key={doc.title} title={doc.title} onRead={() => setDocumentIndex(index + 2)} onDownload={() => downloadDocument(index + 2)} />)}
-          <p className="mt-6 text-xs leading-relaxed text-muted-foreground">The documents summarise the supplied subscription terms; they are not final legal contracts. By continuing, you can confirm this demonstration application.</p>
+          <p className="mt-6 text-xs leading-relaxed text-muted-foreground">Please read each document. By accepting, you agree to all four and sign them digitally with a confirmation code. You can save a PDF copy of each now, and the signed copies stay in your dashboard.</p>
           <div className="mt-6 flex gap-3"><Button variant="secondary" aria-label="Back to review" className="size-11 shrink-0 rounded-full" onClick={() => setStep(3)}><ArrowLeft /></Button><Button className="signup-primary flex-1" onClick={openConfirmation}>Accept & continue <PenLine /></Button></div>
         </div>}
       </div>
@@ -212,19 +204,8 @@ function Signup() {
 
       </section>
     </div>
-    {/* The same photo as the login page keeps every signup stage visually continuous on tablet and desktop. */}
-    <aside className="relative hidden md:block"><div className="sticky top-0 h-dvh overflow-hidden p-4 pl-0">
-      <div className="relative h-full overflow-hidden rounded-3xl">
-        <img src={hero} alt="" className="absolute inset-0 h-full w-full object-cover object-[60%_30%]" />
-        <div className="absolute inset-0 bg-gradient-to-t from-foreground/80 via-foreground/10 to-transparent" />
-        <div className="absolute inset-x-0 bottom-10 px-10">
-          <p className="text-sm font-medium uppercase tracking-[0.25em] text-background/70">Marketing Accelerator</p>
-          <p className="mt-3 max-w-sm text-3xl font-bold leading-tight text-background">{step >= 6 ? "Welcome aboard." : "Grow faster. Market smarter."}</p>
-        </div>
-      </div>
-    </div></aside>
     <Dialog.Root open={confirmOpen} onOpenChange={setConfirmOpen}>
-      <Dialog.Portal><Dialog.Overlay className="fixed inset-0 z-40 bg-foreground/40 backdrop-blur-sm" /><Dialog.Content className="app-modal">
+      <Dialog.Portal><Dialog.Overlay className="fixed inset-0 z-40 bg-foreground/40 backdrop-blur-sm" /><Dialog.Content className="app-modal max-h-[85dvh] overflow-y-auto sm:max-w-2xl">
                 <Dialog.Close asChild><Button variant="ghost" size="icon" aria-label="Close confirmation" className="absolute right-4 top-4"><X /></Button></Dialog.Close>
         <span className="mx-auto grid size-12 place-items-center rounded-full bg-secondary"><PenLine className="size-5" /></span>
         <Dialog.Title className="mt-4 text-center text-xl font-bold leading-snug">Confirm your application</Dialog.Title>
@@ -235,18 +216,18 @@ function Signup() {
         <div className="relative z-10 mt-6 space-y-2"><Button className="signup-primary text-sm" disabled={entered.length !== 6 || submitting} onClick={accept}>{submitting ? "Submitting…" : "Accept & sign"}</Button><button type="button" className="app-modal-secondary" onClick={() => setConfirmOpen(false)}>Cancel</button></div>
       </Dialog.Content></Dialog.Portal>
     </Dialog.Root>
-    <Dialog.Root open={selectedDoc !== null} onOpenChange={(open) => { if (!open) setDocumentIndex(null); }}><Dialog.Portal><Dialog.Overlay className="fixed inset-0 z-40 bg-foreground/40 backdrop-blur-sm" /><Dialog.Content className="app-modal"><Dialog.Title className="pr-8 text-xl font-bold">{selectedDoc?.title}</Dialog.Title><Dialog.Description className="mt-4 whitespace-pre-line text-sm leading-relaxed text-muted-foreground">{selectedDoc?.body}</Dialog.Description><p className="mt-6 text-xs text-muted-foreground">Summary for this demonstration; not a final legal contract.</p><div className="mt-6 space-y-2"><Button className="signup-primary text-sm" onClick={() => { if (documentIndex !== null) downloadDocument(documentIndex); }}><Download /> Save a copy</Button><Dialog.Close asChild><Button variant="secondary" className="app-modal-secondary">Close</Button></Dialog.Close></div></Dialog.Content></Dialog.Portal></Dialog.Root>
+    <Dialog.Root open={selectedDoc !== null} onOpenChange={(open) => { if (!open) setDocumentIndex(null); }}><Dialog.Portal><Dialog.Overlay className="fixed inset-0 z-40 bg-foreground/40 backdrop-blur-sm" /><Dialog.Content className="app-modal"><Dialog.Title className="pr-8 text-xl font-bold">{selectedDoc?.title}</Dialog.Title><Dialog.Description className="mt-4 whitespace-pre-line text-sm leading-relaxed text-muted-foreground">{selectedDoc?.body}</Dialog.Description><div className="mt-6 space-y-2"><Button className="signup-primary text-sm" onClick={() => { if (documentIndex !== null) downloadDocument(documentIndex); }}><Download /> Save as PDF</Button><Dialog.Close asChild><Button variant="secondary" className="app-modal-secondary">Close</Button></Dialog.Close></div></Dialog.Content></Dialog.Portal></Dialog.Root>
   </main>;
 }
 
 function ReviewSection({ title, children, onEdit }: { title: string; children: ReactNode; onEdit: () => void }) {
-  return <section className="mb-6"><div className="-mx-5 flex items-center justify-between bg-secondary px-5 py-4 sm:mx-0 sm:px-6"><h2 className="text-xl font-medium">{title}</h2><Button variant="link" onClick={onEdit}>Edit</Button></div><div className="divide-y px-0 sm:px-6">{children}</div></section>;
+  return <section className="mb-8"><div className="flex items-center justify-between border-b pb-2"><h2 className="text-lg font-semibold">{title}</h2><Button variant="link" className="h-auto p-0" onClick={onEdit}>Edit</Button></div><div className="divide-y">{children}</div></section>;
 }
 function ReviewRow({ label, value, country }: { label: string; value: string; country?: string }) {
-  return <div className="py-4"><p className="text-sm font-semibold text-muted-foreground">{label}</p><p className="mt-1 flex items-center gap-2 break-words text-base leading-relaxed">{country && <CountryFlag code={country} />}{value}</p></div>;
+  return <div className="flex flex-col gap-0.5 py-3 sm:flex-row sm:justify-between sm:gap-6"><p className="shrink-0 text-sm text-muted-foreground">{label}</p><p className="flex items-center gap-2 break-words text-sm font-medium sm:text-right">{country && <CountryFlag code={country} />}{value}</p></div>;
 }
 function DocumentRow({ title, onRead, onDownload }: { title: string; onRead: () => void; onDownload: () => void }) {
-  return <div className="flex items-center justify-between gap-3 border-b py-5 sm:px-6"><Button variant="link" className="h-auto whitespace-normal p-0 text-left text-base font-semibold" onClick={onRead}>{title}</Button><Button variant="ghost" size="icon" aria-label={`Download ${title}`} title={`Download ${title}`} className="shrink-0 text-primary" onClick={onDownload}><Download /></Button></div>;
+  return <div className="flex items-center justify-between gap-3 border-b py-3"><Button variant="link" className="h-auto whitespace-normal p-0 text-left text-base font-semibold" onClick={onRead}>{title}</Button><Button variant="ghost" size="icon" aria-label={`Download ${title}`} title={`Download ${title}`} className="shrink-0 text-primary" onClick={onDownload}><Download /></Button></div>;
 }
 const processingStages = (hours: number) => [
   { label: "Verifying your details", ms: 1400 },
@@ -283,10 +264,10 @@ function ProcessingScreen({ hours, accountNumber, onDone }: { hours: number; acc
   }
   return <section className="mx-auto max-w-lg px-5 pb-16 pt-10 md:px-6 md:pt-14" aria-live="polite">
     <div className="text-center"><h1 className="text-2xl font-bold sm:text-3xl">Processing your application</h1><p className="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-muted-foreground">Please keep this page open. This only takes a few seconds.</p></div>
-    <div className="mt-8 rounded-2xl border p-4 text-center"><p className="text-xs text-muted-foreground">Your account number</p><p className="mt-1 font-mono text-xl font-semibold tracking-wider tabular-nums">{formatAccountNumber(accountNumber)}</p></div>
+    <p className="mt-4 text-center text-sm text-muted-foreground">Account number <span className="font-semibold tabular-nums text-foreground">{formatAccountNumber(accountNumber)}</span></p>
     <div className="mt-8"><div className="flex justify-between text-xs text-muted-foreground"><span>{stages[current]?.label ?? "Complete"}…</span><span className="tabular-nums">{Math.floor(progress)}%</span></div>
       <div role="progressbar" aria-label="Processing application" aria-valuenow={Math.floor(progress)} aria-valuemin={0} aria-valuemax={100} className="relative mt-2 h-1.5 overflow-hidden rounded-full bg-secondary"><div className="h-full rounded-full bg-foreground transition-[width] duration-300 ease-out" style={{ width: `${progress}%` }} /><div className="signup-shimmer pointer-events-none absolute inset-0 bg-gradient-to-r from-transparent via-background/40 to-transparent" /></div></div>
-    <ol className="mt-8 space-y-1 rounded-2xl border p-2">{stages.map((stage, i) => {
+    <ol className="mt-8 space-y-1">{stages.map((stage, i) => {
       const state = i < current ? "done" : i === current ? "active" : "todo";
       return <li key={stage.label} className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm ${state === "active" ? "bg-secondary font-medium" : ""} ${state === "todo" ? "text-muted-foreground" : ""}`}>
         <span className={`grid size-6 shrink-0 place-items-center rounded-full ${state === "done" ? "bg-foreground text-background" : "border"}`}>{state === "done" ? <Check className="size-3.5" /> : state === "active" ? <Loader2 className="size-3.5 animate-spin" /> : null}</span>{stage.label}</li>;
@@ -309,15 +290,16 @@ function SuccessScreen({ name, accountNumber, plan, signedAt, email }: { name: s
     { title: "Your accelerator starts", text: `${plan.monthlyHours} service hours assigned every month.`, state: "todo" },
   ] as const;
   return <section className="mx-auto max-w-lg px-5 pb-12 pt-8 md:px-6 md:pt-12">
-    <div className="text-center"><span className="mx-auto grid size-16 place-items-center rounded-full bg-foreground text-background"><Check className="size-8" /></span><h1 className="mt-6 text-2xl font-bold leading-tight sm:text-3xl">Your application was successful, {name}!</h1><p className="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-muted-foreground">Here's where things stand and what happens next.</p></div>
-    <div className="mt-8 flex items-center justify-between gap-3 rounded-2xl border p-4"><div className="min-w-0"><p className="text-xs text-muted-foreground">Current status</p><p className="mt-0.5 font-semibold">Confirm your email</p></div><span className="flex shrink-0 items-center gap-2 rounded-full bg-secondary px-3 py-1.5 text-xs font-medium"><span className="size-2 animate-pulse rounded-full bg-primary" />Step 3 of 6</span></div>
-    <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl border p-4"><div className="min-w-0"><p className="text-xs text-muted-foreground">Account number</p><p className="mt-0.5 font-mono text-lg font-semibold tracking-wider tabular-nums">{formatAccountNumber(accountNumber)}</p><p className="text-xs text-muted-foreground">Keep it for support and billing questions.</p></div><Button type="button" variant="secondary" className="shrink-0 rounded-full" onClick={copy}>{copied ? <><Check /> Copied</> : "Copy"}</Button></div>
-    <ol className="mt-4 rounded-2xl border p-5">{timeline.map((item, i) => <li key={item.title} className="relative flex gap-4 pb-6 last:pb-0">
+    <div className="text-center"><span className="mx-auto grid size-14 place-items-center rounded-full bg-foreground text-background"><Check className="size-7" /></span><h1 className="mt-5 text-2xl font-bold leading-tight sm:text-3xl">Application submitted, {name}!</h1><p className="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-muted-foreground">Confirm your email to activate your login. Here's what happens next.</p></div>
+    <dl className="mt-8 divide-y border-y text-sm">
+      <div className="flex items-center justify-between gap-3 py-3"><dt className="text-muted-foreground">Account number</dt><dd className="flex items-center gap-2 font-semibold tabular-nums">{formatAccountNumber(accountNumber)}<button type="button" onClick={copy} className="text-xs font-medium text-primary hover:underline">{copied ? "Copied" : "Copy"}</button></dd></div>
+      <div className="flex items-center justify-between gap-3 py-3"><dt className="text-muted-foreground">Plan</dt><dd className="font-semibold">{plan.name}, {plan.monthlyHours} hours / month, ${plan.monthlyFee}/month</dd></div>
+    </dl>
+    <ol className="mt-8">{timeline.map((item, i) => <li key={item.title} className="relative flex gap-4 pb-6 last:pb-0">
       {i < timeline.length - 1 && <span className={`absolute left-[11px] top-7 h-[calc(100%-1.5rem)] w-px ${item.state === "done" ? "bg-foreground" : "bg-border"}`} />}
       <span className={`relative grid size-6 shrink-0 place-items-center rounded-full ${item.state === "done" ? "bg-foreground text-background" : item.state === "current" ? "border-2 border-primary bg-background" : "border bg-background"}`}>{item.state === "done" ? <Check className="size-3.5" /> : item.state === "current" ? <span className="size-2 rounded-full bg-primary" /> : null}</span>
       <div className="min-w-0"><p className={`text-sm font-semibold ${item.state === "todo" ? "text-muted-foreground" : ""}`}>{item.title}{item.state === "current" && <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">Now</span>}</p><p className="mt-1 text-sm leading-relaxed text-muted-foreground">{item.text}</p></div>
     </li>)}</ol>
-    <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl border p-4 text-sm"><span className="min-w-0"><span className="block font-semibold">{plan.name} Plan</span><span className="text-muted-foreground">{plan.monthlyHours} hours / month</span></span><span className="shrink-0 font-semibold">${plan.monthlyFee}<span className="font-normal text-muted-foreground">/month</span></span></div>
     <Button asChild className="signup-primary mt-8"><Link to="/">Go to sign in</Link></Button>
   </section>;
 }
