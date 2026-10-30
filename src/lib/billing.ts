@@ -137,7 +137,7 @@ export function localInvoiceStatus(o: { status?: string | null; due_date?: numbe
   switch (o.status) {
     case "paid": return "paid";
     case "void": return "void";
-    case "uncollectible": return "overdue";
+    case "uncollectible": return "uncollectible";
     case "open": return o.due_date && o.due_date * 1000 < now.getTime() ? "overdue" : "open";
     default: return null;
   }
@@ -145,6 +145,7 @@ export function localInvoiceStatus(o: { status?: string | null; due_date?: numbe
 
 /** Local subscription status for a Stripe subscription. */
 export function localSubscriptionStatus(s: { status?: string | null; pause_collection?: unknown }): string {
+  if (s.status === "canceled" || s.status === "incomplete_expired") return "cancelled";
   if (s.status === "paused" || s.pause_collection) return "paused";
   switch (s.status) {
     case "active": case "trialing": return "active";
@@ -164,21 +165,24 @@ export function planFromStripe(unitAmountCents: number | null | undefined, produ
 }
 
 export type Standing = "active" | "past_due" | "suspended" | "abandoned";
-type StandingInvoice = { status: string; kind?: string | null; due_at: string | null; collection_stage?: string | null };
+type StandingInvoice = { status: string; kind?: string | null; due_at: string | null; collection_stage?: string | null; failed_payment_at?: string | null; stripe_status?: string | null };
 
 /** Where a subscription should stand given its invoices. Null means its status isn't decided by invoices (cancelled, paused by
  * the client or a hold, or a new order still waiting for its first payment). "abandoned" is a new order whose first invoice was
  * voided without ever being paid, so it will never start. */
 export function subscriptionStanding(sub: { status: string; started_at: string | null; stripe_status?: string | null }, invoices: StandingInvoice[], today = new Date().toISOString().slice(0, 10)): Standing | null {
   if (sub.status === "cancelled" || sub.status === "paused") return null;
-  if (sub.status === "pending" || !sub.started_at) {
+  if (!sub.started_at) {
     const firsts = invoices.filter((i) => i.kind === "first");
-    return firsts.length > 0 && firsts.every((i) => i.status === "void") ? "abandoned" : null;
+    if (firsts.length > 0 && firsts.every((i) => i.status === "void")) return "abandoned";
   }
-  const unpaid = invoices.filter((i) => i.status === "open" || i.status === "overdue");
+  const unpaid = invoices.filter((i) => ["open", "overdue", "uncollectible"].includes(i.status) && i.collection_stage !== "written_off");
+  if (unpaid.some((i) => i.status === "uncollectible" || i.stripe_status === "uncollectible")) return "suspended";
   // Stripe gave up collecting (retries exhausted) or the debt is in recovery.
   if (unpaid.length && sub.stripe_status === "unpaid") return "suspended";
   if (unpaid.some((i) => ["debt_recovery", "legal", "court"].includes(String(i.collection_stage)))) return "suspended";
-  if (unpaid.some((i) => i.status === "overdue" || (!!i.due_at && i.due_at < today))) return "past_due";
+  if (unpaid.some((i) => i.status === "overdue" || !!i.failed_payment_at || (!!i.due_at && i.due_at < today))) return "past_due";
+  if (unpaid.length) return "past_due";
+  if (!sub.started_at) return null;
   return "active";
 }
