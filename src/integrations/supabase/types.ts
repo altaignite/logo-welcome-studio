@@ -66,6 +66,9 @@ export type Database = {
           account_number: string
           archived_at: string | null
           assigned_to: string | null
+          billing_previous_status:
+            | Database["public"]["Enums"]["application_status"]
+            | null
           created_at: string
           decided_at: string | null
           id: string
@@ -83,6 +86,9 @@ export type Database = {
           account_number: string
           archived_at?: string | null
           assigned_to?: string | null
+          billing_previous_status?:
+            | Database["public"]["Enums"]["application_status"]
+            | null
           created_at?: string
           decided_at?: string | null
           id?: string
@@ -100,6 +106,9 @@ export type Database = {
           account_number?: string
           archived_at?: string | null
           assigned_to?: string | null
+          billing_previous_status?:
+            | Database["public"]["Enums"]["application_status"]
+            | null
           created_at?: string
           decided_at?: string | null
           id?: string
@@ -599,6 +608,7 @@ export type Database = {
           kind: string
           number: string
           paid_at: string | null
+          payment_effects_applied_at: string | null
           pdf_url: string | null
           stage_changed_at: string | null
           status: string
@@ -627,6 +637,7 @@ export type Database = {
           kind?: string
           number: string
           paid_at?: string | null
+          payment_effects_applied_at?: string | null
           pdf_url?: string | null
           stage_changed_at?: string | null
           status?: string
@@ -655,6 +666,7 @@ export type Database = {
           kind?: string
           number?: string
           paid_at?: string | null
+          payment_effects_applied_at?: string | null
           pdf_url?: string | null
           stage_changed_at?: string | null
           status?: string
@@ -910,6 +922,7 @@ export type Database = {
         Row: {
           archived_at: string | null
           assigned_to: string | null
+          billing_previous_status: string | null
           completed_at: string | null
           created_at: string
           description: string | null
@@ -926,6 +939,7 @@ export type Database = {
         Insert: {
           archived_at?: string | null
           assigned_to?: string | null
+          billing_previous_status?: string | null
           completed_at?: string | null
           created_at?: string
           description?: string | null
@@ -942,6 +956,7 @@ export type Database = {
         Update: {
           archived_at?: string | null
           assigned_to?: string | null
+          billing_previous_status?: string | null
           completed_at?: string | null
           created_at?: string
           description?: string | null
@@ -1149,6 +1164,7 @@ export type Database = {
           notes: string | null
           overage_billed_hours: number
           paused_by_account_status: boolean
+          paused_for_nonpayment: boolean
           payment_warning: string | null
           pending_plan_id: string | null
           plan_name: string
@@ -1180,6 +1196,7 @@ export type Database = {
           notes?: string | null
           overage_billed_hours?: number
           paused_by_account_status?: boolean
+          paused_for_nonpayment?: boolean
           payment_warning?: string | null
           pending_plan_id?: string | null
           plan_name: string
@@ -1211,6 +1228,7 @@ export type Database = {
           notes?: string | null
           overage_billed_hours?: number
           paused_by_account_status?: boolean
+          paused_for_nonpayment?: boolean
           payment_warning?: string | null
           pending_plan_id?: string | null
           plan_name?: string
@@ -1318,6 +1336,7 @@ export type Database = {
         Row: {
           actor_label: string
           assigned_to: string | null
+          billing_previous_status: string | null
           completed_at: string | null
           created_at: string
           details: string | null
@@ -1336,6 +1355,7 @@ export type Database = {
         Insert: {
           actor_label?: string
           assigned_to?: string | null
+          billing_previous_status?: string | null
           completed_at?: string | null
           created_at?: string
           details?: string | null
@@ -1354,6 +1374,7 @@ export type Database = {
         Update: {
           actor_label?: string
           assigned_to?: string | null
+          billing_previous_status?: string | null
           completed_at?: string | null
           created_at?: string
           details?: string | null
@@ -1568,6 +1589,10 @@ export type Database = {
     }
     Functions: {
       account_access_ok: { Args: never; Returns: boolean }
+      apply_paid_invoice_effects: {
+        Args: { _invoice: string }
+        Returns: boolean
+      }
       email_domain_blocked: { Args: { _email: string }; Returns: boolean }
       has_perm: { Args: { _perm: string; _user_id: string }; Returns: boolean }
       has_role: {
