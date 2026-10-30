@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { ArrowLeft, ArrowRight, Check, Clock, FileText, ChevronDown, Download, Eye, EyeOff, LockKeyhole, Loader2, PenLine, RefreshCw, ShieldCheck, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, ShieldCheck, Clock, Code2, FileText, Megaphone, Palette, ChevronDown, Download, Eye, EyeOff, LockKeyhole, Loader2, PenLine, RefreshCw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CountryField, CountryFlag } from "@/components/country-field";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
@@ -161,10 +161,15 @@ function Signup() {
             </div>
             <p className="mt-1 flex items-baseline gap-1"><span className="text-2xl font-bold tracking-tight">${plan.monthlyFee}</span><span className="text-xs text-muted-foreground">/month</span></p>
             <p className="mt-1 text-xs text-muted-foreground">{plan.description}</p>
-            <p className="mt-3 flex items-center gap-2 border-t pt-3 text-sm sm:mb-4"><Clock className="size-4 shrink-0 text-muted-foreground" /><span><span className="font-semibold">{plan.monthlyHours} hours</span> / month</span></p>
+            <ul className="mt-3 space-y-2.5 border-t pt-3 sm:mb-4">{[
+              { icon: Clock, title: `${plan.monthlyHours} Service Hours`, text: "Assigned every month." },
+              { icon: Megaphone, title: "Marketing", text: "Campaigns, content and strategy." },
+              { icon: Palette, title: "Design", text: "Brand, social and web visuals." },
+              { icon: Code2, title: "Development", text: "Websites, landing pages and fixes." },
+            ].map(({ icon: Icon, title, text }) => <li key={title} className="flex items-start gap-2.5"><span className="grid size-7 shrink-0 place-items-center rounded-lg bg-secondary"><Icon className="size-3.5" strokeWidth={1.75} /></span><span className="min-w-0 leading-tight"><span className="block text-[13px] font-medium">{title}</span><span className="block text-xs text-muted-foreground">{text}</span></span></li>)}</ul>
             <Button className="mt-4 h-10 w-full rounded-xl bg-foreground text-sm font-semibold text-background hover:bg-foreground/90 sm:mt-auto" onClick={() => { setSelectedPlan(plan); setStep(1); }}>Choose {plan.name}</Button>
+            <p className="mt-2 flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground"><ShieldCheck className="size-3.5 text-primary" />90-day money-back guarantee</p>
           </div>)}</div>
-          <div className="mx-auto mt-4 flex max-w-xl items-start justify-center gap-2 text-center text-xs leading-relaxed text-muted-foreground"><ShieldCheck className="size-4 shrink-0 text-primary" /><p>Every plan includes marketing, design and development. Hours are shared across all services and are not unlimited. 90-day money-back guarantee on service fees if no sales are received; advertising budgets excluded.</p></div>
           <p className="mt-4 text-center text-sm text-muted-foreground">Already have an account? <Button asChild variant="link" className="h-auto p-0 font-semibold text-foreground"><Link to="/">Log in</Link></Button></p>
         </div>}
         {(step === 1 || step === 2) && <form onSubmit={advance} noValidate className="space-y-4">
