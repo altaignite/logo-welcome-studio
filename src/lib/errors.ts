@@ -18,7 +18,8 @@ export function friendlyError(e: unknown): string {
 /** Short reference shown to the user and sent with the report, so a reported problem can be matched to what they saw. */
 export const errorReference = () => Math.random().toString(36).slice(2, 8).toUpperCase();
 
-/** Sends an error to Lovable's error reporting (editor and production telemetry). Never throws. */
-export function reportError(e: unknown, context: Record<string, unknown> = {}, severity: "error" | "warning" = "error") {
-  try { reportLovableError(e, context, { handled: true, severity }); } catch { /* reporting must never break the app */ }
+/** Sends an error to Lovable's error reporting (editor and production telemetry). Never throws.
+ * Pass handled = false only for crashes (the route error page), which the editor also flags as a runtime error. */
+export function reportError(e: unknown, context: Record<string, unknown> = {}, severity: "error" | "warning" = "error", handled = true) {
+  try { reportLovableError(e, context, { handled, severity }); } catch { /* reporting must never break the app */ }
 }

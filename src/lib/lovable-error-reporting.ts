@@ -42,6 +42,8 @@ export function reportLovableError(error: unknown, context: Record<string, unkno
   // Prod React does not rethrow boundary-caught errors to window.onerror, so the
   // editor's telemetry never sees them. Forward to lovable.js's reporting hook,
   // which is present only inside the editor preview.
+  // Only crashes go there: handled errors (a popup, an inline error with retry) are not blank screens.
+  if (opts.handled !== false) return;
   const stack = error instanceof Error ? error.stack : undefined;
   window.__lovableReportRuntimeError?.({
     message: describeThrown(error),

@@ -8,7 +8,7 @@ export function RouteError({ error, reset }: ErrorComponentProps) {
   const router = useRouter();
   const ref = useMemo(errorReference, [error]);
   const [details, setDetails] = useState(false);
-  useEffect(() => { console.error(error); reportError(error, { boundary: "route_error", reference: ref }); }, [error, ref]);
+  useEffect(() => { console.error(error); reportError(error, { boundary: "route_error", reference: ref }, "error", false); }, [error, ref]);
   return (
     <div className="grid min-h-[60dvh] place-items-center px-4 py-10">
       <div className="w-full max-w-md rounded-3xl border bg-card p-6 text-center shadow-sm">
