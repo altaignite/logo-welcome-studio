@@ -4,17 +4,24 @@ import { useState } from "react";
 import { DataTable, StatusBadge } from "@/components/admin/data-table";
 import { db } from "@/components/admin/record-bits";
 import { formatDate } from "@/lib/admin";
+import { slaLabel, slaState, ticketStatusLabel, ticketStatuses, type TicketStatus } from "@/lib/support";
+import { FormModal } from "@/components/admin/form-modal";
+import { useStaff } from "@/components/admin/staff";
 
 export const Route = createFileRoute("/admin/support")({ component: Support });
 const adminRoute = getRouteApi("/admin");
-const tabs = ["open", "in_progress", "waiting", "closed", "all"] as const;
-type Ticket = { id: string; subject: string; status: string; priority: string; category: string; assigned_to: string | null; user_id: string; updated_at: string; created_at: string; closed_at: string | null; client: string; last: string };
+// Tabs use the stored statuses, so every ticket shows up in exactly one status tab.
+const tabs = [...ticketStatuses, "overdue_reply", "all"] as const;
+const tabLabel = (t: (typeof tabs)[number]) => t === "all" ? "All" : t === "overdue_reply" ? "Overdue reply" : ticketStatusLabel[t as TicketStatus];
+type Ticket = { id: string; subject: string; status: string; priority: string; category: string; assigned_to: string | null; user_id: string; updated_at: string; created_at: string; closed_at: string | null; first_response_at: string | null; last_client_message_at: string | null; last_staff_message_at: string | null; client: string; last: string };
 
 function Support() {
   const { adminEmail } = adminRoute.useRouteContext();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [tab, setTab] = useState<(typeof tabs)[number]>("open");
+  const [assigning, setAssigning] = useState<Ticket[] | null>(null);
+  const staff = useStaff();
   const { data = [], isLoading, error } = useQuery({
     queryKey: ["admin", "support"],
     queryFn: async () => {
@@ -30,19 +37,22 @@ function Support() {
       });
     },
   });
-  const shown = tab === "all" ? data : data.filter((t: Ticket) => t.status === tab);
+  const inTab = (t: Ticket, k: (typeof tabs)[number]) => k === "all" || (k === "overdue_reply" ? slaState(t) === "breached" : t.status === k);
+  const shown = data.filter((t: Ticket) => inTab(t, tab));
   const update = async (rows: Ticket[], patch: Record<string, unknown>) => { await db.from("support_tickets").update({ ...patch, updated_at: new Date().toISOString() }).in("id", rows.map((r) => r.id)); await qc.invalidateQueries({ queryKey: ["admin"] }); };
   return (
     <div className="space-y-6">
-      <div><h1 className="text-2xl font-extrabold sm:text-3xl">Support</h1><p className="mt-1 text-sm text-muted-foreground">Every client inquiry. Closed tickets are locked for clients and can't be reopened or replied to by them.</p></div>
+      <div><h1 className="text-2xl font-extrabold sm:text-3xl">Support</h1><p className="mt-1 text-sm text-muted-foreground">Every client inquiry. Reply targets: urgent 2 hours, high 8, normal 24, low 72. Closed tickets are locked for clients.</p></div>
       <div className="flex flex-wrap gap-2">
-        {tabs.map((t) => <button key={t} type="button" onClick={() => setTab(t)} className={`rounded-full border px-4 py-1.5 text-sm capitalize ${tab === t ? "border-foreground bg-foreground text-background" : "bg-card"}`}>{t.replace("_", " ")} <span className="opacity-60">{t === "all" ? data.length : data.filter((d: Ticket) => d.status === t).length}</span></button>)}
+        {tabs.map((t) => <button key={t} type="button" onClick={() => setTab(t)} className={`rounded-full border px-4 py-1.5 text-sm ${tab === t ? "border-foreground bg-foreground text-background" : "bg-card"}`}>{tabLabel(t)} <span className="opacity-60">{data.filter((d: Ticket) => inTab(d, t)).length}</span></button>)}
       </div>
       {error ? <p className="text-sm text-destructive">{(error as Error).message}</p> : isLoading ? <p className="text-sm text-muted-foreground">Loading tickets…</p> :
         <DataTable<Ticket> title="Support tickets" rows={shown} getId={(r) => r.id} empty="No tickets here."
           onRowClick={(r) => navigate({ to: "/admin/records/$kind/$id", params: { kind: "support_tickets", id: r.id } })}
           bulkActions={[
             { label: "Assign to me", run: (rows) => update(rows, { assigned_to: adminEmail }) },
+            { label: "Assign to…", run: (rows) => setAssigning(rows) },
+            { label: "Waiting on client", run: (rows) => update(rows, { status: "waiting_on_client", closed_at: null }) },
             { label: "Mark in progress", run: (rows) => update(rows, { status: "in_progress", closed_at: null }) },
             { label: "Close", run: (rows) => update(rows, { status: "closed", closed_at: new Date().toISOString() }) },
           ]}
@@ -51,11 +61,14 @@ function Support() {
             { key: "client", label: "Client", value: (r) => r.client },
             { key: "status", label: "Status", value: (r) => r.status, render: (r) => <StatusBadge status={r.status} /> },
             { key: "priority", label: "Priority", value: (r) => r.priority },
+            { key: "sla", label: "Reply", value: (r) => slaLabel[slaState(r)], render: (r) => { const st = slaState(r); return st === "none" ? "—" : <StatusBadge status={st} label={slaLabel[st]} />; } },
             { key: "category", label: "Category", value: (r) => r.category },
             { key: "who", label: "Assigned", value: (r) => r.assigned_to ?? "" },
             { key: "last", label: "Last reply by", value: (r) => r.last },
             { key: "updated", label: "Updated", value: (r) => r.updated_at, render: (r) => formatDate(r.updated_at) },
           ]} />}
+      {assigning && <FormModal title={`Assign ${assigning.length} ticket${assigning.length > 1 ? "s" : ""}`} submitLabel="Assign" fields={[{ name: "who", label: "Staff member", type: "select", options: staff.emails }]}
+        onClose={() => setAssigning(null)} onSubmit={async (v) => { await update(assigning, { assigned_to: v.who || null }); return null; }} />}
     </div>
   );
 }

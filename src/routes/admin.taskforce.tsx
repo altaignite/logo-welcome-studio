@@ -5,6 +5,7 @@ import { DataTable, StatusBadge } from "@/components/admin/data-table";
 import { FormModal, type FieldDef } from "@/components/admin/form-modal";
 import { db } from "@/components/admin/record-bits";
 import { formatDay } from "@/lib/admin";
+import { useStaff, withStaffPicker } from "@/components/admin/staff";
 
 export const Route = createFileRoute("/admin/taskforce")({ component: Taskforce });
 const adminRoute = getRouteApi("/admin");
@@ -17,6 +18,7 @@ function Taskforce() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [view, setView] = useState<"list" | "board">("board");
+  const staff = useStaff();
   const [filter, setFilter] = useState({ client: "", assignee: "", priority: "", overdue: false });
   const [modal, setModal] = useState<{ title: string; fields: FieldDef[]; submit: (v: any) => Promise<string | null> } | null>(null);
 
@@ -48,12 +50,12 @@ function Taskforce() {
   };
   const newTask = () => setModal({
     title: "New task",
-    fields: [
+    fields: withStaffPicker([
       { name: "project", label: "Project", type: "select", options: (data?.projects ?? []).filter((p) => p.status !== "cancelled").map((p) => `${p.name}`), required: true },
       { name: "title", label: "Task", required: true }, { name: "details", label: "Details", type: "textarea" },
       { name: "priority", label: "Priority", type: "select", options: priorities, defaultValue: "normal" }, { name: "due_at", label: "Due date", type: "date" },
       { name: "estimated_hours", label: "Estimated hours", type: "number" }, { name: "assigned_to", label: "Assigned to", defaultValue: adminEmail },
-    ],
+    ], staff.emails),
     submit: async (v) => {
       const p = data?.projects.find((x) => x.name === v.project); if (!p) return "Choose a project.";
       const r = await db.from("tasks").insert({ user_id: p.user_id, project_id: p.id, subscription_id: p.subscription_id, title: v.title, details: v.details || null, priority: v.priority, due_at: v.due_at || null, estimated_hours: v.estimated_hours ? Number(v.estimated_hours) : null, assigned_to: v.assigned_to || null, actor_label: adminEmail });

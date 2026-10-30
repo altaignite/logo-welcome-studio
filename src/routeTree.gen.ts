@@ -18,8 +18,10 @@ import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
+import { Route as AdminStaffRouteImport } from './routes/admin.staff'
 import { Route as AdminSupportRouteImport } from './routes/admin.support'
 import { Route as AdminTaskforceRouteImport } from './routes/admin.taskforce'
+import { Route as AdminTemplatesRouteImport } from './routes/admin.templates'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard.index'
 import { Route as DashboardSectionRouteImport } from './routes/dashboard.$section'
 import { Route as AdminAccountsIndexRouteImport } from './routes/admin.accounts.index'
@@ -27,8 +29,10 @@ import { Route as AdminAccountsIdRouteImport } from './routes/admin.accounts.$id
 import { Route as AdminApplicationsIndexRouteImport } from './routes/admin.applications.index'
 import { Route as AdminApplicationsIdRouteImport } from './routes/admin.applications.$id'
 import { Route as DashboardKindIdRouteImport } from './routes/dashboard.$kind.$id'
+import { Route as AdminRecordsKindIndexRouteImport } from './routes/admin.records.$kind.index'
 import { Route as AdminRecordsKindIdRouteImport } from './routes/admin.records.$kind.$id'
 import { Route as ApiPublicCronCollectionsRouteImport } from './routes/api/public/cron/collections'
+import { Route as ApiPublicCronNotificationsRouteImport } from './routes/api/public/cron/notifications'
 import { Route as ApiPublicStripeWebhookRouteImport } from './routes/api/public/stripe/webhook'
 
 const IndexRoute = IndexRouteImport.update({
@@ -76,6 +80,11 @@ const AdminSettingsRoute = AdminSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminStaffRoute = AdminStaffRouteImport.update({
+  id: '/staff',
+  path: '/staff',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminSupportRoute = AdminSupportRouteImport.update({
   id: '/support',
   path: '/support',
@@ -84,6 +93,11 @@ const AdminSupportRoute = AdminSupportRouteImport.update({
 const AdminTaskforceRoute = AdminTaskforceRouteImport.update({
   id: '/taskforce',
   path: '/taskforce',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminTemplatesRoute = AdminTemplatesRouteImport.update({
+  id: '/templates',
+  path: '/templates',
   getParentRoute: () => AdminRoute,
 } as any)
 const DashboardIndexRoute = DashboardIndexRouteImport.update({
@@ -121,6 +135,11 @@ const DashboardKindIdRoute = DashboardKindIdRouteImport.update({
   path: '/$kind/$id',
   getParentRoute: () => DashboardRoute,
 } as any)
+const AdminRecordsKindIndexRoute = AdminRecordsKindIndexRouteImport.update({
+  id: '/records/$kind/',
+  path: '/records/$kind/',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminRecordsKindIdRoute = AdminRecordsKindIdRouteImport.update({
   id: '/records/$kind/$id',
   path: '/records/$kind/$id',
@@ -130,6 +149,12 @@ const ApiPublicCronCollectionsRoute =
   ApiPublicCronCollectionsRouteImport.update({
     id: '/api/public/cron/collections',
     path: '/api/public/cron/collections',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicCronNotificationsRoute =
+  ApiPublicCronNotificationsRouteImport.update({
+    id: '/api/public/cron/notifications',
+    path: '/api/public/cron/notifications',
     getParentRoute: () => rootRouteImport,
   } as any)
 const ApiPublicStripeWebhookRoute = ApiPublicStripeWebhookRouteImport.update({
@@ -147,8 +172,10 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/admin/settings': typeof AdminSettingsRoute
+  '/admin/staff': typeof AdminStaffRoute
   '/admin/support': typeof AdminSupportRoute
   '/admin/taskforce': typeof AdminTaskforceRoute
+  '/admin/templates': typeof AdminTemplatesRoute
   '/dashboard/$section': typeof DashboardSectionRoute
   '/admin/': typeof AdminIndexRoute
   '/dashboard/': typeof DashboardIndexRoute
@@ -159,7 +186,9 @@ export interface FileRoutesByFullPath {
   '/admin/applications/': typeof AdminApplicationsIndexRoute
   '/admin/records/$kind/$id': typeof AdminRecordsKindIdRoute
   '/api/public/cron/collections': typeof ApiPublicCronCollectionsRoute
+  '/api/public/cron/notifications': typeof ApiPublicCronNotificationsRoute
   '/api/public/stripe/webhook': typeof ApiPublicStripeWebhookRoute
+  '/admin/records/$kind/': typeof AdminRecordsKindIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -168,8 +197,10 @@ export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/admin/settings': typeof AdminSettingsRoute
+  '/admin/staff': typeof AdminStaffRoute
   '/admin/support': typeof AdminSupportRoute
   '/admin/taskforce': typeof AdminTaskforceRoute
+  '/admin/templates': typeof AdminTemplatesRoute
   '/dashboard/$section': typeof DashboardSectionRoute
   '/admin': typeof AdminIndexRoute
   '/dashboard': typeof DashboardIndexRoute
@@ -180,7 +211,9 @@ export interface FileRoutesByTo {
   '/admin/applications': typeof AdminApplicationsIndexRoute
   '/admin/records/$kind/$id': typeof AdminRecordsKindIdRoute
   '/api/public/cron/collections': typeof ApiPublicCronCollectionsRoute
+  '/api/public/cron/notifications': typeof ApiPublicCronNotificationsRoute
   '/api/public/stripe/webhook': typeof ApiPublicStripeWebhookRoute
+  '/admin/records/$kind': typeof AdminRecordsKindIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -192,8 +225,10 @@ export interface FileRoutesById {
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/admin/settings': typeof AdminSettingsRoute
+  '/admin/staff': typeof AdminStaffRoute
   '/admin/support': typeof AdminSupportRoute
   '/admin/taskforce': typeof AdminTaskforceRoute
+  '/admin/templates': typeof AdminTemplatesRoute
   '/dashboard/$section': typeof DashboardSectionRoute
   '/admin/': typeof AdminIndexRoute
   '/dashboard/': typeof DashboardIndexRoute
@@ -204,7 +239,9 @@ export interface FileRoutesById {
   '/admin/applications/': typeof AdminApplicationsIndexRoute
   '/admin/records/$kind/$id': typeof AdminRecordsKindIdRoute
   '/api/public/cron/collections': typeof ApiPublicCronCollectionsRoute
+  '/api/public/cron/notifications': typeof ApiPublicCronNotificationsRoute
   '/api/public/stripe/webhook': typeof ApiPublicStripeWebhookRoute
+  '/admin/records/$kind/': typeof AdminRecordsKindIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -217,8 +254,10 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/signup'
     | '/admin/settings'
+    | '/admin/staff'
     | '/admin/support'
     | '/admin/taskforce'
+    | '/admin/templates'
     | '/dashboard/$section'
     | '/admin/'
     | '/dashboard/'
@@ -229,7 +268,9 @@ export interface FileRouteTypes {
     | '/admin/applications/'
     | '/admin/records/$kind/$id'
     | '/api/public/cron/collections'
+    | '/api/public/cron/notifications'
     | '/api/public/stripe/webhook'
+    | '/admin/records/$kind/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -238,8 +279,10 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/signup'
     | '/admin/settings'
+    | '/admin/staff'
     | '/admin/support'
     | '/admin/taskforce'
+    | '/admin/templates'
     | '/dashboard/$section'
     | '/admin'
     | '/dashboard'
@@ -250,7 +293,9 @@ export interface FileRouteTypes {
     | '/admin/applications'
     | '/admin/records/$kind/$id'
     | '/api/public/cron/collections'
+    | '/api/public/cron/notifications'
     | '/api/public/stripe/webhook'
+    | '/admin/records/$kind'
   id:
     | '__root__'
     | '/'
@@ -261,8 +306,10 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/signup'
     | '/admin/settings'
+    | '/admin/staff'
     | '/admin/support'
     | '/admin/taskforce'
+    | '/admin/templates'
     | '/dashboard/$section'
     | '/admin/'
     | '/dashboard/'
@@ -273,7 +320,9 @@ export interface FileRouteTypes {
     | '/admin/applications/'
     | '/admin/records/$kind/$id'
     | '/api/public/cron/collections'
+    | '/api/public/cron/notifications'
     | '/api/public/stripe/webhook'
+    | '/admin/records/$kind/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -285,6 +334,7 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   SignupRoute: typeof SignupRoute
   ApiPublicCronCollectionsRoute: typeof ApiPublicCronCollectionsRoute
+  ApiPublicCronNotificationsRoute: typeof ApiPublicCronNotificationsRoute
   ApiPublicStripeWebhookRoute: typeof ApiPublicStripeWebhookRoute
 }
 
@@ -353,6 +403,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminSettingsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/staff': {
+      id: '/admin/staff'
+      path: '/staff'
+      fullPath: '/admin/staff'
+      preLoaderRoute: typeof AdminStaffRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/support': {
       id: '/admin/support'
       path: '/support'
@@ -365,6 +422,13 @@ declare module '@tanstack/react-router' {
       path: '/taskforce'
       fullPath: '/admin/taskforce'
       preLoaderRoute: typeof AdminTaskforceRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/templates': {
+      id: '/admin/templates'
+      path: '/templates'
+      fullPath: '/admin/templates'
+      preLoaderRoute: typeof AdminTemplatesRouteImport
       parentRoute: typeof AdminRoute
     }
     '/dashboard/': {
@@ -416,6 +480,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardKindIdRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/admin/records/$kind/': {
+      id: '/admin/records/$kind/'
+      path: '/records/$kind'
+      fullPath: '/admin/records/$kind/'
+      preLoaderRoute: typeof AdminRecordsKindIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/records/$kind/$id': {
       id: '/admin/records/$kind/$id'
       path: '/records/$kind/$id'
@@ -430,6 +501,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicCronCollectionsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/cron/notifications': {
+      id: '/api/public/cron/notifications'
+      path: '/api/public/cron/notifications'
+      fullPath: '/api/public/cron/notifications'
+      preLoaderRoute: typeof ApiPublicCronNotificationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/stripe/webhook': {
       id: '/api/public/stripe/webhook'
       path: '/api/public/stripe/webhook'
@@ -442,26 +520,32 @@ declare module '@tanstack/react-router' {
 
 interface AdminRouteChildren {
   AdminSettingsRoute: typeof AdminSettingsRoute
+  AdminStaffRoute: typeof AdminStaffRoute
   AdminSupportRoute: typeof AdminSupportRoute
   AdminTaskforceRoute: typeof AdminTaskforceRoute
+  AdminTemplatesRoute: typeof AdminTemplatesRoute
   AdminIndexRoute: typeof AdminIndexRoute
   AdminAccountsIdRoute: typeof AdminAccountsIdRoute
   AdminApplicationsIdRoute: typeof AdminApplicationsIdRoute
   AdminAccountsIndexRoute: typeof AdminAccountsIndexRoute
   AdminApplicationsIndexRoute: typeof AdminApplicationsIndexRoute
   AdminRecordsKindIdRoute: typeof AdminRecordsKindIdRoute
+  AdminRecordsKindIndexRoute: typeof AdminRecordsKindIndexRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
   AdminSettingsRoute: AdminSettingsRoute,
+  AdminStaffRoute: AdminStaffRoute,
   AdminSupportRoute: AdminSupportRoute,
   AdminTaskforceRoute: AdminTaskforceRoute,
+  AdminTemplatesRoute: AdminTemplatesRoute,
   AdminIndexRoute: AdminIndexRoute,
   AdminAccountsIdRoute: AdminAccountsIdRoute,
   AdminApplicationsIdRoute: AdminApplicationsIdRoute,
   AdminAccountsIndexRoute: AdminAccountsIndexRoute,
   AdminApplicationsIndexRoute: AdminApplicationsIndexRoute,
   AdminRecordsKindIdRoute: AdminRecordsKindIdRoute,
+  AdminRecordsKindIndexRoute: AdminRecordsKindIndexRoute,
 }
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
@@ -491,6 +575,7 @@ const rootRouteChildren: RootRouteChildren = {
   ResetPasswordRoute: ResetPasswordRoute,
   SignupRoute: SignupRoute,
   ApiPublicCronCollectionsRoute: ApiPublicCronCollectionsRoute,
+  ApiPublicCronNotificationsRoute: ApiPublicCronNotificationsRoute,
   ApiPublicStripeWebhookRoute: ApiPublicStripeWebhookRoute,
 }
 export const routeTree = rootRouteImport

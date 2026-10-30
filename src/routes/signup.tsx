@@ -7,7 +7,7 @@ import { CountryField, CountryFlag } from "@/components/country-field";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { usePopup } from "@/components/popup";
 import { supabase } from "@/integrations/supabase/client";
-import { createAccountNumber, accountSchema, countries, createSignatureCode, isSignatureMatch, personalSchema, plans, planTerms, type Plan, type CountryCode, type PersonalDetails, formatPhoneInput, switchPhoneCountry, phonePlaceholder } from "@/lib/signup";
+import { agreementDocuments, createAccountNumber, accountSchema, countries, createSignatureCode, isSignatureMatch, personalSchema, plans, type Plan, type CountryCode, type PersonalDetails, formatPhoneInput, switchPhoneCountry, phonePlaceholder } from "@/lib/signup";
 import logo from "@/assets/logo.png.asset.json";
 
 export const Route = createFileRoute("/signup")({
@@ -24,12 +24,6 @@ export const Route = createFileRoute("/signup")({
 const steps = ["Your plan", "Personal details", "Create account", "Review", "Agreements"];
 const titles = ["CHOOSE YOUR PLAN", "Let's get to know you.", "Make it yours.", "Almost there!", "Your agreements"];
 const subtitles = ["Marketing, design & development. A monthly hours allowance that fits your ambition.", "The person and business behind the ambition.", "Create your FP login details.", "Please check your details carefully.", "Read your agreements before proceeding. Save a copy for your records."];
-const baseDocuments = [
-  { title: "Client Agreement", body: "FP Marketing Accelerator\n\nYour monthly subscription covers marketing, design and development services within your assigned monthly service hours. Services are not unlimited. Advertising budgets are excluded and are separate from service fees." },
-  { title: "Subscription Agreement", body: "Marketing Accelerator subscription\n\nService fee: $199 per month. Includes marketing, design and development. Does not include advertising budgets." },
-  { title: "90-day Money-back Guarantee", body: "90-day money-back guarantee\n\nIf no sales are received within 90 days, the money-back guarantee applies to service fees only. Advertising budgets are not covered." },
-  { title: "Privacy Information", body: "Privacy\n\nPersonal details and passwords in this demonstration stay in this browser page, are not submitted, and clear when the page is refreshed." },
-];
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return <label className="block space-y-1.5"><span className="block text-[13px] font-medium text-foreground">{label}<span className="text-primary">*</span></span>{children}</label>;
@@ -38,7 +32,7 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 function Signup() {
   const [step, setStep] = useState(0);
   const [selectedPlan, setSelectedPlan] = useState<Plan>(plans[0]);
-  const documents = baseDocuments.map((doc, index) => index === 1 ? { ...doc, body: `FP Subscription Agreement\n\n${planTerms(selectedPlan)}` } : doc);
+  const documents = agreementDocuments(selectedPlan);
   const [personal, setPersonal] = useState<PersonalDetails>({ firstName: "", lastName: "", company: "", country: "", phone: "" });
   const [phoneCountry, setPhoneCountry] = useState<string>("");
   const [account, setAccount] = useState({ email: "", password: "", confirmPassword: "" });
@@ -292,7 +286,7 @@ function SuccessScreen({ name, plan, signedAt, email }: { name: string; plan: Pl
   const timeline = [
     { title: "Application submitted", text: time, state: "done" },
     { title: "Agreement signed digitally", text: "Your confirmation code was accepted.", state: "done" },
-    { title: "Account review", text: "We're checking your details. Usually within 1 business day.", state: "current" },
+    { title: "Account review", text: "We're checking your details, usually within 1 business day. We'll email you with any update, and you can follow it from your dashboard after confirming your email.", state: "current" },
     { title: "Onboarding call", text: `We'll contact you at ${email} to plan your first month.`, state: "todo" },
     { title: "Your accelerator starts", text: `${plan.monthlyHours} service hours assigned every month.`, state: "todo" },
   ] as const;

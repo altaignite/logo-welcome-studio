@@ -22,6 +22,24 @@ export function planTerms(plan: Plan) {
   return `${plan.name} — $${plan.monthlyFee} / month\n${plan.monthlyHours} assigned service hours per month, shared across marketing, design and development. Services are not unlimited. Advertising budgets are separate and excluded.\n90-day money-back guarantee if no sales are received, on service fees only.`;
 }
 
+/** Bump when agreement wording changes; signed copies record the version they were rendered from. */
+export const AGREEMENT_VERSION = "2026-10-29";
+
+/** The agreements a client signs for a plan. Shown at signup and stored server-side as the signed copy. */
+export function agreementDocuments(plan: Plan): { title: string; body: string }[] {
+  return [
+    { title: "Client Agreement", body: "FP Marketing Accelerator\n\nYour monthly subscription covers marketing, design and development services within your assigned monthly service hours. Services are not unlimited. Advertising budgets are excluded and are separate from service fees." },
+    { title: "Subscription Agreement", body: `FP Subscription Agreement\n\n${planTerms(plan)}` },
+    { title: "90-day Money-back Guarantee", body: "90-day money-back guarantee\n\nIf no sales are received within 90 days, the money-back guarantee applies to service fees only. Advertising budgets are not covered." },
+    { title: "Privacy Information", body: "Privacy\n\nWe use your personal and business details to provide your services, bill you and contact you about your account. Billing records are kept for as long as the law requires. You can ask for a copy of your data or for your account to be closed from your dashboard at any time." },
+  ];
+}
+
+/** Signed copy of an agreement, as stored and shown in the dashboard. */
+export function signedAgreementText(doc: { title: string; body: string }, signer: { name: string; accountNumber: string; signedAt: string }) {
+  return `${doc.body}\n\n---\nSigned digitally by ${signer.name} (account ${signer.accountNumber}) on ${new Date(signer.signedAt).toISOString()}.\nAgreement version ${AGREEMENT_VERSION}.`;
+}
+
 const countryNames = new Intl.DisplayNames(["en"], { type: "region" });
 export const countries = getCountries().map((code) => ({
   code, name: countryNames.of(code) ?? code, dial: `+${getCountryCallingCode(code)}`,

@@ -9,23 +9,27 @@ import { usePopup } from "@/components/popup";
 import { pauseVoidsGuarantee } from "@/lib/billing";
 import { approveOverage, billingPortal, subscriptionAction } from "@/lib/billing.functions";
 import { changePlan, orderAdditionalPlan, undoCancel } from "@/lib/client.functions";
+import { claimGuarantee, respondToInfoRequest, reviewDeliverable } from "@/lib/portal.functions";
 import { plans } from "@/lib/signup";
 import { money } from "@/lib/admin";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type R = any;
 export type ClientData = Awaited<ReturnType<typeof loadClient>>;
-export type RecordKind = "subscription" | "project" | "task" | "invoice" | "payment" | "application" | "ticket";
+export type RecordKind = "subscription" | "project" | "task" | "invoice" | "payment" | "application" | "ticket" | "deliverable" | "report";
 
 async function loadClient(userId: string) {
   const own = async (t: string, order = "created_at") => ((await db.from(t).select("*").eq("user_id", userId).order(order, { ascending: false })).data ?? []) as R[];
-  const [profile, subs, projects, tasks, apps, invoices, payments, tickets, messages, hours] = await Promise.all([
+  const [profile, subs, projects, tasks, apps, invoices, payments, tickets, messages, hours, deliverables, reports, documents, privacy, brief, events] = await Promise.all([
     db.from("profiles").select("*").eq("id", userId).maybeSingle().then((r: R) => r.data as R | null),
     own("subscriptions"), own("projects"), own("tasks"), own("applications"), own("invoices", "issued_at"), own("transactions"), own("support_tickets", "updated_at"),
     db.from("ticket_messages").select("*").eq("user_id", userId).eq("internal", false).order("created_at").then((r: R) => (r.data ?? []) as R[]),
-    own("time_entries", "worked_on"),
+    own("time_entries", "worked_on"), own("deliverables", "updated_at"), own("client_reports", "period_start"), own("documents"), own("compliance_requests"),
+    db.from("onboarding_briefs").select("*").eq("user_id", userId).maybeSingle().then((r: R) => r.data as R | null),
+    // Row level security returns only the events shared with the client.
+    db.from("application_events").select("*").order("created_at").then((r: R) => (r.data ?? []) as R[]),
   ]);
-  return { profile, subs, projects, tasks, apps, invoices, payments, tickets, messages, hours };
+  return { profile, subs, projects, tasks, apps, invoices, payments, tickets, messages, hours, deliverables, reports, documents, privacy, brief, events };
 }
 
 export function useClient() {
@@ -59,6 +63,7 @@ export function useClientActions() {
   const [modal, setModal] = useState<Modal | null>(null);
   const fnSub = useServerFn(subscriptionAction), fnPortal = useServerFn(billingPortal), fnApprove = useServerFn(approveOverage);
   const fnChange = useServerFn(changePlan), fnOrder = useServerFn(orderAdditionalPlan), fnUndo = useServerFn(undoCancel);
+  const fnRespond = useServerFn(respondToInfoRequest), fnClaim = useServerFn(claimGuarantee), fnReview = useServerFn(reviewDeliverable);
   const refresh = () => qc.invalidateQueries({ queryKey: ["client"] });
   const fail = (e: unknown) => popup({ type: "error", title: "Something went wrong", description: (e as Error).message, primaryLabel: "Close", secondaryLabel: null });
   const err = (e: unknown) => (e as Error).message || "Something went wrong.";
@@ -109,8 +114,31 @@ export function useClientActions() {
       if (m.error) return m.error.message; await refresh(); return null;
     },
   });
+  const respond = (app: R) => setModal({
+    title: "Send the information we asked for", submitLabel: "Send to the FP team",
+    description: "Your reply is added to your application and our team picks it back up. To share files, upload them on this page first.",
+    fields: [{ name: "message", label: "Your reply", type: "textarea", required: true, max: 4000 }],
+    onSubmit: async (v) => { try { await fnRespond({ data: { applicationId: app.id, message: v.message } }); await refresh(); return null; } catch (e) { return err(e); } },
+  });
+  const claim = (s: R) => setModal({
+    title: "Claim your money-back guarantee", submitLabel: "Send claim",
+    description: "If you received no sales in your first 90 days, we refund your service fees. Advertising budgets aren't covered. We'll review your claim and reply in a support ticket.",
+    fields: [{ name: "statement", label: "What happened in your first 90 days?", type: "textarea", required: true, max: 4000 },
+      { name: "confirm", label: "I confirm I received no sales in this period", type: "select", options: ["no", "yes"] }],
+    onSubmit: async (v) => {
+      if (v.confirm !== "yes") return "Confirm that you received no sales.";
+      try { await fnClaim({ data: { subscriptionId: s.id, statement: v.statement, confirmNoSales: true } }); await refresh();
+        popup({ type: "success", title: "Claim sent", description: "We've opened a support ticket for your claim and will reply there.", primaryLabel: "Got it", secondaryLabel: null }); return null; }
+      catch (e) { return err(e); }
+    },
+  });
+  const review = (d: R, decision: "approved" | "changes_requested") => setModal(decision === "approved"
+    ? { title: `Approve ${d.title}?`, submitLabel: "Approve", description: "Let the team know this is ready to go. You can add a note.", fields: [{ name: "feedback", label: "Note (optional)", type: "textarea", max: 4000 }],
+      onSubmit: async (v) => { try { await fnReview({ data: { deliverableId: d.id, decision, ...(v.feedback ? { feedback: v.feedback } : {}) } }); await refresh(); return null; } catch (e) { return err(e); } } }
+    : { title: "Request changes", submitLabel: "Send feedback", description: "Tell us what to change. The team will update it and send it back for review.", fields: [{ name: "feedback", label: "What should change?", type: "textarea", required: true, max: 4000 }],
+      onSubmit: async (v) => { try { await fnReview({ data: { deliverableId: d.id, decision, feedback: v.feedback } }); await refresh(); return null; } catch (e) { return err(e); } } });
   const modalEl = modal && <FormModal title={modal.title} description={modal.description} fields={modal.fields} submitLabel={modal.submitLabel} onClose={() => setModal(null)} onSubmit={modal.onSubmit} />;
-  return { subAct, undo, change, order, approve, portal, newTicket, reply, refresh, fail, modalEl, setModal };
+  return { subAct, undo, change, order, approve, portal, newTicket, reply, respond, claim, review, refresh, fail, modalEl, setModal };
 }
 
 /** Context buttons for a subscription, used in tables and on its details page. */

@@ -3,6 +3,9 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { sendFirstInvoice } from "@/lib/billing.functions";
+import { applicationAgreements } from "@/lib/staff.functions";
+import { AgreementList, DocumentList } from "@/components/files";
+import { useStaff, withStaffPicker } from "@/components/admin/staff";
 import { Archive, ArchiveRestore, ArrowLeft, Check, Circle, MessageSquare, Pencil, UserCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { DataTable, StatusBadge } from "@/components/admin/data-table";
@@ -11,7 +14,7 @@ import { Btn, ClientBar, FieldGrid, Section, fmtText } from "@/components/admin/
 import { usePopup } from "@/components/popup";
 import { plans } from "@/lib/signup";
 import type { Vals } from "@/lib/records";
-import { formatAccount, formatDate, money, statusLabel, workflowActions, workflowStages, type WorkflowAction, type AppStatus } from "@/lib/admin";
+import { formatAccount, formatDate, money, sharedWithClient, statusLabel, workflowActions, workflowStages, type WorkflowAction, type AppStatus } from "@/lib/admin";
 
 export const Route = createFileRoute("/admin/applications/$id")({ component: ApplicationDetail });
 const adminRoute = getRouteApi("/admin");
@@ -20,7 +23,8 @@ type Modal = { title: string; fields: FieldDef[]; submitLabel: string; onSubmit:
 function ApplicationDetail() {
   const { id } = Route.useParams();
   const { adminEmail, adminId } = adminRoute.useRouteContext();
-  const sendFirst = useServerFn(sendFirstInvoice);
+  const sendFirst = useServerFn(sendFirstInvoice), loadAgreements = useServerFn(applicationAgreements);
+  const staff = useStaff();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const popup = usePopup();
@@ -47,7 +51,11 @@ function ApplicationDetail() {
         supabase.from("transactions").select("*").eq("user_id", uid).order("created_at", { ascending: false }),
         supabase.from("applications").select("id, plan_name, status, created_at").eq("user_id", uid).neq("id", id),
       ]);
-      return { app: a.data, profile: p.data, events: e.data ?? [], subs: s.data ?? [], projects: pr.data ?? [], invoices: inv.data ?? [], transactions: tx.data ?? [], others: others.data ?? [] };
+      const [agreements, docs] = await Promise.all([
+        a.data.signed_at ? loadAgreements({ data: { applicationId: id } }).catch(() => []) : Promise.resolve([]),
+        supabase.from("documents").select("*").eq("related_table", "applications").eq("related_id", id).eq("status", "ready").order("created_at", { ascending: false }),
+      ]);
+      return { app: a.data, profile: p.data, events: e.data ?? [], subs: s.data ?? [], projects: pr.data ?? [], invoices: inv.data ?? [], transactions: tx.data ?? [], others: others.data ?? [], agreements, docs: docs.data ?? [] };
     },
   });
   const refresh = () => qc.invalidateQueries({ queryKey: ["admin"] });
@@ -66,7 +74,7 @@ function ApplicationDetail() {
     }
     popup({
       type: a.tone === "danger" ? "error" : "info", title: `${a.label}?`,
-      description: `The application moves from ${statusLabel[app.status]} to ${statusLabel[a.to]}.`,
+      description: `The application moves from ${statusLabel[app.status]} to ${statusLabel[a.to]}.${sharedWithClient(a.to) ? " The client is notified and sees your note." : ""}`,
       primaryLabel: a.label, secondaryLabel: "Cancel",
       onPrimary: async () => {
         setBusy(true);
@@ -112,7 +120,7 @@ function ApplicationDetail() {
     title: "Edit application", submitLabel: "Save changes",
     fields: [
       ...(decided ? [] : [{ name: "plan", label: "Plan", type: "select" as const, options: plans.map((x) => x.name), defaultValue: app.plan_name }]),
-      { name: "assigned_to", label: "Assigned to", defaultValue: app.assigned_to ?? "" },
+      ...withStaffPicker([{ name: "assigned_to", label: "Assigned to", defaultValue: app.assigned_to ?? "" }], staff.emails),
       { name: "internal_notes", label: "Internal notes", type: "textarea", defaultValue: app.internal_notes ?? "" },
     ],
     onSubmit: async (v) => {
@@ -198,13 +206,15 @@ function ApplicationDetail() {
             { key: "plan", label: "Plan", value: (r) => r.plan_name }, { key: "status", label: "Status", value: (r) => r.status, render: (r) => <StatusBadge status={r.status} label={statusLabel[r.status]} /> },
             { key: "date", label: "Submitted", value: (r) => formatDate(r.created_at) },
           ]} />}
+          {app.signed_at && <Section title="Signed agreements"><AgreementList agreements={data.agreements} empty="The signed copy is prepared the first time this page loads." /></Section>}
+          {data.docs.length > 0 && <Section title="Files from the client"><DocumentList docs={data.docs} staff /></Section>}
           <Section title="Audit log">
             <ol className="divide-y">
               {events.map((e) => (
                 <li key={e.id} className="flex gap-3 px-5 py-4">
                   <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-full bg-secondary">{e.note ? <MessageSquare className="size-4" /> : <Check className="size-4" />}</span>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium">{e.action}</p>
+                    <p className="text-sm font-medium">{e.action}{e.visible_to_client && <span className="ml-2 rounded-full bg-secondary px-2 py-0.5 text-[11px] font-medium text-muted-foreground">Shared with client</span>}</p>
                     {e.from_status && e.to_status && <p className="text-sm text-muted-foreground">{statusLabel[e.from_status]} → {statusLabel[e.to_status]}</p>}
                     {e.note && <p className="mt-1 whitespace-pre-wrap rounded-lg bg-secondary/60 p-2 text-sm">{e.note}</p>}
                     <p className="mt-1 text-xs text-muted-foreground">{e.actor_label}, {formatDate(e.created_at)}</p>
@@ -221,7 +231,7 @@ function ApplicationDetail() {
             <p className="mt-1 text-sm text-muted-foreground">Assigned to: {app.assigned_to ?? "nobody"}</p>
             {app.assigned_to !== adminEmail && actions.length > 0 && <button type="button" disabled={busy} onClick={assignToMe} className="mt-3 inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium hover:bg-secondary"><UserCheck className="size-4" />Assign to me</button>}
             <label className="mt-4 block text-[13px] font-medium" htmlFor="note">Note</label>
-            <textarea id="note" value={note} onChange={(e) => setNote(e.target.value)} maxLength={2000} rows={3} placeholder="Reason or internal note (saved in the audit log)" className="mt-1.5 w-full rounded-lg border bg-background p-3 text-sm outline-none focus:ring-2 focus:ring-ring" />
+            <textarea id="note" value={note} onChange={(e) => setNote(e.target.value)} maxLength={2000} rows={3} placeholder="Reason or note. Notes on Request information, Approve and Reject are shared with the client; Save note only stays internal." className="mt-1.5 w-full rounded-lg border bg-background p-3 text-sm outline-none focus:ring-2 focus:ring-ring" />
             {actions.length === 0 ? <p className="mt-3 text-sm text-muted-foreground">This application is {statusLabel[app.status].toLowerCase()}. The decision is final.</p> :
               <div className="mt-3 grid gap-2">
                 {actions.map((a) => (

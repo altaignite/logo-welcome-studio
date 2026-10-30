@@ -1,9 +1,14 @@
 import { createFileRoute, Link, Outlet, redirect, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { FileText, LifeBuoy, ListChecks, LogOut, Menu, Settings, Users, X } from "lucide-react";
+import { BarChart3, FileCheck2, FileText, FolderKanban, LayoutDashboard, LifeBuoy, ListChecks, LogOut, Mail, Menu, PhoneCall, Receipt, Repeat, Settings, ShieldCheck, UserCog, Users, Wallet, X } from "lucide-react";
 import logo from "@/assets/logo.png.asset.json";
 import { supabase } from "@/integrations/supabase/client";
+import { NotificationBell } from "@/components/notifications";
+import { mfaNeeded } from "@/components/mfa";
+import { GlobalSearch } from "@/components/admin/search";
+import { useStaff } from "@/components/admin/staff";
+import { levelLabel, type StaffLevel } from "@/lib/staff";
 
 export const Route = createFileRoute("/admin")({
   ssr: false,
@@ -23,21 +28,42 @@ export const Route = createFileRoute("/admin")({
     if (!data.user) throw redirect({ to: "/admin-login" });
     const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: data.user.id, _role: "admin" });
     if (!isAdmin) throw redirect({ to: "/admin-login" });
+    if (await mfaNeeded()) throw redirect({ to: "/admin-login" });
     return { adminEmail: data.user.email ?? "", adminId: data.user.id };
   },
   component: AdminLayout,
 });
 
 const nav = [
-  { to: "/admin/accounts", label: "Accounts", icon: Users },
-  { to: "/admin/applications", label: "Applications", icon: FileText },
-  { to: "/admin/taskforce", label: "Taskforce", icon: ListChecks },
-  { to: "/admin/support", label: "Support", icon: LifeBuoy },
-  { to: "/admin/settings", label: "Billing rules", icon: Settings },
+  { group: "General", items: [
+    { to: "/admin", label: "Overview", icon: LayoutDashboard, exact: true },
+    { to: "/admin/accounts", label: "Accounts", icon: Users },
+    { to: "/admin/applications", label: "Applications", icon: FileText },
+  ] },
+  { group: "Work", items: [
+    { to: "/admin/taskforce", label: "Taskforce", icon: ListChecks },
+    { to: "/admin/records/projects", kind: "projects", label: "Projects", icon: FolderKanban },
+    { to: "/admin/records/deliverables", kind: "deliverables", label: "Deliverables", icon: FileCheck2 },
+    { to: "/admin/records/client_reports", kind: "client_reports", label: "Reports", icon: BarChart3 },
+    { to: "/admin/support", label: "Support", icon: LifeBuoy },
+    { to: "/admin/records/crm_activities", kind: "crm_activities", label: "Follow-ups", icon: PhoneCall },
+    { to: "/admin/records/compliance_requests", kind: "compliance_requests", label: "Privacy requests", icon: ShieldCheck },
+  ] },
+  { group: "Billing", items: [
+    { to: "/admin/records/invoices", kind: "invoices", label: "Invoices", icon: Receipt },
+    { to: "/admin/records/subscriptions", kind: "subscriptions", label: "Subscriptions", icon: Repeat },
+    { to: "/admin/records/transactions", kind: "transactions", label: "Payments", icon: Wallet },
+    { to: "/admin/settings", label: "Billing rules", icon: Settings },
+  ] },
+  { group: "Team", items: [
+    { to: "/admin/templates", label: "Message templates", icon: Mail },
+    { to: "/admin/staff", label: "Staff and security", icon: UserCog },
+  ] },
 ] as const;
 
 function AdminLayout() {
-  const { adminEmail } = Route.useRouteContext();
+  const { adminEmail, adminId } = Route.useRouteContext();
+  const staff = useStaff();
   const path = useRouterState({ select: (s) => s.location.pathname });
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
@@ -55,17 +81,21 @@ function AdminLayout() {
         <span className="h-5 w-px bg-border" />
         <span className="text-sm font-semibold">Admin</span>
       </div>
-      <p className="px-5 pb-2 pt-4 text-xs text-muted-foreground">General</p>
-      <nav className="space-y-0.5">
-        {nav.map(({ to, label, icon: Icon }) => {
-          const active = path.startsWith(to);
-          return (
-            <Link key={to} to={to} onClick={() => setOpen(false)} className={`flex items-center gap-3 border-r-2 px-5 py-2.5 text-sm ${active ? "border-primary bg-secondary font-semibold" : "border-transparent text-muted-foreground hover:bg-secondary/60 hover:text-foreground"}`}>
-              <Icon className="size-4" />{label}
-            </Link>
-          );
-        })}
-      </nav>
+      <div className="flex-1 overflow-y-auto pb-4">
+        {nav.map(({ group, items }) => <div key={group}>
+          <p className="px-5 pb-2 pt-4 text-xs text-muted-foreground">{group}</p>
+          <nav className="space-y-0.5">
+            {items.map((item) => {
+              const { to, label, icon: Icon } = item;
+              const active = "exact" in item ? path === to || path === `${to}/` : path === to || path.startsWith(`${to}/`);
+              const cls = `flex items-center gap-3 border-r-2 px-5 py-2.5 text-sm ${active ? "border-primary bg-secondary font-semibold" : "border-transparent text-muted-foreground hover:bg-secondary/60 hover:text-foreground"}`;
+              return "kind" in item
+                ? <Link key={to} to="/admin/records/$kind" params={{ kind: item.kind }} onClick={() => setOpen(false)} className={cls}><Icon className="size-4" />{label}</Link>
+                : <Link key={to} to={item.to} onClick={() => setOpen(false)} className={cls}><Icon className="size-4" />{label}</Link>;
+            })}
+          </nav>
+        </div>)}
+      </div>
       <div className="mt-auto border-t p-3">
         <button type="button" onClick={signOut} className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground"><LogOut className="size-4" />Sign out</button>
       </div>
@@ -81,12 +111,18 @@ function AdminLayout() {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b bg-card px-4 sm:px-6">
           <button type="button" aria-label="Open menu" onClick={() => setOpen(true)} className="rounded-lg p-2 hover:bg-secondary lg:hidden"><Menu className="size-5" /></button>
+          <GlobalSearch />
           <div className="ml-auto flex min-w-0 items-center gap-3">
-            <span className="hidden truncate text-sm text-muted-foreground sm:block">{adminEmail}</span>
+            <span className="hidden min-w-0 text-right sm:block"><span className="block truncate text-sm text-muted-foreground">{adminEmail}</span>{staff.me && <span className="block text-[11px] text-muted-foreground">{levelLabel[staff.me.level as StaffLevel] ?? staff.me.level}</span>}</span>
+            <NotificationBell userId={adminId} />
             <span className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-xs font-semibold">{initials}</span>
           </div>
         </header>
-        <main className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8"><Outlet /></main>
+        <main className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8">
+          {staff.me && staff.requireMfa && !staff.me.mfa_enabled && <p className="mb-4 rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm">Two-factor authentication is required for staff. You can view the admin but not change anything until you <Link to="/admin/staff" className="font-semibold underline">set it up</Link>.</p>}
+          {staff.me?.level === "viewer" && <p className="mb-4 rounded-xl border bg-card p-3 text-sm text-muted-foreground">You have view-only access. Ask an owner to set your staff level under Staff and security.</p>}
+          <Outlet />
+        </main>
       </div>
     </div>
   );
