@@ -205,3 +205,8 @@
 
 @keyframes signup-shimmer { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
 .signup-shimmer { animation: signup-shimmer 1.6s ease-in-out infinite; }
+
+@keyframes progress {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(300%); }
+}

@@ -39,3 +39,7 @@
 - Subscriptions and invoices follow Stripe's live status through syncSubscriptionFromStripe (webhook and the daily reconcileStripe in /api/public/cron/collections); a paid invoice is only ever marked paid by the signed webhook.
 - Money-back guarantee rules are guaranteeCheck in src/lib/billing.ts: request after 90 days, within the next 30, no failed or late invoices, not voided, no sales.
 - The client-files bucket is created on first use by ensureBucket (Lovable Cloud migrations can't create storage buckets).
+- Errors: show them with ErrorState (inline, with retry) or an error popup, and use friendlyError for wording; every error popup, failed query or save, route error and unhandled rejection is reported to Lovable through reportError (src/lib/errors.ts).
+- Loading: use PageSkeleton, TableSkeleton, SectionSkeleton, Spinner and AppLoader from src/components/loading.tsx, never "Loading…" text; TopProgress shows any navigation, fetch or save.
+- Protected layouts use guardClient / guardStaff (src/lib/session-guard.ts): local session, cached staff check, background sign-in check. Don't add network calls to layout beforeLoad.
+- Every admin list (/admin/records/$kind) creates records through the client picker; invoices and subscriptions go through Stripe server functions, and Stripe-mirrored transactions can't be created by hand.

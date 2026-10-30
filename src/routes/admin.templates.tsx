@@ -1,4 +1,5 @@
 import { createFileRoute, getRouteApi } from "@tanstack/react-router";
+import { ErrorState, TableSkeleton } from "@/components/loading";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Plus } from "lucide-react";
@@ -45,7 +46,7 @@ function Templates() {
     <div className="space-y-6">
       <div><h1 className="text-2xl font-extrabold sm:text-3xl">Message templates</h1>
         <p className="mt-1 text-sm text-muted-foreground">Reusable emails for clients. Use {placeholders.map((p) => `{{${p}}}`).join(", ")}. Send them from an account or by selecting accounts in the list.</p></div>
-      {error ? <p className="text-sm text-destructive">{(error as Error).message}</p> : isLoading ? <p className="text-sm text-muted-foreground">Loading…</p> :
+      {error ? <ErrorState error={error} retry={() => location.reload()} /> : isLoading ? <TableSkeleton /> :
         <DataTable<T> title="Templates" rows={data} getId={(r) => r.id} onRowClick={save} empty="No templates yet." toolbar={<Btn icon={Plus} onClick={() => save()}>New template</Btn>}
           bulkActions={[{ label: "Delete", danger: true, run: remove }]}
           columns={[

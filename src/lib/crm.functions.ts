@@ -67,3 +67,34 @@ export const setAccountStatus = createServerFn({ method: "POST" })
     }
     return { ok: true, skipped: skipped.length, ...done };
   });
+
+const inviteInput = z.object({
+  email: z.string().trim().toLowerCase().email("Enter a valid email address.").max(254),
+  first_name: z.string().trim().min(1, "Enter a first name.").max(80),
+  last_name: z.string().trim().min(1, "Enter a last name.").max(80),
+  company: z.string().trim().max(160).optional(),
+  phone: z.string().trim().max(40).optional(),
+});
+
+/** Staff add a client by email: Supabase sends an invitation to set a password, and the signup trigger builds the profile. */
+export const inviteClient = createServerFn({ method: "POST" })
+  .middleware([requireSession])
+  .inputValidator((d: unknown) => inviteInput.parse(d))
+  .handler(async ({ data, context }) => {
+    const { requirePerm } = await import("@/lib/access.server");
+    await requirePerm(context, "accounts");
+    const { isBlockedDomain } = await import("@/lib/disposable-domains");
+    if (isBlockedDomain(data.email)) throw new Error("Disposable email addresses can't be used.");
+    if (/@firstpersonmarketing\.com$/i.test(data.email)) throw new Error("Staff accounts are created from the staff sign-in page.");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { audit } = await import("@/lib/stripe.server");
+    const { getRequest } = await import("@tanstack/react-start/server");
+    const origin = process.env["APP_URL"] ?? new URL(getRequest().url).origin;
+    const r = await supabaseAdmin.auth.admin.inviteUserByEmail(data.email, {
+      redirectTo: `${origin}/reset-password`,
+      data: { first_name: data.first_name, last_name: data.last_name, company: data.company ?? null, phone: data.phone ?? null },
+    });
+    if (r.error || !r.data.user) throw new Error(/already/i.test(r.error?.message ?? "") ? "An account with this email already exists." : "Couldn't send the invitation.");
+    await audit(supabaseAdmin, r.data.user.id, "profiles", r.data.user.id, "invited", { email: data.email }, context.userId, String(context.claims?.email ?? "Staff"));
+    return { userId: r.data.user.id };
+  });

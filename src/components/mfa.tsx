@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { SectionSkeleton } from "@/components/loading";
 import { Loader2, ShieldCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
@@ -82,7 +83,7 @@ export function MfaSettings({ onChange }: { onChange?: () => void }) {
       await load(); onChange?.();
     },
   });
-  if (!factors) return <p className="p-5 text-sm text-muted-foreground">Loading…</p>;
+  if (!factors) return <SectionSkeleton />;
   return (
     <div className="space-y-4 p-5 text-sm">
       {verified.length > 0 ? <>

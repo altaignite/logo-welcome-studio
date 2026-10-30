@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { Spinner } from "@/components/loading";
 import { useState, type FormEvent } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { usePopup } from "@/components/popup";
@@ -38,7 +39,7 @@ function Forgot() {
           <span className="block text-[13px] font-medium">Email Address<span className="text-primary">*</span></span>
           <input name="email" type="email" autoComplete="email" placeholder="Enter your email" className="signup-input" />
         </label>
-        <button type="submit" disabled={busy} className="signup-primary text-sm">{busy ? "Sending…" : "Send reset link"}</button>
+        <button type="submit" disabled={busy} className="signup-primary inline-flex items-center justify-center gap-2 text-sm">{busy && <Spinner />}{busy ? "Sending…" : "Send reset link"}</button>
         <p className="text-center text-sm text-muted-foreground"><Link to="/" className="font-semibold text-foreground hover:text-primary">Back to login</Link></p>
       </form>
     </AuthShell>

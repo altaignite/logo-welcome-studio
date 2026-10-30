@@ -111,6 +111,8 @@ export const recordKinds: Record<RecordKind, KindConfig> = {
   },
   support_tickets: {
     singular: "Support ticket", plural: "Support tickets", archivable: true, files: true,
+    list: { order: "updated_at", columns: [["Subject", "subject", "text"], ["Status", "status", "status"], ["Department", "department", "text"], ["Priority", "priority", "text"], ["Assigned to", "assigned_to", "text"]],
+      views: [{ id: "open", label: "Not closed", match: (r) => r.status !== "closed" }, all] },
     title: (r) => s(r.subject),
     fields: [["Subject", "subject", "text"], ["Status", "status", "status"], ["Department", "department", "text"], ["Priority", "priority", "text"], ["Reply by", "contact_preference", "text"], ["Phone to call", "contact_phone", "text"], ["Assigned to", "assigned_to", "text"],
       ["Opened", "created_at", "date"], ["Closed", "closed_at", "date"]],
@@ -134,6 +136,8 @@ export const recordKinds: Record<RecordKind, KindConfig> = {
   },
   tasks: {
     singular: "Task", plural: "Tasks",
+    list: { order: "created_at", columns: [["Task", "title", "text"], ["Status", "status", "status"], ["Priority", "priority", "text"], ["Due", "due_at", "day"], ["Assigned to", "assigned_to", "text"]],
+      views: [{ id: "open", label: "Open", match: (r) => !["completed", "cancelled"].includes(r.status) }, { id: "overdue", label: "Overdue", match: (r, today) => !!r.due_at && r.due_at < today && !["completed", "cancelled"].includes(r.status) }, all] },
     title: (r) => s(r.title),
     fields: [["Task", "title", "text"], ["Status", "status", "status"], ["Priority", "priority", "text"], ["Due", "due_at", "day"], ["Assigned to", "assigned_to", "text"],
       ["Completed", "completed_at", "date"], ["Estimated hours", "estimated_hours", "hours"], ["Over allowance", "over_allowance", "bool"], ["Extra hours approved", "overage_approved", "bool"],
@@ -144,6 +148,7 @@ export const recordKinds: Record<RecordKind, KindConfig> = {
   },
   contacts: {
     singular: "Contact", plural: "Contacts",
+    list: { order: "created_at", columns: [["Name", "name", "text"], ["Role", "role", "text"], ["Email", "email", "text"], ["Phone", "phone", "text"]], views: [all] },
     title: (r) => s(r.name),
     fields: [["Name", "name", "text"], ["Role", "role", "text"], ["Email", "email", "text"], ["Phone", "phone", "text"], ["Added", "created_at", "date"], ["Notes", "notes", "long"]],
     edit: [{ name: "name", label: "Name", required: true }, sel("role", "Role", ["primary", "billing", "technical", "marketing", "decision_maker", "other"]),

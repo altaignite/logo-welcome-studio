@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { ErrorState, PageSkeleton } from "@/components/loading";
 import { AlertTriangle, Check, Circle } from "lucide-react";
 import { Section } from "@/components/admin/record-bits";
 import { StatusBadge } from "@/components/admin/data-table";
@@ -11,8 +12,8 @@ export const Route = createFileRoute("/dashboard/")({ component: Overview });
 function Overview() {
   const { data, isLoading, error, userId } = useClient();
   const a = useClientActions();
-  if (error) return <p className="text-sm text-destructive">{(error as Error).message}</p>;
-  if (isLoading || !data) return <p className="text-sm text-muted-foreground">Loading your dashboard…</p>;
+  if (error) return <ErrorState error={error} retry={() => location.reload()} />;
+  if (isLoading || !data) return <PageSkeleton />;
   const live = data.subs.filter((s) => ["active", "past_due", "paused", "suspended"].includes(s.status));
   const unpaid = data.invoices.filter((i) => i.status === "open" || i.status === "overdue");
   const approvals = data.tasks.filter((t) => t.over_allowance && !t.overage_approved && !["completed", "cancelled"].includes(t.status));

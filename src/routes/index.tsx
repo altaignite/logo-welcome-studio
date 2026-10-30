@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
 import { Mail, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
 import { usePopup } from "@/components/popup";
+import { Spinner } from "@/components/loading";
 import { SwitchField } from "@/components/switch-field";
 import logo from "@/assets/logo.png.asset.json";
 import hero from "@/assets/login-hero.jpg";
@@ -29,6 +30,7 @@ function Login() {
   const [remember, setRemember] = useState(false);
   const [show, setShow] = useState(false);
   const [mfa, setMfa] = useState(false);
+  const [busy, setBusy] = useState(false);
   const popup = usePopup();
   const navigate = useNavigate();
   // A signed-in session that still needs its authenticator code continues here (the dashboard sends it back).
@@ -42,14 +44,18 @@ function Login() {
       popup({ type: "error", title: "Please fill in your email and password", description: "Both fields are needed to log in." });
       return;
     }
+    setBusy(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password: pw });
     if (error) {
+      setBusy(false);
       if (/banned/i.test(error.message)) popup({ type: "error", title: "Your account is suspended", description: "Please contact our support team to restore access." });
       else popup({ type: "error", title: "Something went wrong while trying to log you in", description: error.message });
       return;
     }
-    if (await mfaNeeded()) { setMfa(true); return; }
-    navigate({ to: "/dashboard" });
+    if (await mfaNeeded()) { setBusy(false); setMfa(true); return; }
+    // Keep the spinner until the dashboard has opened.
+    await navigate({ to: "/dashboard" });
+    setBusy(false);
   };
   return (
     <main className="min-h-dvh bg-background lg:flex lg:items-center lg:justify-center lg:bg-secondary lg:p-8">
@@ -100,8 +106,8 @@ function Login() {
               <SwitchField checked={remember} onCheckedChange={setRemember} label={<span className="text-muted-foreground">Remember me</span>} className="flex-row-reverse justify-end" />
               <Link to="/forgot-password" className="font-semibold text-foreground hover:text-primary">Forgot Password?</Link>
             </div>
-            <button type="submit" className="signup-primary group flex items-center justify-center gap-2 text-sm">
-              Log In <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
+            <button type="submit" disabled={busy} aria-busy={busy} className="signup-primary group flex items-center justify-center gap-2 text-sm disabled:opacity-80">
+              {busy ? <><Spinner />Signing in…</> : <>Log In <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" /></>}
             </button>
           </form>}
 

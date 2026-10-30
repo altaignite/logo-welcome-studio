@@ -1,4 +1,5 @@
 import { createFileRoute, getRouteApi, useNavigate } from "@tanstack/react-router";
+import { ErrorState, TableSkeleton } from "@/components/loading";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { DataTable, StatusBadge } from "@/components/admin/data-table";
@@ -46,7 +47,7 @@ function Support() {
       <div className="flex flex-wrap gap-2">
         {tabs.map((t) => <button key={t} type="button" onClick={() => setTab(t)} className={`rounded-full border px-4 py-1.5 text-sm ${tab === t ? "border-foreground bg-foreground text-background" : "bg-card"}`}>{tabLabel(t)} <span className="opacity-60">{data.filter((d: Ticket) => inTab(d, t)).length}</span></button>)}
       </div>
-      {error ? <p className="text-sm text-destructive">{(error as Error).message}</p> : isLoading ? <p className="text-sm text-muted-foreground">Loading tickets…</p> :
+      {error ? <ErrorState error={error} retry={() => location.reload()} /> : isLoading ? <TableSkeleton /> :
         <DataTable<Ticket> title="Support tickets" rows={shown} getId={(r) => r.id} empty="No tickets here."
           onRowClick={(r) => navigate({ to: "/admin/records/$kind/$id", params: { kind: "support_tickets", id: r.id } })}
           bulkActions={[

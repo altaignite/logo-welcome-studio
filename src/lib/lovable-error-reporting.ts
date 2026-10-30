@@ -24,7 +24,7 @@ declare global {
   }
 }
 
-export function reportLovableError(error: unknown, context: Record<string, unknown> = {}) {
+export function reportLovableError(error: unknown, context: Record<string, unknown> = {}, opts: { handled?: boolean; severity?: "error" | "warning" } = {}) {
   if (typeof window === "undefined") return;
   window.__lovableEvents?.captureException?.(
     error,
@@ -34,9 +34,9 @@ export function reportLovableError(error: unknown, context: Record<string, unkno
       ...context,
     },
     {
-      mechanism: "react_error_boundary",
-      handled: false,
-      severity: "error",
+      mechanism: opts.handled ? "manual" : "react_error_boundary",
+      handled: opts.handled ?? false,
+      severity: opts.severity ?? "error",
     },
   );
   // Prod React does not rethrow boundary-caught errors to window.onerror, so the

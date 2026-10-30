@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { ErrorState, PageSkeleton } from "@/components/loading";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { KeyRound, LogOut, MapPin, ShieldOff } from "lucide-react";
@@ -22,8 +23,8 @@ export function AccountSecurity({ userId, adminEmail }: { userId: string; adminE
   const { data, isLoading, error } = useQuery({ queryKey: key, queryFn: () => load({ data: { userId } }) });
   const refresh = () => qc.invalidateQueries({ queryKey: ["admin"] });
   const fail = (e: unknown) => popup({ type: "error", title: "Something went wrong", description: (e as Error).message, primaryLabel: "Close", secondaryLabel: null });
-  if (error) return <p className="text-sm text-destructive">{(error as Error).message}</p>;
-  if (isLoading || !data) return <p className="text-sm text-muted-foreground">Loading sign-in details…</p>;
+  if (error) return <ErrorState error={error} retry={() => location.reload()} />;
+  if (isLoading || !data) return <PageSkeleton />;
   const reason = (title: string, submitLabel: string, description: string, run: (r: string) => Promise<unknown>) => setModal({
     title, submitLabel, description, fields: [{ name: "reason", label: "Reason (saved in the audit log)", type: "textarea", required: true }],
     onSubmit: async (v) => { try { await run(v.reason); await refresh(); return null; } catch (e) { return (e as Error).message; } },

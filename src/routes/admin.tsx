@@ -1,12 +1,12 @@
-import { createFileRoute, Link, Outlet, redirect, useNavigate, useRouterState } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { BarChart3, FileCheck2, FileText, FolderKanban, LayoutDashboard, LifeBuoy, ListChecks, LogOut, Mail, Menu, PhoneCall, Receipt, Repeat, Settings, ShieldCheck, UserCog, Users, Wallet, X } from "lucide-react";
+import { BarChart3, Contact, FileCheck2, FileText, FolderKanban, LayoutDashboard, LifeBuoy, ListChecks, LogOut, Mail, Menu, PhoneCall, Receipt, Repeat, Settings, ShieldCheck, UserCog, Users, Wallet, X } from "lucide-react";
 import logo from "@/assets/logo.png.asset.json";
 import { supabase } from "@/integrations/supabase/client";
 import { NotificationBell } from "@/components/notifications";
-import { mfaNeeded } from "@/components/mfa";
-import { touchSession } from "@/lib/account-security.functions";
+import { guardStaff } from "@/lib/session-guard";
+import { AppLoader } from "@/components/loading";
 import { GlobalSearch } from "@/components/admin/search";
 import { useStaff } from "@/components/admin/staff";
 import { levelLabel, type StaffLevel } from "@/lib/staff";
@@ -24,18 +24,9 @@ export const Route = createFileRoute("/admin")({
       { name: "robots", content: "noindex" },
     ],
   }),
-  beforeLoad: async () => {
-    const { data } = await supabase.auth.getUser();
-    if (!data.user) throw redirect({ to: "/admin-login" });
-    const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: data.user.id, _role: "admin" });
-    if (!isAdmin) throw redirect({ to: "/admin-login" });
-    if (await mfaNeeded()) throw redirect({ to: "/admin-login" });
-    // Records the sign-in location and refuses suspended or closed accounts on the server; sign them out here too.
-    try { await touchSession(); } catch (e) {
-      if (/suspended|closed/i.test((e as Error).message)) { await supabase.auth.signOut(); throw redirect({ to: "/admin-login" }); }
-    }
-    return { adminEmail: data.user.email ?? "", adminId: data.user.id };
-  },
+  beforeLoad: () => guardStaff(),
+  pendingComponent: () => <AppLoader label="Opening the admin" />,
+
   component: AdminLayout,
 });
 
@@ -44,6 +35,7 @@ const nav = [
     { to: "/admin", label: "Overview", icon: LayoutDashboard, exact: true },
     { to: "/admin/accounts", label: "Accounts", icon: Users },
     { to: "/admin/applications", label: "Applications", icon: FileText },
+    { to: "/admin/records/contacts", kind: "contacts", label: "Contacts", icon: Contact },
   ] },
   { group: "Work", items: [
     { to: "/admin/taskforce", label: "Taskforce", icon: ListChecks },

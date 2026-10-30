@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { Spinner } from "@/components/loading";
 import { useEffect, useState, type FormEvent } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { usePopup } from "@/components/popup";
@@ -52,7 +53,7 @@ function Reset() {
             <input name="password" type="password" autoComplete="new-password" className="signup-input" /></label>
           <label className="block space-y-1.5"><span className="block text-[13px] font-medium">Confirm password<span className="text-primary">*</span></span>
             <input name="confirm" type="password" autoComplete="new-password" className="signup-input" /></label>
-          <button type="submit" disabled={busy} className="signup-primary text-sm">{busy ? "Saving…" : "Update password"}</button>
+          <button type="submit" disabled={busy} className="signup-primary inline-flex items-center justify-center gap-2 text-sm">{busy && <Spinner />}{busy ? "Saving…" : "Update password"}</button>
         </form>
       ) : (
         <button type="button" onClick={() => navigate({ to: "/forgot-password" })} className="signup-primary text-sm">Request a new link</button>

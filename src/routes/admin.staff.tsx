@@ -1,4 +1,5 @@
 import { createFileRoute, getRouteApi } from "@tanstack/react-router";
+import { ErrorState, TableSkeleton } from "@/components/loading";
 import { useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
@@ -45,7 +46,7 @@ function Staff() {
   return (
     <div className="space-y-6">
       <div><h1 className="text-2xl font-extrabold sm:text-3xl">Staff and security</h1><p className="mt-1 text-sm text-muted-foreground">Staff accounts are created by signing up with a verified company email. New staff start with view-only access.</p></div>
-      {s.error ? <p className="text-sm text-destructive">{(s.error as Error).message}</p> : s.isLoading ? <p className="text-sm text-muted-foreground">Loading staff…</p> :
+      {s.error ? <ErrorState error={s.error} retry={() => location.reload()} /> : s.isLoading ? <TableSkeleton /> :
         <DataTable<StaffRow> title="Staff" rows={s.staff} empty="No staff yet." columns={[
           { key: "email", label: "Email", value: (r) => r.email ?? "" },
           { key: "name", label: "Name", value: (r) => r.name ?? "" },

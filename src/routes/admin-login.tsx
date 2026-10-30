@@ -4,6 +4,7 @@ import { Lock, Mail, ShieldCheck } from "lucide-react";
 import logo from "@/assets/logo.png.asset.json";
 import { supabase } from "@/integrations/supabase/client";
 import { usePopup } from "@/components/popup";
+import { Spinner } from "@/components/loading";
 import { passwordIssue } from "@/lib/client";
 import { MfaChallenge, mfaNeeded } from "@/components/mfa";
 
@@ -79,7 +80,7 @@ function AdminLogin() {
             <span className="relative block"><Mail className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><input name="email" type="email" autoComplete="email" className="signup-input pl-10" placeholder={`name${DOMAIN}`} /></span></label>
           <label className="block space-y-1.5"><span className="text-[13px] font-medium">Password<span className="text-primary">*</span></span>
             <span className="relative block"><Lock className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><input name="password" type="password" autoComplete={mode === "in" ? "current-password" : "new-password"} className="signup-input pl-10" /></span></label>
-          <button type="submit" disabled={busy} className="signup-primary inline-flex items-center justify-center gap-2"><ShieldCheck className="size-4" />{busy ? "Please wait…" : mode === "in" ? "Sign in" : "Create account"}</button>
+          <button type="submit" disabled={busy} className="signup-primary inline-flex items-center justify-center gap-2">{busy ? <Spinner /> : <ShieldCheck className="size-4" />}{busy ? "Signing in…" : mode === "in" ? "Sign in" : "Create account"}</button>
         </form>
         {mode === "in" && <Link to="/forgot-password" className="mt-4 block text-center text-sm font-semibold hover:text-primary">Forgot password?</Link>}
         <button type="button" onClick={() => setMode(mode === "in" ? "up" : "in")} className="mt-4 w-full text-center text-sm text-muted-foreground hover:text-foreground">

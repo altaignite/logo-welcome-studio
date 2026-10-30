@@ -1,4 +1,5 @@
 import { createFileRoute, notFound, useNavigate } from "@tanstack/react-router";
+import { ErrorState, PageSkeleton, SectionSkeleton } from "@/components/loading";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -33,8 +34,8 @@ function SectionPage() {
   const { data, isLoading, error } = useClient();
   const a = useClientActions();
   const navigate = useNavigate();
-  if (error) return <p className="text-sm text-destructive">{(error as Error).message}</p>;
-  if (isLoading || !data) return <p className="text-sm text-muted-foreground">Loading…</p>;
+  if (error) return <ErrorState error={error} retry={() => location.reload()} />;
+  if (isLoading || !data) return <PageSkeleton />;
   const open = (kind: RecordKind) => (r: R) => navigate({ to: "/dashboard/$kind/$id", params: { kind, id: r.id } });
   const subName = (id: string | null) => data.subs.find((s) => s.id === id)?.plan_name ?? "—";
   const s = section as S;
@@ -252,7 +253,7 @@ function DocumentsPanel({ docs, refresh }: { docs: R[]; refresh: () => Promise<v
       <DocumentList docs={mine} empty="No files yet. Upload your logo or brand guide to get started." />
     </Section>
     <Section title="Signed agreements">
-      {agreements.isLoading ? <p className="p-5 text-sm text-muted-foreground">Loading…</p> : <AgreementList agreements={agreements.data ?? []} empty="Agreements you sign appear here." />}
+      {agreements.isLoading ? <SectionSkeleton /> : <AgreementList agreements={agreements.data ?? []} empty="Agreements you sign appear here." />}
     </Section>
     {docs.some((d) => d.kind === "deliverable" || d.kind === "report") && <Section title="Files from deliverables and reports"><DocumentList docs={docs.filter((d) => d.kind === "deliverable" || d.kind === "report")} /></Section>}
   </div>;

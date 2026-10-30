@@ -1,4 +1,5 @@
 import { createFileRoute, getRouteApi, useNavigate } from "@tanstack/react-router";
+import { ErrorState, TableSkeleton } from "@/components/loading";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { DataTable, StatusBadge } from "@/components/admin/data-table";
@@ -102,7 +103,7 @@ function Taskforce() {
         <select aria-label="Priority" className={sel} value={filter.priority} onChange={(e) => setFilter({ ...filter, priority: e.target.value })}><option value="">Any priority</option>{priorities.map((c) => <option key={c}>{c}</option>)}</select>
         <SwitchField checked={filter.overdue} onCheckedChange={(v) => setFilter({ ...filter, overdue: v })} label="Overdue only" />
       </div>
-      {error ? <p className="text-sm text-destructive">{(error as Error).message}</p> : isLoading ? <p className="text-sm text-muted-foreground">Loading tasks…</p> : view === "board" ? (
+      {error ? <ErrorState error={error} retry={() => location.reload()} /> : isLoading ? <TableSkeleton /> : view === "board" ? (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {columns.map(([key, label]) => {
             const list = shown.filter((t) => (key === "open" ? !["in_progress", "review", "completed"].includes(t.status) : t.status === key));

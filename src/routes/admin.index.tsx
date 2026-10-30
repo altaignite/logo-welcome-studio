@@ -1,4 +1,5 @@
 import { createFileRoute, getRouteApi, Link } from "@tanstack/react-router";
+import { ErrorState, PageSkeleton } from "@/components/loading";
 import { useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
@@ -38,8 +39,8 @@ function Overview() {
       return { signIns, subs, invoices, txs, apps, tickets, tasks, follow, privacy, deliverables, clients: profiles.filter((p: R) => !staff.has(p.id)) };
     },
   });
-  if (error) return <p className="text-sm text-destructive">{(error as Error).message}</p>;
-  if (isLoading || !data) return <p className="text-sm text-muted-foreground">Loading overview…</p>;
+  if (error) return <ErrorState error={error} retry={() => location.reload()} />;
+  if (isLoading || !data) return <PageSkeleton />;
   const today = new Date().toISOString().slice(0, 10);
   const rec = receivables(data.invoices);
   const hours = hoursUse(data.subs);

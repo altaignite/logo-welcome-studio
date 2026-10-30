@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { ErrorState, TableSkeleton } from "@/components/loading";
 import { SwitchField } from "@/components/switch-field";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
@@ -56,7 +57,7 @@ function Applications() {
           </button>
         ))}
       </div>
-      {error ? <p className="text-sm text-destructive">{(error as Error).message}</p> : isLoading ? <p className="text-sm text-muted-foreground">Loading applications…</p> :
+      {error ? <ErrorState error={error} retry={() => location.reload()} /> : isLoading ? <TableSkeleton /> :
         <DataTable<Row> title="Applications" rows={rows} getId={(r) => r.id}
           toolbar={<SwitchField checked={showArchived} onCheckedChange={setShowArchived} label="Show archived" />}
           bulkActions={[bulk("Assign to me", { assigned_to: adminEmail }), bulk("Start review", { status: "in_review", assigned_to: adminEmail }, "submitted", "in_review"), bulk("Archive", { archived_at: new Date().toISOString() })]} onRowClick={(r) => navigate({ to: "/admin/applications/$id", params: { id: r.id } })} empty="No applications match." columns={[

@@ -1,4 +1,5 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { ErrorState, PageSkeleton } from "@/components/loading";
 import type { ReactNode } from "react";
 import { ArrowLeft } from "lucide-react";
 import { DataTable, StatusBadge } from "@/components/admin/data-table";
@@ -30,8 +31,8 @@ function Details() {
   const kind = k as RecordKind;
   const { data, isLoading, error, userId } = useClient();
   const a = useClientActions();
-  if (error) return <p className="text-sm text-destructive">{(error as Error).message}</p>;
-  if (isLoading || !data) return <p className="text-sm text-muted-foreground">Loading…</p>;
+  if (error) return <ErrorState error={error} retry={() => location.reload()} />;
+  if (isLoading || !data) return <PageSkeleton />;
   const list: Record<RecordKind, R[]> = { subscription: data.subs, project: data.projects, task: data.tasks, invoice: data.invoices, payment: data.payments, application: data.apps, ticket: data.tickets, deliverable: data.deliverables, report: data.reports };
   const docsFor = (table: string, rid: string) => data.documents.filter((d: R) => d.related_table === table && d.related_id === rid);
   const r = list[kind].find((x) => x.id === id);

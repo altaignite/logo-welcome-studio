@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { PageSkeleton } from "@/components/loading";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
@@ -19,7 +20,7 @@ function Settings() {
   const { data } = useQuery({ queryKey: ["admin", "billing-rules"], queryFn: async () => ((await db.from("billing_settings").select("*").eq("id", 1).maybeSingle()).data ?? defaultRules) as BillingRules });
   const [r, setR] = useState<BillingRules | null>(null);
   useEffect(() => { if (data) setR(data); }, [data]);
-  if (!r) return <p className="text-sm text-muted-foreground">Loading…</p>;
+  if (!r) return <PageSkeleton />;
   const num = (v: string) => Math.max(0, Number(v) || 0);
   const save = async () => {
     const { error } = await db.from("billing_settings").update({ ...r, updated_at: new Date().toISOString() }).eq("id", 1);

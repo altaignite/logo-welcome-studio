@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { Switch } from "@/components/ui/switch";
+import { Spinner } from "@/components/loading";
 
 export type FieldDef = {
   name: string; label: string; type?: "text" | "textarea" | "number" | "date" | "select" | "email" | "url"; options?: string[];
@@ -52,7 +53,7 @@ export function FormModal({ title, description, fields, submitLabel, onSubmit, o
         </div>
         {err && <p className="mt-3 text-sm text-destructive">{err}</p>}
         <div className="mt-5 grid gap-2">
-          <button type="submit" disabled={busy} className="signup-primary">{busy ? "Saving…" : submitLabel}</button>
+          <button type="submit" disabled={busy} aria-busy={busy} className="signup-primary inline-flex items-center justify-center gap-2">{busy && <Spinner />}{busy ? "Saving…" : submitLabel}</button>
           <button type="button" onClick={onClose} className="app-modal-secondary">Cancel</button>
         </div>
       </form>

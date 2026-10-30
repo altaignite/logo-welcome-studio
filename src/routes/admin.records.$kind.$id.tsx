@@ -1,4 +1,5 @@
 import { createFileRoute, Link, getRouteApi, useNavigate } from "@tanstack/react-router";
+import { ErrorState, PageSkeleton } from "@/components/loading";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { approveOverage, billOverage, collectionAction, createInvoice, guaranteeRefund, sendFirstInvoice, subscriptionAction, voidInvoices } from "@/lib/billing.functions";
@@ -55,8 +56,8 @@ function RecordPage() {
   const done = async (e: { message: string } | null) => { if (e) return e.message; await refresh(); return null; };
 
   if (!cfg) return <p className="text-sm text-muted-foreground">This record type doesn't exist.</p>;
-  if (error) return <p className="text-sm text-destructive">{(error as Error).message}</p>;
-  if (isLoading || data === undefined) return <p className="text-sm text-muted-foreground">Loading…</p>;
+  if (error) return <ErrorState error={error} retry={() => location.reload()} />;
+  if (isLoading || data === undefined) return <PageSkeleton />;
   if (!data) return <p className="text-sm text-muted-foreground">This {cfg.singular.toLowerCase()} doesn't exist.</p>;
   const { row, profile } = data;
   const actor = { actor_id: adminId, actor_label: adminEmail };

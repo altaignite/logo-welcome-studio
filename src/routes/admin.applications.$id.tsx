@@ -1,4 +1,5 @@
 import { createFileRoute, Link, getRouteApi, useNavigate } from "@tanstack/react-router";
+import { ErrorState, PageSkeleton } from "@/components/loading";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
@@ -62,8 +63,8 @@ function ApplicationDetail() {
   const log = (action: string, extra: { from_status?: AppStatus; to_status?: AppStatus; note?: string | null } = {}) =>
     supabase.from("application_events").insert({ application_id: id, actor_id: adminId, actor_label: adminEmail, action, ...extra });
 
-  if (error) return <p className="text-sm text-destructive">{(error as Error).message}</p>;
-  if (isLoading) return <p className="text-sm text-muted-foreground">Loading application…</p>;
+  if (error) return <ErrorState error={error} retry={() => location.reload()} />;
+  if (isLoading) return <PageSkeleton />;
   if (!data) return <p className="text-sm text-muted-foreground">This application doesn't exist.</p>;
   const { app, profile, events } = data;
 
