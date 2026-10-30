@@ -21,7 +21,7 @@ function Overview() {
   const warnings = [
     ...data.subs.filter((s) => s.payment_warning).map((s) => `${s.plan_name} plan: ${s.payment_warning}`),
     ...live.filter((s) => Number(s.hours_used) > Number(s.monthly_hours)).map((s) => `${s.plan_name} plan is ${Number(s.hours_used) - Number(s.monthly_hours)} hours over its monthly allowance. Extra hours are billed separately.`),
-    ...unpaid.filter((i) => i.status === "overdue").map((i) => `Invoice ${i.number} is overdue. Interest of 5% per month is added until it's paid.`),
+    ...unpaid.filter((i) => i.status === "overdue").map((i) => `Invoice ${i.number} is overdue. Interest is added each month until it's paid, as set out in your Collections and Debt Recovery Policy.`),
   ];
   const p = data.profile;
   const reviews = data.deliverables.filter((d: R) => d.status === "in_review");

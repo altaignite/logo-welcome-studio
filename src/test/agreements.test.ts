@@ -37,7 +37,7 @@ describe("collections policy", () => {
   it("states the real stages, rates and fees", () => {
     const body = agreementDocuments(plans[0]).find((d) => d.title === "Collections and Debt Recovery Policy")!.body;
     expect(body).toContain("Day 90 after the due date");
-    expect(body).toContain("5% per month, compounded monthly");
+    expect(body).toContain("1.24% per month, compounded monthly");
     expect(body).toContain("15% of the outstanding balance, with a minimum of US$40.00");
     const tables = parseAgreement(body).filter((b) => b.kind === "table");
     expect(tables.length).toBeGreaterThanOrEqual(2);

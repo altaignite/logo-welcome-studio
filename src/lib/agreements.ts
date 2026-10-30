@@ -19,7 +19,7 @@ export const companyLine = `${company.legalName}, ${company.entity} doing busine
 export type AgreementClient = { name: string; company?: string | null; email?: string | null; phone?: string | null; country?: string | null; address?: string | null; accountNumber?: string | null };
 
 /** Bump when agreement wording changes; signed copies record the version they were rendered from. */
-export const AGREEMENT_VERSION = "2026-10-30.6";
+export const AGREEMENT_VERSION = "2026-10-30.7";
 
 /**
  * Agreement body markup, shared by the reading dialog and the PDF:

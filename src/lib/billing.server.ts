@@ -1,6 +1,6 @@
 /** Server-only billing workflows shared by server functions, the Stripe webhook and the daily collections job. */
 import { audit, cents, ensureCustomer, planPrice, stripe } from "@/lib/stripe.server";
-import { invoiceKind, nextRenewalAt } from "@/lib/billing";
+import { cappedInterestPct, invoiceKind, nextRenewalAt } from "@/lib/billing";
 import { autoStage, compoundInterest, daysOverdue, defaultRules, failedPaymentVoidsGuarantee, legalFee, monthsOverdue, round2, type BillingRules, type CollectionStage } from "@/lib/billing";
 import { clientActionsBlocked, guaranteeEnd } from "@/lib/admin";
 
@@ -156,7 +156,7 @@ export async function runCollections(admin: Admin, now = new Date()) {
     if (stage === "settled" || stage === "written_off") continue;
     const patch: any = { status: "overdue" };
     if (!inv.interest_paused) {
-      const target = compoundInterest(Number(inv.amount), monthsOverdue(inv.due_at, now), Number(rules.monthly_interest_pct));
+      const target = compoundInterest(Number(inv.amount), monthsOverdue(inv.due_at, now), cappedInterestPct(Number(rules.monthly_interest_pct)));
       const delta = round2(target - Number(inv.interest_accrued));
       if (delta > 0) {
         must(await admin.from("invoice_charges").insert({ user_id: inv.user_id, invoice_id: inv.id, subscription_id: inv.subscription_id, kind: "interest", description: `Interest at ${rules.monthly_interest_pct}% monthly, compounded`, amount: delta }));

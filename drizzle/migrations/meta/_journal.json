@@ -169,6 +169,13 @@
       "when": 1793326364660,
       "tag": "0023_account_change_requests",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1793326365660,
+      "tag": "0024_ny_interest_cap",
+      "breakpoints": true
     }
   ]
 }

@@ -48,6 +48,7 @@ function SecurityPage() {
     <div className="space-y-6">
       <div><h1 className="text-2xl font-extrabold sm:text-3xl">Security log</h1>
         <p className="mt-1 text-sm text-muted-foreground">What the server blocked or flagged, possible data leaks, and what to do. Repeats are grouped per source and hour. Network floods stopped by Cloudflare before reaching the app appear in your hosting analytics, not here.</p></div>
+      <div className={`rounded-xl border p-3 text-sm ${d.botProtection ? "" : "border-destructive/30 bg-destructive/5"}`}>{d.botProtection ? "Bot protection (Cloudflare Turnstile) is on for signup, login and password resets." : "Bot protection is off. Create a Turnstile widget in Cloudflare and add TURNSTILE_SITE_KEY and TURNSTILE_SECRET_KEY to Lovable's secrets to turn it on."}</div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {stat("Open events", openEvents.length, `${openEvents.filter((e) => severityRank[e.severity]! >= 3).length} high or critical`)}
         {stat("Blocked attempts, 24 h", attacks24, "Rate limits, probes, fakes and refusals")}

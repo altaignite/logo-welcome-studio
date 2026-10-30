@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { CountryField } from "@/components/country-field";
 import { MfaChallenge, mfaNeeded } from "@/components/mfa";
 import { Spinner } from "@/components/loading";
+import { useTurnstile } from "@/components/turnstile";
 import { useServerFn } from "@tanstack/react-start";
 import { orderAdditionalPlan } from "@/lib/client.functions";
 import { usePopup } from "@/components/popup";
@@ -48,6 +49,8 @@ function Signup() {
   const [existing, setExisting] = useState(false);
   const [gateBusy, setGateBusy] = useState(false);
   const [loginPassword, setLoginPassword] = useState("");
+  // Cloudflare Turnstile: tokens for the email check and Supabase sign-up, sign-in and reset (no-op until configured).
+  const bot = useTurnstile();
   const [selectedPlan, setSelectedPlan] = useState<Plan>(plans[0]);
   const [personal, setPersonal] = useState<PersonalDetails>({ firstName: "", lastName: "", company: "", country: "", phone: "" });
   const [phoneCountry, setPhoneCountry] = useState<string>("");
@@ -106,7 +109,7 @@ function Signup() {
     if (!valid.success) { popup({ type: "error", title: "Let's check your email", description: valid.error.issues[0]?.message ?? "Enter a valid email address.", primaryLabel: "Try again", secondaryLabel: null }); return; }
     setGateBusy(true);
     try {
-      const r = await fetch("/api/public/account-check", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email }) });
+      const r = await fetch("/api/public/account-check", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email, turnstile: await bot.getToken() }) });
       const body = (await r.json().catch(() => ({}))) as { exists?: boolean; error?: string; risk?: { suggestion?: string } };
       if (!r.ok) {
         const fix = body.risk?.suggestion;
@@ -125,7 +128,8 @@ function Signup() {
     event.preventDefault();
     if (!loginPassword) return;
     setGateBusy(true);
-    const { error } = await supabase.auth.signInWithPassword({ email: account.email.trim(), password: loginPassword });
+    const captcha = await bot.getToken();
+    const { error } = await supabase.auth.signInWithPassword({ email: account.email.trim(), password: loginPassword, ...(captcha ? { options: { captchaToken: captcha } } : {}) });
     if (error) {
       setGateBusy(false);
       // The plan is kept: after confirming, the client comes back to this tab and signs in.
@@ -141,7 +145,8 @@ function Signup() {
     finally { setGateBusy(false); }
   };
   const forgot = async () => {
-    await supabase.auth.resetPasswordForEmail(account.email.trim(), { redirectTo: `${window.location.origin}/reset-password` });
+    const captcha = await bot.getToken();
+    await supabase.auth.resetPasswordForEmail(account.email.trim(), { redirectTo: `${window.location.origin}/reset-password`, ...(captcha ? { captchaToken: captcha } : {}) });
     popup({ type: "success", title: "Check your email", description: `We sent a reset link to ${account.email.trim()}. Set a new password in the tab it opens, then come back here and sign in. Your order is kept on this page.`, primaryLabel: "Got it", secondaryLabel: null });
   };
   const advance = async (event: FormEvent) => {
@@ -162,9 +167,10 @@ function Signup() {
   };
   const openConfirmation = () => setConfirmOpen(true);
   const accept = async (): Promise<boolean> => {
+    const captcha = await bot.getToken();
     const { data, error } = await supabase.auth.signUp({
       email: account.email.trim(), password: account.password,
-      options: { emailRedirectTo: window.location.origin, data: {
+      options: { ...(captcha ? { captchaToken: captcha } : {}), emailRedirectTo: window.location.origin, data: {
         account_number: accountNumber, first_name: personal.firstName.trim(), last_name: personal.lastName.trim(), company: personal.company.trim(),
         country: personal.country, phone: personal.phone, plan_id: selectedPlan.id, plan_name: selectedPlan.name,
         monthly_fee: selectedPlan.monthlyFee, monthly_hours: selectedPlan.monthlyHours,
@@ -183,7 +189,7 @@ function Signup() {
     }
     // Security checks run when the account is created (for example a mobile number already used by another account).
     try {
-      const r = await fetch("/api/public/account-check", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: account.email.trim() }) });
+      const r = await fetch("/api/public/account-check", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: account.email.trim(), turnstile: await bot.getToken() }) });
       if (r.ok && ((await r.json()) as { restricted?: boolean }).restricted) { setConfirmOpen(false); window.location.assign("/kyc"); return true; }
     } catch { /* the check is best effort; staff still see the flag */ }
     setSignature({ name: `${personal.firstName} ${personal.lastName}`, at: new Date().toISOString() });
@@ -267,6 +273,7 @@ function Signup() {
       </section>
     </div>
     <SignDialog open={confirmOpen} onOpenChange={setConfirmOpen} title="Confirm your application" onSign={accept} />
+    <div className="pb-6">{bot.widget}</div>
   </main>;
 }
 

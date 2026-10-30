@@ -3,6 +3,7 @@ import { Spinner } from "@/components/loading";
 import { useState, type FormEvent } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { usePopup } from "@/components/popup";
+import { useTurnstile } from "@/components/turnstile";
 import { AuthShell } from "@/components/auth-shell";
 
 export const Route = createFileRoute("/forgot-password")({
@@ -21,13 +22,15 @@ export const Route = createFileRoute("/forgot-password")({
 
 function Forgot() {
   const popup = usePopup();
+  const bot = useTurnstile();
   const [busy, setBusy] = useState(false);
   const submit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const email = String(new FormData(e.currentTarget).get("email") ?? "").trim();
     if (!/^\S+@\S+\.\S+$/.test(email)) { popup({ type: "error", title: "Enter a valid email address", description: "We'll send the reset link there." }); return; }
     setBusy(true);
-    await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/reset-password` });
+    const captcha = await bot.getToken();
+    await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/reset-password`, ...(captcha ? { captchaToken: captcha } : {}) });
     setBusy(false);
     // Same message either way so the page never reveals which emails have accounts.
     popup({ type: "success", title: "Check your inbox", description: "If an account exists for this email, a reset link is on its way. It expires in one hour.", primaryLabel: "Got it", secondaryLabel: null });
@@ -40,6 +43,7 @@ function Forgot() {
           <input name="email" type="email" autoComplete="email" placeholder="Enter your email" className="signup-input" />
         </label>
         <button type="submit" disabled={busy} className="signup-primary inline-flex items-center justify-center gap-2 text-sm">{busy && <Spinner />}{busy ? "Sending…" : "Send reset link"}</button>
+            {bot.widget}
         <p className="text-center text-sm text-muted-foreground"><Link to="/" className="font-semibold text-foreground hover:text-primary">Back to login</Link></p>
       </form>
     </AuthShell>

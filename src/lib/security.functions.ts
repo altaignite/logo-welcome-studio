@@ -37,6 +37,7 @@ export const securityOverview = createServerFn({ method: "POST" })
       heaviestUsers: top.map(([id, count]) => { const p = names.find((n: { id: string }) => n.id === id) as { account_number?: string; email?: string } | undefined; return { id, count, account: p?.account_number ?? null, email: p?.email ?? null }; }),
       signIns: { total: signInRows.length, newLocations: (signIns.data ?? []).filter((s: { new_location: boolean }) => s.new_location), distinctIps: new Set(signInRows.map((s) => s.ip).filter(Boolean)).size },
       restricted: restricted.data ?? [],
+      botProtection: (await import("@/lib/turnstile.server")).turnstileConfigured(),
     };
   });
 

@@ -4,6 +4,11 @@
 export const cancelNowAllowed = (sub: { started_at: string | null; status: string }) => !sub.started_at && ["pending", "paused"].includes(sub.status);
 import { GUARANTEE_CLAIM_DAYS, GUARANTEE_DAYS } from "@/lib/admin";
 
+/** New York's civil usury cap is 16% a year (N.Y. Gen. Oblig. Law § 5-501, Banking Law § 14-a). Interest here compounds monthly,
+ * so 1.24% a month (about 15.9% a year) is the most that stays under it. Settings can't exceed this (database check, 0024). */
+export const NY_MAX_MONTHLY_INTEREST_PCT = 1.24;
+export const cappedInterestPct = (pct: number) => Math.min(Math.max(0, Number(pct) || 0), NY_MAX_MONTHLY_INTEREST_PCT);
+
 export type BillingRules = {
   overage_rates: Record<string, number>;
   overage_needs_approval: boolean;
@@ -17,7 +22,7 @@ export type BillingRules = {
 export const defaultRules: BillingRules = {
   overage_rates: { Starter: 60, Growth: 55, Scale: 50 },
   overage_needs_approval: true,
-  monthly_interest_pct: 5,
+  monthly_interest_pct: NY_MAX_MONTHLY_INTEREST_PCT,
   legal_after_days: 90,
   legal_fee_pct: 15,
   legal_fee_min: 40,

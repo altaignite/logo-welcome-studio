@@ -1,3 +1,4 @@
+import { NY_MAX_MONTHLY_INTEREST_PCT, cappedInterestPct } from "@/lib/billing";
 import { createFileRoute } from "@tanstack/react-router";
 import { PageSkeleton } from "@/components/loading";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -43,7 +44,7 @@ function Settings() {
       </Section>
       <Section title="Unpaid invoices">
         <div className="grid gap-4 p-5 sm:grid-cols-2">
-          <F label="Monthly interest, compounded (%)"><input className={input} type="number" value={r.monthly_interest_pct} onChange={(e) => setR({ ...r, monthly_interest_pct: num(e.target.value) })} /></F>
+          <F label={`Monthly interest, compounded (%), New York maximum ${NY_MAX_MONTHLY_INTEREST_PCT}`}><input className={input} type="number" step="0.01" min={0} max={NY_MAX_MONTHLY_INTEREST_PCT} value={r.monthly_interest_pct} onChange={(e) => setR({ ...r, monthly_interest_pct: cappedInterestPct(num(e.target.value)) })} /></F>
           <F label="Move to legal after (days unpaid)"><input className={input} type="number" value={r.legal_after_days} onChange={(e) => setR({ ...r, legal_after_days: num(e.target.value) })} /></F>
           <F label="Legal and collection fee (%)"><input className={input} type="number" value={r.legal_fee_pct} onChange={(e) => setR({ ...r, legal_fee_pct: num(e.target.value) })} /></F>
           <F label="Minimum legal fee (USD)"><input className={input} type="number" value={r.legal_fee_min} onChange={(e) => setR({ ...r, legal_fee_min: num(e.target.value) })} /></F>

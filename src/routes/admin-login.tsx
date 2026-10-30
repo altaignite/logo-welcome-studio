@@ -4,6 +4,7 @@ import { Lock, Mail, ShieldCheck } from "lucide-react";
 import logo from "@/assets/logo.png.asset.json";
 import { supabase } from "@/integrations/supabase/client";
 import { usePopup } from "@/components/popup";
+import { useTurnstile } from "@/components/turnstile";
 import { isUnconfirmedEmail, unconfirmedPopup } from "@/lib/email-confirmation";
 import { Spinner } from "@/components/loading";
 import { MfaChallenge, mfaNeeded } from "@/components/mfa";
@@ -30,6 +31,7 @@ function AdminLogin() {
   const [busy, setBusy] = useState(false);
   const [mfa, setMfa] = useState(false);
   const popup = usePopup();
+  const bot = useTurnstile();
   const navigate = useNavigate();
   useEffect(() => { void supabase.auth.getSession().then(async ({ data }) => { if (data.session && (await mfaNeeded())) setMfa(true); }); }, []);
   const submit = async (e: FormEvent<HTMLFormElement>) => {
@@ -39,7 +41,8 @@ function AdminLogin() {
     const password = String(f.get("password") ?? "");
     if (!email || !password) return popup(FAILED);
     setBusy(true);
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    const captcha = await bot.getToken();
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password, ...(captcha ? { options: { captchaToken: captcha } } : {}) });
     if (isUnconfirmedEmail(error)) { setBusy(false); return popup(unconfirmedPopup(email, popup, "/admin-login")); }
     if (error || !data.user) { setBusy(false); return popup(FAILED); }
     const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: data.user.id, _role: "admin" });
@@ -68,6 +71,7 @@ function AdminLogin() {
           <label className="block space-y-1.5"><span className="text-[13px] font-medium">Password<span className="text-primary">*</span></span>
             <span className="relative block"><Lock className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><input name="password" type="password" autoComplete="current-password" className="signup-input pl-10" /></span></label>
           <button type="submit" disabled={busy} className="signup-primary inline-flex items-center justify-center gap-2">{busy ? <Spinner /> : <ShieldCheck className="size-4" />}{busy ? "Signing in…" : "Sign in"}</button>
+            {bot.widget}
         </form>
         <Link to="/forgot-password" className="mt-4 block text-center text-sm font-semibold hover:text-primary">Forgot password?</Link>
         </>}
