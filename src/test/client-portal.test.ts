@@ -15,7 +15,7 @@ describe("plan changes", () => {
 });
 
 describe("password strength", () => {
-  it("rejects under 10 characters", () => expect(passwordIssue("Abc12345")).not.toBeNull());
+  it("rejects under 8 characters", () => expect(passwordIssue("Ab12345")).not.toBeNull());
   it("requires a number", () => expect(passwordIssue("Abcdefghijkl")).not.toBeNull());
   it("accepts a strong password", () => expect(passwordIssue("Tr0ub4dor&Horse")).toBeNull());
 });

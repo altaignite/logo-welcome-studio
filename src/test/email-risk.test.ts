@@ -27,7 +27,7 @@ describe("email risk", () => {
 
 describe("password rules", () => {
   it("need length, letters and numbers, and nothing from the email; no symbol or case rules", () => {
-    expect(passwordIssue("Short1")).toMatch(/12 characters/);
+    expect(passwordIssue("Short1")).toMatch(/8 characters/);
     expect(passwordIssue("onlyletterslong")).toMatch(/letters and numbers/);
     expect(passwordIssue("aaaaaaaaaaaa")).toMatch(/letters and numbers/);
     expect(passwordIssue("janedoe2026garden", "janedoe@acme.com")).toMatch(/email/);

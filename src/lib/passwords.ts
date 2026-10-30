@@ -1,6 +1,6 @@
 /** One password policy for signup, password resets, password changes and staff invitations. Length matters most (NIST 800-63B),
  * nothing from the person's own email, and no password found in data breaches. */
-export const PASSWORD_MIN = 12;
+export const PASSWORD_MIN = 8;
 export const PASSWORD_MAX = 128;
 
 /** A message when the password breaks a rule, or null. Kept short on purpose (NIST 800-63B): length and the breach check do the
