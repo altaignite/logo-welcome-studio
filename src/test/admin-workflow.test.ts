@@ -18,6 +18,6 @@ describe("Application workflow", () => {
 import { auditSummary } from "@/lib/admin";
 describe("audit summary", () => {
   it("shows from → to for updates", () => {
-    expect(auditSummary("update", { status: { from: "active", to: "suspended" } })).toBe("status: active → suspended");
+    expect(auditSummary("update", { status: { from: "active", to: "suspended" } })).toBe("Status: active → suspended");
   });
 });

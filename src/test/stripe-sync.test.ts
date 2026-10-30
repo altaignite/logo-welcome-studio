@@ -7,7 +7,7 @@ describe("Stripe status mapping", () => {
   it("maps invoice statuses, with past-due open invoices as overdue", () => {
     expect(localInvoiceStatus({ status: "paid" }, now)).toBe("paid");
     expect(localInvoiceStatus({ status: "void" }, now)).toBe("void");
-    expect(localInvoiceStatus({ status: "uncollectible" }, now)).toBe("overdue");
+    expect(localInvoiceStatus({ status: "uncollectible" }, now)).toBe("uncollectible");
     expect(localInvoiceStatus({ status: "open", due_date: Date.parse("2026-10-01") / 1000 }, now)).toBe("overdue");
     expect(localInvoiceStatus({ status: "open", due_date: Date.parse("2026-11-30") / 1000 }, now)).toBe("open");
     expect(localInvoiceStatus({ status: "draft" }, now)).toBeNull();
@@ -32,9 +32,9 @@ import { subscriptionStanding } from "@/lib/billing";
 describe("subscription standing follows its invoices", () => {
   const live = { status: "active", started_at: "2026-01-01T00:00:00Z" };
   const today = "2026-10-30";
-  it("is active with nothing unpaid, past due with an overdue invoice, suspended in recovery", () => {
+  it("is active with nothing unpaid, past due with anything unpaid, suspended in recovery", () => {
     expect(subscriptionStanding(live, [{ status: "paid", due_at: "2026-10-01" }, { status: "void", due_at: "2026-09-01" }], today)).toBe("active");
-    expect(subscriptionStanding(live, [{ status: "open", due_at: "2026-11-05" }], today)).toBe("active");
+    expect(subscriptionStanding(live, [{ status: "open", due_at: "2026-11-05" }], today)).toBe("past_due");
     expect(subscriptionStanding(live, [{ status: "open", due_at: "2026-10-01" }], today)).toBe("past_due");
     expect(subscriptionStanding({ ...live, status: "suspended" }, [{ status: "overdue", due_at: "2026-08-01", collection_stage: "legal" }], today)).toBe("suspended");
     expect(subscriptionStanding({ ...live, stripe_status: "unpaid" }, [{ status: "overdue", due_at: "2026-10-01" }], today)).toBe("suspended");

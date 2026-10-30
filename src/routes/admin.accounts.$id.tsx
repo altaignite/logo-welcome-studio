@@ -1,3 +1,4 @@
+import { countryName } from "@/lib/security";
 import { createFileRoute, Link, getRouteApi, useNavigate } from "@tanstack/react-router";
 import { ErrorState, PageSkeleton } from "@/components/loading";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -202,7 +203,7 @@ function AccountDetail() {
   const address = [p.address_line, p.city, p.state, p.postal_code].filter(Boolean).join(", ");
   const groups: [string, [string, string][]][] = [
     ["Company", [["Business name", p.company ?? "—"], ["Legal entity", p.legal_name ?? "—"], ["Tax ID", p.tax_id ?? "—"], ["Industry", p.industry ?? "—"], ["Company size", p.company_size ?? "—"], ["Website", p.website ?? "—"]]],
-    ["Contact", [["Name", `${p.first_name ?? ""} ${p.last_name ?? ""}`], ["Email", p.email ?? "—"], ["Mobile number", p.phone ?? "—"], ["Address", address || "—"], ["Country", p.country ?? "—"], ["Time zone", p.timezone ?? "—"]]],
+    ["Contact", [["Name", `${p.first_name ?? ""} ${p.last_name ?? ""}`], ["Email", p.email ?? "—"], ["Mobile number", p.phone ?? "—"], ["Address", address || "—"], ["Country", countryName(p.country) || "—"], ["Time zone", p.timezone ?? "—"]]],
     ["Account", [["Account number", formatAccount(p.account_number)], ["Status", stat(p.status)], ["Status reason", p.status_reason ?? "—"], ["Status changed", formatDate(p.status_changed_at)], ["Lifecycle stage", humanize(p.lifecycle_stage)], ["Account manager", p.account_manager ?? "—"], ["Lead source", p.lead_source ?? "—"], ["Agreement signed", formatDate(p.terms_accepted_at)], ["Joined", formatDate(p.created_at)]]],
   ];
 

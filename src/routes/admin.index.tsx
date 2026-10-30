@@ -1,3 +1,4 @@
+import { placeLabel } from "@/lib/security";
 import { createFileRoute, getRouteApi, Link } from "@tanstack/react-router";
 import { ErrorState, PageSkeleton } from "@/components/loading";
 import { useQuery } from "@tanstack/react-query";
@@ -101,7 +102,7 @@ function Overview() {
       </Section>
 
       <div className="space-y-6">
-        {data.signIns.length > 0 && list("New sign-in locations", data.signIns.map((x: R) => <li key={x.id}><Link to="/admin/accounts/$id" params={{ id: x.user_id }} className="flex items-center justify-between gap-3 px-5 py-3 hover:bg-secondary/60"><span className="min-w-0 truncate">{[x.city, x.region, x.country].filter(Boolean).join(", ") || x.ip || "Unknown location"}</span><span className="shrink-0 text-xs text-muted-foreground">{formatDay(x.created_at)}</span></Link></li>), "None to review.")}
+        {data.signIns.length > 0 && list("New sign-in locations", data.signIns.map((x: R) => <li key={x.id}><Link to="/admin/accounts/$id" params={{ id: x.user_id }} className="flex items-center justify-between gap-3 px-5 py-3 hover:bg-secondary/60"><span className="min-w-0 truncate">{placeLabel(x)}</span><span className="shrink-0 text-xs text-muted-foreground">{formatDay(x.created_at)}</span></Link></li>), "None to review.")}
         {list("Applications to review", data.apps.map((a: R) => row(a.id, { app: a.id }, `${a.plan_name} plan`, <StatusBadge status={a.status} />)), "No applications waiting.", "/admin/applications")}
         {list("Replies overdue", breached.map((t: R) => row(t.id, { kind: "support_tickets", id: t.id }, t.subject, `${t.priority}${mine(t.assigned_to) ? ", yours" : ""}`)), "Every ticket is answered on time.", "/admin/support")}
         {list("Follow-ups due", dueFollow.map((f: R) => row(f.id, { kind: "crm_activities", id: f.id }, f.subject, formatDay(f.follow_up_at))), "No follow-ups due.", "/admin/records/crm_activities")}

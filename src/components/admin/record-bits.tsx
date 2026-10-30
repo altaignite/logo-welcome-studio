@@ -3,7 +3,8 @@ import type { ReactNode } from "react";
 import { ArrowLeft, type LucideIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { StatusBadge } from "@/components/admin/data-table";
-import { accountStatusLabel, auditLines, formatAccount, formatDate, formatDay, humanize, money, type AccountStatus } from "@/lib/admin";
+import { accountStatusLabel, auditRows, formatAccount, formatDate, formatDay, humanize, money, type AccountStatus } from "@/lib/admin";
+const sentence = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 import type { Fmt } from "@/lib/records";
 import { metricsText } from "@/lib/work";
 
@@ -79,15 +80,28 @@ type Audit = { id: string; action: string; changes: unknown; actor_label: string
 export function AuditList({ rows, showTable }: { rows: Audit[]; showTable?: boolean }) {
   return (
     <ol className="divide-y">
-      {rows.map((r) => (
-        <li key={r.id} className="px-5 py-3">
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <p className="text-sm font-medium capitalize">{showTable ? `${humanize(r.table_name)} ${r.action}` : r.action}</p>
-            <p className="text-xs text-muted-foreground">{r.actor_label}, {formatDate(r.created_at)}</p>
-          </div>
-          <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground">{auditLines(r.action, r.changes).slice(0, 8).map((l, i) => <li key={i} className="break-words">{l}</li>)}</ul>
-        </li>
-      ))}
+      {rows.map((r) => {
+        const changes = auditRows(r.action, r.changes);
+        const diff = changes.some((c) => c.from != null);
+        return (
+          <li key={r.id} className="px-5 py-3">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <p className="text-sm font-medium">{sentence(`${showTable ? `${humanize(r.table_name)}: ` : ""}${humanize(r.action)}`)}</p>
+              <p className="text-xs text-muted-foreground">{r.actor_label}, {formatDate(r.created_at)}</p>
+            </div>
+            {changes.length > 0 && <div className="mt-2 overflow-x-auto rounded-lg border">
+              <table className="w-full table-fixed text-left text-xs">
+                <thead className="bg-secondary/60 text-muted-foreground"><tr><th className="w-1/4 px-3 py-1.5 font-medium">Field</th>{diff && <th className="px-3 py-1.5 font-medium">Before</th>}<th className="px-3 py-1.5 font-medium">{diff ? "After" : "Value"}</th></tr></thead>
+                <tbody className="divide-y">{changes.map((c, i) => <tr key={i} className="align-top">
+                  <td className="px-3 py-1.5 font-medium">{c.field}</td>
+                  {diff && <td className="truncate px-3 py-1.5 text-muted-foreground" title={c.from ?? ""}>{c.from ?? "—"}</td>}
+                  <td className="truncate px-3 py-1.5" title={c.to}>{c.to}</td>
+                </tr>)}</tbody>
+              </table>
+            </div>}
+          </li>
+        );
+      })}
       {rows.length === 0 && <li className="px-5 py-6 text-sm text-muted-foreground">No changes recorded yet.</li>}
     </ol>
   );

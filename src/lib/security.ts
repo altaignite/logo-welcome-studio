@@ -30,7 +30,14 @@ export function isNewLocation(place: SignInPlace, previous: SignInPlace[]) {
   return !previous.some((p) => locationKey(p) === key);
 }
 
-export const placeLabel = (p: Partial<SignInPlace>) => [p.city, p.region, p.country].filter(Boolean).join(", ") || p.ip || "Unknown location";
+/** Full English country name for a two-letter code ("NL" → "Netherlands"); anything else is returned as it is. */
+export function countryName(code: string | null | undefined): string {
+  if (!code) return "";
+  const c = code.trim();
+  if (!/^[A-Za-z]{2}$/.test(c) || /^(XX|T1)$/i.test(c)) return c;
+  try { return new Intl.DisplayNames(["en"], { type: "region" }).of(c.toUpperCase()) ?? c; } catch { return c; }
+}
+export const placeLabel = (p: Partial<SignInPlace>) => [p.city, p.region, countryName(p.country)].filter(Boolean).join(", ") || p.ip || "Unknown location";
 
 /** Basic browser and device description from a user agent, for the sessions list. */
 export function deviceLabel(ua: string | null | undefined) {

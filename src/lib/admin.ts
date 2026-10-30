@@ -1,3 +1,4 @@
+import { countryName } from "@/lib/security";
 import type { Database } from "@/integrations/supabase/types";
 
 export type AppStatus = Database["public"]["Enums"]["application_status"];
@@ -113,16 +114,33 @@ export const lifecycleStages = ["onboarding", "active", "at_risk", "churned", "w
 export const complianceKinds = ["access", "deletion", "correction", "opt_out_of_sale", "marketing_opt_out"] as const;
 
 /** Readable lines for an audit log entry, one per changed field. */
-export function auditLines(action: string, changes: unknown): string[] {
-  if (!changes || typeof changes !== "object") return [action];
-  const c = changes as Record<string, unknown>;
-  if (action !== "update") {
-    const pick = ["subject", "name", "title", "number", "reference", "kind", "status", "amount", "hours", "plan_name"].filter((k) => c[k] != null);
-    return pick.length ? pick.map((k) => `${humanize(k)}: ${String(c[k])}`) : [action];
+/** A readable audit value: dates formatted, yes/no for booleans, status codes in words, nested values flattened. */
+export function auditValue(v: unknown): string {
+  if (v == null || v === "") return "—";
+  if (typeof v === "boolean") return v ? "Yes" : "No";
+  if (typeof v === "number") return String(v);
+  if (typeof v === "string") {
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(v) && !Number.isNaN(Date.parse(v))) return formatDate(v);
+    if (/^[a-z]+(_[a-z]+)+$/.test(v)) return humanize(v);
+    return v;
   }
-  return Object.entries(c).map(([k, v]) => {
-    const d = v as { from?: unknown; to?: unknown };
-    return `${humanize(k)}: ${d.from ?? "—"} → ${d.to ?? "—"}`;
-  });
+  if (Array.isArray(v)) return v.map(auditValue).join(", ") || "—";
+  return Object.entries(v as Record<string, unknown>).map(([k, x]) => `${fieldLabel(k)}: ${auditValue(x)}`).join(", ") || "—";
+}
+const fieldLabel = (k: string) => { const h = humanize(k); return h.charAt(0).toUpperCase() + h.slice(1); };
+const isChange = (v: unknown): v is { from?: unknown; to?: unknown } => !!v && typeof v === "object" && !Array.isArray(v) && ("from" in v || "to" in v);
+
+/** One row per changed field. Updates and status changes show before and after; other actions show the key details. */
+export function auditRows(action: string, changes: unknown): { field: string; from: string | null; to: string }[] {
+  if (!changes || typeof changes !== "object") return [];
+  const c = changes as Record<string, unknown>;
+  const entries = action === "update" || Object.values(c).some(isChange) ? Object.entries(c)
+    : ["subject", "name", "title", "number", "reference", "kind", "status", "amount", "hours", "plan_name", "reason"].filter((k) => c[k] != null).map((k) => [k, c[k]] as const);
+  const val = (k: string, x: unknown) => (k === "country" && typeof x === "string" ? countryName(x) || "—" : auditValue(x));
+  return entries.map(([k, v]) => isChange(v) ? { field: fieldLabel(k), from: val(k, v.from), to: val(k, v.to) } : { field: fieldLabel(k), from: null, to: val(k, v) });
+}
+export function auditLines(action: string, changes: unknown): string[] {
+  const rows = auditRows(action, changes);
+  return rows.length ? rows.map((r) => `${r.field}: ${r.from != null ? `${r.from} → ` : ""}${r.to}`) : [humanize(action)];
 }
 export const auditSummary = (action: string, changes: unknown) => auditLines(action, changes).join("; ");
