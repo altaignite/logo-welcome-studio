@@ -29,6 +29,7 @@ export const rateLimits = {
   collections: { max: 120, windowSec: 3600, message: "Too many collections actions in an hour." },
   stripeImport: { max: 600, windowSec: 3600, message: "The import is running too often. Try again in an hour." },
   stripeSync: { max: 6, windowSec: 3600, message: "Stripe was synced several times this hour. The daily sync also runs on its own." },
+  stripeSetup: { max: 5, windowSec: 3600, message: "The webhook was set up several times this hour. Try again later." },
   staffAdmin: { max: 30, windowSec: 3600, message: "Too many staff changes in an hour." },
   privacyFulfil: { max: 20, windowSec: 3600, message: "Too many privacy actions in an hour." },
   lookup: { max: 600, windowSec: 3600, message: "Too many requests. Please try again later." },

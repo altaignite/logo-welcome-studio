@@ -46,7 +46,7 @@ describe("two-factor sessions", () => {
     const all = readdirSync("drizzle/migrations").filter((f) => f.endsWith(".sql")).map((f) => readFileSync(`drizzle/migrations/${f}`, "utf8")).join("\n");
     const rls = new Set([...all.matchAll(/ALTER TABLE public\.(\w+) ENABLE ROW LEVEL SECURITY/gi)].map((m) => m[1]!));
     // Service-role only tables: no grants to signed-in users.
-    for (const t of ["stripe_events", "job_runs", "rate_limit_hits"]) rls.delete(t);
+    for (const t of ["stripe_events", "job_runs", "rate_limit_hits", "app_secrets"]) rls.delete(t);
     // Tables named in every restrictive "two-factor session" loop across the migrations.
     const covered = new Set<string>();
     for (const m of all.matchAll(/FOREACH t IN ARRAY ARRAY\[([^\]]*)\] LOOP\s*EXECUTE format\('CREATE POLICY "two-factor session"/g)) for (const t of m[1]!.matchAll(/'(\w+)'/g)) covered.add(t[1]!);

@@ -8,16 +8,19 @@ export const Route = createFileRoute("/api/public/stripe/webhook")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const secret = process.env["STRIPE_WEBHOOK_SECRET"];
-        if (!secret) return new Response("Not configured", { status: 500 });
         const body = await request.text();
-        const { verifyStripeSignature, audit, stripe } = await import("@/lib/stripe.server");
-        if (!(await verifyStripeSignature(body, request.headers.get("stripe-signature"), secret))) return new Response("Invalid signature", { status: 400 });
-        const event = JSON.parse(body);
+        const { verifyStripeSignature, audit, stripe, webhookSecrets } = await import("@/lib/stripe.server");
         const B = await import("@/lib/billing.server");
         const { refundDelta } = await import("@/lib/billing");
         const { must } = B;
         const admin = await B.getAdmin();
+        const secrets = await webhookSecrets(admin);
+        if (!secrets.length) return new Response("Not configured", { status: 500 });
+        const sig = request.headers.get("stripe-signature");
+        let valid = false;
+        for (const s of secrets) if (await verifyStripeSignature(body, sig, s)) { valid = true; break; }
+        if (!valid) return new Response("Invalid signature", { status: 400 });
+        const event = JSON.parse(body);
         const seen = await admin.from("stripe_events").select("id").eq("id", event.id).maybeSingle();
         if (seen.error) {
           

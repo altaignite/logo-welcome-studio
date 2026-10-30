@@ -73,3 +73,11 @@ export async function audit(admin: any, accountId: string, table: string, record
   const { error } = await admin.from("audit_log").insert({ account_id: accountId, table_name: table, record_id: recordId, action, changes, actor_id: actorId, actor_label: actorLabel });
   if (error) console.error("Audit log write failed", table, recordId, action, error.message);
 }
+
+/** Webhook signing secrets to accept: the one from Lovable's secrets and the one stored by "Set up webhook automatically". */
+export async function webhookSecrets(admin: any): Promise<string[]> {
+  const out = process.env["STRIPE_WEBHOOK_SECRET"] ? [process.env["STRIPE_WEBHOOK_SECRET"]] : [];
+  const { data } = await admin.from("app_secrets").select("value").eq("name", "stripe_webhook_secret").maybeSingle();
+  if (data?.value) out.push(data.value);
+  return out;
+}

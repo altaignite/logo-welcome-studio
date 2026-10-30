@@ -359,7 +359,9 @@ export const stripeHealth = createServerFn({ method: "POST" })
       try { const a = await stripe("GET", "balance"); account = !!a; checks.push({ label: "Connection to Stripe", ok: true, detail: "Stripe accepted the key" }); }
       catch (e) { checks.push({ label: "Connection to Stripe", ok: false, detail: (e as Error).message }); }
     }
-    checks.push({ label: "Webhook signing secret", ok: !!process.env["STRIPE_WEBHOOK_SECRET"], detail: process.env["STRIPE_WEBHOOK_SECRET"] ? "Set" : "Not set. Add STRIPE_WEBHOOK_SECRET (from the Stripe webhook endpoint) in Lovable's secrets." });
+    const { webhookSecrets } = await import("@/lib/stripe.server");
+    const hasSecret = (await webhookSecrets(admin)).length > 0;
+    checks.push({ label: "Webhook signing secret", ok: hasSecret, detail: hasSecret ? "Set" : "Not set. Use \"Set up webhook automatically\" below." });
     if (account) {
       try {
         const hooks = await stripe("GET", "webhook_endpoints", { limit: 100 });
@@ -378,6 +380,29 @@ export const stripeHealth = createServerFn({ method: "POST" })
     const invoiced = new Set((firsts ?? []).map((i: { subscription_id: string }) => i.subscription_id));
     const waiting = (pending ?? []).filter((p: { id: string }) => !invoiced.has(p.id));
     return { checks, webhookUrl: hookUrl, events: requiredStripeEvents, waiting: waiting as { id: string; user_id: string; plan_name: string; created_at: string }[] };
+  });
+
+/** Creates the Stripe webhook endpoint for this site and stores its signing secret server side (never sent to the browser).
+ * Stripe only reveals a secret when an endpoint is created, so any existing endpoint for the same URL is replaced. */
+export const setupStripeWebhook = createServerFn({ method: "POST" })
+  .middleware([limited("stripeSetup")])
+  .handler(async ({ context }) => {
+    await requireAdmin(context);
+    const { stripe, audit } = await import("@/lib/stripe.server");
+    const { getAdmin, must } = await import("@/lib/billing.server");
+    const { getRequest } = await import("@tanstack/react-start/server");
+    const admin = await getAdmin();
+    const url = `${process.env["APP_URL"] ?? new URL(getRequest().url).origin}/api/public/stripe/webhook`;
+    if (!url.startsWith("https://")) throw new Error("Stripe webhooks need an https address. Open the published site to set this up.");
+    const created = await stripe("POST", "webhook_endpoints", { url, description: "CRM billing sync", ...Object.fromEntries(requiredStripeEvents.map((e, i) => [`enabled_events[${i}]`, e])) });
+    if (!created?.secret) throw new Error("Stripe didn't return a signing secret.");
+    must(await admin.from("app_secrets").upsert({ name: "stripe_webhook_secret", value: created.secret, updated_at: new Date().toISOString() }));
+    // Older endpoints for the same address would send every event twice; their secrets can't be read back, so remove them.
+    const hooks = await stripe("GET", "webhook_endpoints", { limit: 100 });
+    let replaced = 0;
+    for (const h of hooks.data ?? []) if (h.url === url && h.id !== created.id) { await stripe("DELETE", `webhook_endpoints/${h.id}`); replaced++; }
+    await audit(admin, context.userId, "stripe_webhook", context.userId, "stripe_webhook_setup", { url, endpoint: created.id, replaced }, context.userId, actorLabel(context));
+    return { url, replaced };
   });
 
 /** Imports one page of Stripe customers (clients, subscriptions, invoices, payments). Call again with `next` until it's null. */

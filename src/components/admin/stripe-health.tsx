@@ -7,14 +7,21 @@ import { Btn, Section } from "@/components/admin/record-bits";
 import { ErrorState, SectionSkeleton, Spinner } from "@/components/loading";
 import { usePopup } from "@/components/popup";
 import { formatDate } from "@/lib/admin";
-import { sendFirstInvoice, stripeHealth } from "@/lib/billing.functions";
+import { sendFirstInvoice, setupStripeWebhook, stripeHealth } from "@/lib/billing.functions";
 
 /** Stripe setup status with the exact fixes, plus plans that are waiting for their first invoice. */
 export function StripeHealth() {
   const qc = useQueryClient();
   const popup = usePopup();
   const check = useServerFn(stripeHealth), send = useServerFn(sendFirstInvoice);
+  const setup = useServerFn(setupStripeWebhook);
   const [busy, setBusy] = useState<string | null>(null);
+  const autoSetup = async () => {
+    setBusy("webhook");
+    try { const r = await setup(); await q.refetch(); popup({ type: "success", title: "Webhook set up", description: `Stripe now sends events to ${r.url}. The signing secret is stored securely on the server.`, primaryLabel: "Done", secondaryLabel: null }); }
+    catch (e) { popup({ type: "error", title: "Couldn't set up the webhook", description: (e as Error).message, primaryLabel: "Close", secondaryLabel: null }); }
+    setBusy(null);
+  };
   const q = useQuery({ queryKey: ["admin", "stripe-health"], queryFn: () => check() });
   const resend = async (id: string) => {
     setBusy(id);
@@ -33,6 +40,7 @@ export function StripeHealth() {
           <p className="mt-1 flex items-center gap-2 break-all font-mono">{q.data.webhookUrl}
             <button type="button" aria-label="Copy webhook URL" onClick={() => void navigator.clipboard.writeText(q.data!.webhookUrl)}><Copy className="size-3.5" /></button></p>
           <p className="mt-2 text-muted-foreground">Events: {q.data.events.join(", ")}</p>
+          <button type="button" disabled={busy === "webhook"} onClick={autoSetup} className="mt-3 inline-flex h-8 items-center gap-1.5 rounded-full bg-foreground px-3 text-xs font-semibold text-background">{busy === "webhook" && <Spinner className="size-3.5" />}Set up webhook automatically</button>
         </div>
         {q.data.waiting.length > 0 && <div>
           <p className="font-semibold">Plans waiting for a first invoice ({q.data.waiting.length})</p>

@@ -120,6 +120,13 @@
       "when": 1793326357660,
       "tag": "0016_stripe_lifecycle_consistency",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1793326358660,
+      "tag": "0017_stripe_webhook_secret",
+      "breakpoints": true
     }
   ]
 }
