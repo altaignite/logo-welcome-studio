@@ -180,6 +180,7 @@ export const fulfilAccessRequest = createServerFn({ method: "POST" })
     must(await admin.from("documents").insert({ id, user_id: req.user_id, kind: "export", title: "Your data export", storage_path: path, size_bytes: json.length, mime_type: "application/json",
       status: "ready", related_table: "compliance_requests", related_id: req.id, visible_to_client: true, uploaded_by: context.userId, uploaded_by_label: label(context) }));
     must(await admin.from("compliance_requests").update({ status: "completed", completed_at: new Date().toISOString(), outcome_note: "Your data export is ready to download under Documents." }).eq("id", req.id).eq("status", "open"));
+    { const { logSecurityEvent } = await import("@/lib/security-log.server"); await logSecurityEvent({ kind: "privacy_export", severity: "low", group: data.requestId, summary: `${label(context)} exported a client's personal data for a privacy request.`, detail: { request: data.requestId } }); }
     return { documentId: id };
   });
 

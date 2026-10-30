@@ -7,7 +7,10 @@ export const Route = createFileRoute("/api/public/cron/notifications")({
     handlers: {
       POST: async ({ request }) => {
         const denied = await authenticateCronRequest(request);
-        if (denied) return denied;
+        if (denied) {
+          if (denied.status === 401) { const { logSecurityEvent } = await import("@/lib/security-log.server"); await logSecurityEvent({ kind: "cron_unauthorized", severity: "high", request, summary: "A scheduled-job endpoint was called without the right secret." }); }
+          return denied;
+        }
         const { getAdmin } = await import("@/lib/billing.server");
         const { checkReplyTimes, runDailyReminders, runOutbox } = await import("@/lib/jobs.server");
         const admin = await getAdmin();

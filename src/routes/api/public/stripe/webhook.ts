@@ -19,7 +19,11 @@ export const Route = createFileRoute("/api/public/stripe/webhook")({
         const sig = request.headers.get("stripe-signature");
         let valid = false;
         for (const s of secrets) if (await verifyStripeSignature(body, sig, s)) { valid = true; break; }
-        if (!valid) return new Response("Invalid signature", { status: 400 });
+        if (!valid) {
+          const { logSecurityEvent } = await import("@/lib/security-log.server");
+          await logSecurityEvent({ kind: "webhook_bad_signature", severity: "high", request, summary: "A request to the Stripe webhook had a missing or invalid signature. Someone may be trying to fake payments." });
+          return new Response("Invalid signature", { status: 400 });
+        }
         const event = JSON.parse(body);
         const seen = await admin.from("stripe_events").select("id").eq("id", event.id).maybeSingle();
         if (seen.error) {

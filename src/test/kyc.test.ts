@@ -23,6 +23,6 @@ describe("Fraud - KYC restriction", () => {
   });
   it("refuses server actions for restricted accounts", () => {
     const mw = readFileSync("src/lib/session.middleware.ts", "utf8");
-    expect(mw).toMatch(/kycRestricted\(prof\.data\.status\)\) throw new Error\(KYC_ERROR\)/);
+    expect(mw).toMatch(/throw new Error\(kycRestricted\(prof\.data\.status\) \? KYC_ERROR/);
   });
 });

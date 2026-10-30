@@ -17,8 +17,11 @@ export const requireSession = createMiddleware({ type: "function" })
       supabaseAdmin.from("profiles").select("status").eq("id", context.userId).maybeSingle(),
       supabaseAdmin.from("user_roles").select("user_id").eq("user_id", context.userId).eq("role", "admin").maybeSingle(),
     ]);
-    if (!role.data && prof.data && signInBlocked(prof.data.status)) throw new Error("This account is suspended or closed. Please contact support.");
-    if (!role.data && prof.data && kycRestricted(prof.data.status)) throw new Error(KYC_ERROR);
+    if (!role.data && prof.data && (signInBlocked(prof.data.status) || kycRestricted(prof.data.status))) {
+      const { logSecurityEvent } = await import("@/lib/security-log.server");
+      await logSecurityEvent({ kind: "blocked_account_activity", severity: "medium", userId: context.userId, summary: `A ${prof.data.status.replace("_", " ")} account tried to use the app.`, detail: { status: prof.data.status } });
+      throw new Error(kycRestricted(prof.data.status) ? KYC_ERROR : "This account is suspended or closed. Please contact support.");
+    }
     if (context.claims?.aal !== "aal2") {
       const { data, error } = await supabaseAdmin.auth.admin.mfa.listFactors({ userId: context.userId });
       // Refuse only on clear evidence of an unpassed authenticator; a lookup failure must not block every save.

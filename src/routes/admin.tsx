@@ -1,7 +1,7 @@
 import { createFileRoute, Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { BarChart3, Contact, FileCheck2, FileText, FolderKanban, LayoutDashboard, LifeBuoy, ListChecks, LogOut, Mail, Menu, PhoneCall, Receipt, Repeat, Settings, ShieldCheck, UserCog, Users, Wallet, X } from "lucide-react";
+import { BarChart3, Contact, FileCheck2, FileText, FolderKanban, LayoutDashboard, LifeBuoy, ListChecks, LogOut, Mail, Menu, PhoneCall, Receipt, Repeat, Settings, ShieldAlert, ShieldCheck, UserCog, Users, Wallet, X } from "lucide-react";
 import logo from "@/assets/logo.png.asset.json";
 import { supabase } from "@/integrations/supabase/client";
 import { NotificationBell } from "@/components/notifications";
@@ -58,6 +58,7 @@ const nav = [
   { group: "Team", items: [
     { to: "/admin/templates", label: "Message templates", icon: Mail },
     { to: "/admin/staff", label: "Staff and security", icon: UserCog },
+    { to: "/admin/security", label: "Security log", icon: ShieldAlert },
   ] },
 ] as const;
 
@@ -87,7 +88,7 @@ function AdminLayout() {
         {nav.map(({ group, items }) => <div key={group}>
           <p className="px-5 pb-2 pt-4 text-xs text-muted-foreground">{group}</p>
           <nav className="space-y-0.5">
-            {items.map((item) => {
+            {items.filter((item) => item.to !== "/admin/security" || staff.can("staff")).map((item) => {
               const { to, label, icon: Icon } = item;
               const active = "exact" in item ? path === to || path === `${to}/` : path === to || path.startsWith(`${to}/`);
               const cls = `flex items-center gap-3 border-r-2 px-5 py-2.5 text-sm ${active ? "border-primary bg-secondary font-semibold" : "border-transparent text-muted-foreground hover:bg-secondary/60 hover:text-foreground"}`;

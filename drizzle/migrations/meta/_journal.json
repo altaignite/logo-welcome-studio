@@ -155,6 +155,13 @@
       "when": 1793326362660,
       "tag": "0021_revoke_anon_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1793326363660,
+      "tag": "0022_security_events",
+      "breakpoints": true
     }
   ]
 }

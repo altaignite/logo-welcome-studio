@@ -9,5 +9,11 @@ export async function enforceLimit(name: LimitName, subject: string) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data, error } = await supabaseAdmin.rpc("hit_rate_limit", { _key: `${name}:${subject}`, _max: rule.max, _window_seconds: rule.windowSec });
   if (error) { console.error("Rate limit check failed", name, error.message); return; }
-  if (data === false) throw new RateLimitError(rule.message);
+  if (data === false) {
+    const { logSecurityEvent } = await import("@/lib/security-log.server");
+    const uuidLike = /^[0-9a-f-]{36}$/.test(subject);
+    await logSecurityEvent({ kind: "rate_limited", severity: name === "request" || name.startsWith("accountCheck") ? "medium" : "low", group: `${name}:${subject}`,
+      userId: uuidLike ? subject : null, summary: `Rate limit "${name}" exceeded (${rule.max} per ${Math.round(rule.windowSec / 60)} min).`, detail: { limit: name } });
+    throw new RateLimitError(rule.message);
+  }
 }

@@ -18,6 +18,7 @@ import { Route as KycRouteImport } from './routes/kyc'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
+import { Route as AdminSecurityRouteImport } from './routes/admin.security'
 import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
 import { Route as AdminStaffRouteImport } from './routes/admin.staff'
 import { Route as AdminSupportRouteImport } from './routes/admin.support'
@@ -32,6 +33,7 @@ import { Route as AdminApplicationsIndexRouteImport } from './routes/admin.appli
 import { Route as AdminApplicationsIdRouteImport } from './routes/admin.applications.$id'
 import { Route as AdminOrderUserIdRouteImport } from './routes/admin.order.$userId'
 import { Route as ApiPublicAccountCheckRouteImport } from './routes/api/public/account-check'
+import { Route as ApiPublicCspReportRouteImport } from './routes/api/public/csp-report'
 import { Route as DashboardKindIdRouteImport } from './routes/dashboard.$kind.$id'
 import { Route as AdminRecordsKindIndexRouteImport } from './routes/admin.records.$kind.index'
 import { Route as AdminRecordsKindIdRouteImport } from './routes/admin.records.$kind.$id'
@@ -82,6 +84,11 @@ const SignupRoute = SignupRouteImport.update({
 const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminSecurityRoute = AdminSecurityRouteImport.update({
+  id: '/security',
+  path: '/security',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminSettingsRoute = AdminSettingsRouteImport.update({
@@ -154,6 +161,11 @@ const ApiPublicAccountCheckRoute = ApiPublicAccountCheckRouteImport.update({
   path: '/api/public/account-check',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicCspReportRoute = ApiPublicCspReportRouteImport.update({
+  id: '/api/public/csp-report',
+  path: '/api/public/csp-report',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardKindIdRoute = DashboardKindIdRouteImport.update({
   id: '/$kind/$id',
   path: '/$kind/$id',
@@ -196,6 +208,7 @@ export interface FileRoutesByFullPath {
   '/kyc': typeof KycRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
+  '/admin/security': typeof AdminSecurityRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/staff': typeof AdminStaffRoute
   '/admin/support': typeof AdminSupportRoute
@@ -209,6 +222,7 @@ export interface FileRoutesByFullPath {
   '/admin/applications/$id': typeof AdminApplicationsIdRoute
   '/admin/order/$userId': typeof AdminOrderUserIdRoute
   '/api/public/account-check': typeof ApiPublicAccountCheckRoute
+  '/api/public/csp-report': typeof ApiPublicCspReportRoute
   '/dashboard/$kind/$id': typeof DashboardKindIdRoute
   '/admin/accounts/': typeof AdminAccountsIndexRoute
   '/admin/applications/': typeof AdminApplicationsIndexRoute
@@ -225,6 +239,7 @@ export interface FileRoutesByTo {
   '/kyc': typeof KycRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
+  '/admin/security': typeof AdminSecurityRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/staff': typeof AdminStaffRoute
   '/admin/support': typeof AdminSupportRoute
@@ -238,6 +253,7 @@ export interface FileRoutesByTo {
   '/admin/applications/$id': typeof AdminApplicationsIdRoute
   '/admin/order/$userId': typeof AdminOrderUserIdRoute
   '/api/public/account-check': typeof ApiPublicAccountCheckRoute
+  '/api/public/csp-report': typeof ApiPublicCspReportRoute
   '/dashboard/$kind/$id': typeof DashboardKindIdRoute
   '/admin/accounts': typeof AdminAccountsIndexRoute
   '/admin/applications': typeof AdminApplicationsIndexRoute
@@ -257,6 +273,7 @@ export interface FileRoutesById {
   '/kyc': typeof KycRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
+  '/admin/security': typeof AdminSecurityRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/staff': typeof AdminStaffRoute
   '/admin/support': typeof AdminSupportRoute
@@ -270,6 +287,7 @@ export interface FileRoutesById {
   '/admin/applications/$id': typeof AdminApplicationsIdRoute
   '/admin/order/$userId': typeof AdminOrderUserIdRoute
   '/api/public/account-check': typeof ApiPublicAccountCheckRoute
+  '/api/public/csp-report': typeof ApiPublicCspReportRoute
   '/dashboard/$kind/$id': typeof DashboardKindIdRoute
   '/admin/accounts/': typeof AdminAccountsIndexRoute
   '/admin/applications/': typeof AdminApplicationsIndexRoute
@@ -290,6 +308,7 @@ export interface FileRouteTypes {
     | '/kyc'
     | '/reset-password'
     | '/signup'
+    | '/admin/security'
     | '/admin/settings'
     | '/admin/staff'
     | '/admin/support'
@@ -303,6 +322,7 @@ export interface FileRouteTypes {
     | '/admin/applications/$id'
     | '/admin/order/$userId'
     | '/api/public/account-check'
+    | '/api/public/csp-report'
     | '/dashboard/$kind/$id'
     | '/admin/accounts/'
     | '/admin/applications/'
@@ -319,6 +339,7 @@ export interface FileRouteTypes {
     | '/kyc'
     | '/reset-password'
     | '/signup'
+    | '/admin/security'
     | '/admin/settings'
     | '/admin/staff'
     | '/admin/support'
@@ -332,6 +353,7 @@ export interface FileRouteTypes {
     | '/admin/applications/$id'
     | '/admin/order/$userId'
     | '/api/public/account-check'
+    | '/api/public/csp-report'
     | '/dashboard/$kind/$id'
     | '/admin/accounts'
     | '/admin/applications'
@@ -350,6 +372,7 @@ export interface FileRouteTypes {
     | '/kyc'
     | '/reset-password'
     | '/signup'
+    | '/admin/security'
     | '/admin/settings'
     | '/admin/staff'
     | '/admin/support'
@@ -363,6 +386,7 @@ export interface FileRouteTypes {
     | '/admin/applications/$id'
     | '/admin/order/$userId'
     | '/api/public/account-check'
+    | '/api/public/csp-report'
     | '/dashboard/$kind/$id'
     | '/admin/accounts/'
     | '/admin/applications/'
@@ -383,6 +407,7 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   SignupRoute: typeof SignupRoute
   ApiPublicAccountCheckRoute: typeof ApiPublicAccountCheckRoute
+  ApiPublicCspReportRoute: typeof ApiPublicCspReportRoute
   ApiPublicCronCollectionsRoute: typeof ApiPublicCronCollectionsRoute
   ApiPublicCronNotificationsRoute: typeof ApiPublicCronNotificationsRoute
   ApiPublicStripeWebhookRoute: typeof ApiPublicStripeWebhookRoute
@@ -451,6 +476,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/admin/'
       preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/security': {
+      id: '/admin/security'
+      path: '/security'
+      fullPath: '/admin/security'
+      preLoaderRoute: typeof AdminSecurityRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/settings': {
@@ -551,6 +583,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicAccountCheckRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/csp-report': {
+      id: '/api/public/csp-report'
+      path: '/api/public/csp-report'
+      fullPath: '/api/public/csp-report'
+      preLoaderRoute: typeof ApiPublicCspReportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dashboard/$kind/$id': {
       id: '/dashboard/$kind/$id'
       path: '/$kind/$id'
@@ -597,6 +636,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AdminRouteChildren {
+  AdminSecurityRoute: typeof AdminSecurityRoute
   AdminSettingsRoute: typeof AdminSettingsRoute
   AdminStaffRoute: typeof AdminStaffRoute
   AdminSupportRoute: typeof AdminSupportRoute
@@ -613,6 +653,7 @@ interface AdminRouteChildren {
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
+  AdminSecurityRoute: AdminSecurityRoute,
   AdminSettingsRoute: AdminSettingsRoute,
   AdminStaffRoute: AdminStaffRoute,
   AdminSupportRoute: AdminSupportRoute,
@@ -658,6 +699,7 @@ const rootRouteChildren: RootRouteChildren = {
   ResetPasswordRoute: ResetPasswordRoute,
   SignupRoute: SignupRoute,
   ApiPublicAccountCheckRoute: ApiPublicAccountCheckRoute,
+  ApiPublicCspReportRoute: ApiPublicCspReportRoute,
   ApiPublicCronCollectionsRoute: ApiPublicCronCollectionsRoute,
   ApiPublicCronNotificationsRoute: ApiPublicCronNotificationsRoute,
   ApiPublicStripeWebhookRoute: ApiPublicStripeWebhookRoute,

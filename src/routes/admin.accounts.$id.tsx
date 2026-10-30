@@ -12,6 +12,7 @@ import { usePopup } from "@/components/popup";
 import { AuditList, Btn, FieldGrid, Section, db, fmtText } from "@/components/admin/record-bits";
 import { setAccountStatus } from "@/lib/crm.functions";
 import { createInvoice, subscriptionAction, voidInvoices } from "@/lib/billing.functions";
+import { recordDataExport } from "@/lib/security.functions";
 import { accountStatusLabel, accountStatuses, complianceKinds, formatAccount, formatDate, formatDay, humanize, lifecycleStages, money, statusLabel, type AccountStatus } from "@/lib/admin";
 import { plans } from "@/lib/signup";
 import { DocumentList, UploadButton } from "@/components/files";
@@ -36,6 +37,7 @@ function AccountDetail() {
   const qc = useQueryClient();
   const popup = usePopup();
   const changeStatus = useServerFn(setAccountStatus);
+  const fnExport = useServerFn(recordDataExport);
   const fnInvoice = useServerFn(createInvoice), fnSub = useServerFn(subscriptionAction), fnVoid = useServerFn(voidInvoices);
   const [tab, setTab] = useState<(typeof tabs)[number]>(tabs[0]);
   const staff = useStaff();
@@ -179,6 +181,7 @@ function AccountDetail() {
     const url = URL.createObjectURL(new Blob([JSON.stringify({ exported_at: new Date().toISOString(), exported_by: adminEmail, ...rest }, null, 2)], { type: "application/json" }));
     const a = document.createElement("a"); a.href = url; a.download = `account-${p.account_number}.json`; a.click(); URL.revokeObjectURL(url);
     void supabase.from("crm_activities").insert({ user_id: id, ...actor, kind: "note", direction: "internal", subject: "Client data exported" }).then(refresh);
+    void fnExport({ data: { clientId: id, what: "the client's full account data" } }).catch(() => {});
   };
 
   // ---------- columns ----------

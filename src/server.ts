@@ -53,7 +53,7 @@ const securityHeaders: Record<string, string> = {
   "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=(self)",
   "Cross-Origin-Opener-Policy": "same-origin",
   // Enforced: rules that can't break the app (no plugins, no framing, no base-tag hijacking, forms only to us or Stripe, HTTPS only).
-  "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://checkout.stripe.com https://billing.stripe.com; upgrade-insecure-requests",
+  "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://checkout.stripe.com https://billing.stripe.com; upgrade-insecure-requests; report-uri /api/public/csp-report",
   // Reported, not enforced yet: the full script and connection allow-list. Lovable injects its own scripts on hosted pages, so
   // enforce this only after the browser reports show no violations.
   "Content-Security-Policy-Report-Only": [
@@ -67,6 +67,7 @@ const securityHeaders: Record<string, string> = {
     "object-src 'none'",
     "base-uri 'self'",
     "frame-ancestors 'none'",
+    "report-uri /api/public/csp-report",
   ].join("; "),
 };
 function withSecurityHeaders(response: Response) {
@@ -89,6 +90,11 @@ export default {
       return withSecurityHeaders(await normalizeCatastrophicSsrResponse(response));
     } catch (error) {
       console.error(error);
+      // Repeated crashes on one path can mean someone is probing it with malformed requests.
+      try {
+        const { logSecurityEvent } = await import("@/lib/security-log.server");
+        await logSecurityEvent({ kind: "server_error", severity: "medium", request, group: new URL(request.url).pathname, summary: `The server failed while handling ${request.method} ${new URL(request.url).pathname}.`, detail: { error: String((error as Error)?.message ?? error).slice(0, 300) } });
+      } catch { /* logging must never break the error page */ }
       return new Response(renderErrorPage(), {
         status: 500,
         headers: { "content-type": "text/html; charset=utf-8" },
