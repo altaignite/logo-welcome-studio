@@ -38,16 +38,28 @@ export const orderAdditionalPlan = createServerFn({ method: "POST" })
     if (!prof || orderingBlocked(prof.status)) throw new Error("Your account can't place orders right now. Please contact support.");
     const { count } = await admin.from("subscriptions").select("id", { count: "exact", head: true }).eq("user_id", context.userId).eq("status", "pending");
     if ((count ?? 0) >= 2) throw new Error("Please pay your open plan invoices before ordering another plan.");
+    // Make sure Stripe is reachable and the client has a Stripe customer before anything is created locally.
+    const { ensureCustomer } = await import("@/lib/stripe.server");
+    await ensureCustomer(admin, context.userId);
     const app = await admin.from("applications").insert({ user_id: context.userId, account_number: prof.account_number, plan_id: plan.id, plan_name: plan.name, monthly_fee: plan.monthlyFee, monthly_hours: plan.monthlyHours, status: "approved", decided_at: new Date().toISOString() }).select("id").single();
     if (app.error) throw new Error("Couldn't create the order.");
     await admin.from("application_events").insert({ application_id: app.data.id, actor_id: context.userId, actor_label: label(context), action: "Additional plan ordered by client; invoice sent", to_status: "approved" });
     const sub = await admin.from("subscriptions").insert({ user_id: context.userId, plan_name: plan.name, monthly_fee: plan.monthlyFee, monthly_hours: plan.monthlyHours, status: "pending", application_id: app.data.id, notes: "Awaiting payment of first invoice" }).select("id").single();
     if (sub.error) throw new Error("Couldn't create the subscription.");
     await admin.from("projects").insert({ user_id: context.userId, subscription_id: sub.data.id, name: `${prof.company || "Client"} ${plan.name}`, service: "Marketing", status: "planned", description: `${plan.name} plan` });
-    const inv = await issueStripeInvoice(admin, {
+    let inv;
+    try {
+      inv = await issueStripeInvoice(admin, {
       userId: context.userId, subscriptionId: sub.data.id, kind: "first", description: `${plan.name} plan, first month`,
       lines: [{ description: `${plan.name} plan, ${plan.monthlyHours} service hours per month`, amount: plan.monthlyFee }], idem: `client-order-${sub.data.id}`,
     });
+    } catch (e) {
+      // No half-made orders: if Stripe didn't take the invoice, the plan never starts.
+      await admin.from("subscriptions").update({ status: "cancelled", cancelled_at: new Date().toISOString(), notes: `Order not completed: ${(e as Error).message}` }).eq("id", sub.data.id);
+      await admin.from("projects").update({ status: "cancelled" }).eq("subscription_id", sub.data.id);
+      await admin.from("applications").update({ archived_at: new Date().toISOString(), internal_notes: "Order not completed: Stripe invoice failed" }).eq("id", app.data.id);
+      throw e;
+    }
     return { subscriptionId: sub.data.id as string, invoiceId: inv.id as string };
   });
 

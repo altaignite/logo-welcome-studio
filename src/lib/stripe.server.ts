@@ -1,9 +1,12 @@
 /** Minimal Stripe REST client (fetch-based, Worker compatible). Server only. */
+
+/** The Stripe secret key, under Lovable's standard name or the older restricted-key name. */
+export const stripeKey = () => process.env["STRIPE_SECRET_KEY"] ?? process.env["STRIPE_RESTRICTED_API_KEY"] ?? process.env["STRIPE_API_KEY"] ?? null;
 type Params = Record<string, string | number | boolean | undefined | null>;
 
 export async function stripe<T = any>(method: "GET" | "POST" | "DELETE", path: string, params: Params = {}, idempotencyKey?: string): Promise<T> {
-  const key = process.env["STRIPE_RESTRICTED_API_KEY"];
-  if (!key) throw new Error("Stripe isn't configured.");
+  const key = stripeKey();
+  if (!key) throw new Error("Stripe isn't connected. Add your Stripe secret key as STRIPE_SECRET_KEY in Lovable's secrets.");
   const body = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== null) body.append(k, String(v));
   const url = `https://api.stripe.com/v1/${path}${method === "GET" && body.size ? `?${body}` : ""}`;
@@ -19,7 +22,8 @@ export async function stripe<T = any>(method: "GET" | "POST" | "DELETE", path: s
   const json = (await res.json()) as any;
   if (!res.ok) {
     console.error("Stripe error", path, json?.error?.message);
-    throw new Error("The payment provider rejected the request.");
+    // Stripe's own reason (never contains the key), so staff can fix the setup or the data.
+    throw new Error(`Stripe couldn't complete this: ${String(json?.error?.message ?? res.statusText).slice(0, 240)}`);
   }
   return json as T;
 }

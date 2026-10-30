@@ -30,16 +30,28 @@ export const createOrder = createServerFn({ method: "POST" })
     const plan = plans.find((p) => p.id === data.planId)!;
     const { data: prof } = await admin.from("profiles").select("account_number, company, first_name, last_name").eq("id", data.userId).single();
     if (!prof) throw new Error("Client not found.");
+    // Make sure Stripe is reachable and the client has a Stripe customer before anything is created locally.
+    const { ensureCustomer } = await import("@/lib/stripe.server");
+    await ensureCustomer(admin, data.userId);
     const app = await admin.from("applications").insert({ user_id: data.userId, account_number: prof.account_number, plan_id: plan.id, plan_name: plan.name, monthly_fee: plan.monthlyFee, monthly_hours: plan.monthlyHours, status: "approved", decided_at: new Date().toISOString(), internal_notes: data.notes ?? null }).select("id").single();
     if (app.error) throw new Error("Couldn't create the application.");
     await admin.from("application_events").insert({ application_id: app.data.id, actor_id: context.userId, actor_label: actorLabel(context), action: "Order created by staff; invoice sent", to_status: "approved", note: data.notes ?? null });
     const sub = await admin.from("subscriptions").insert({ user_id: data.userId, plan_name: plan.name, monthly_fee: plan.monthlyFee, monthly_hours: plan.monthlyHours, status: "pending", application_id: app.data.id, notes: "Awaiting payment of first invoice" }).select("id").single();
     if (sub.error) throw new Error("Couldn't create the subscription.");
     await admin.from("projects").insert({ user_id: data.userId, subscription_id: sub.data.id, name: prof.company || `${prof.first_name ?? ""} ${prof.last_name ?? ""}`.trim() || "Client project", service: "Marketing", status: "planned", description: `${plan.name} plan` });
-    const inv = await issueStripeInvoice(admin, {
+    let inv;
+    try {
+      inv = await issueStripeInvoice(admin, {
       userId: data.userId, subscriptionId: sub.data.id, kind: "first", description: `${plan.name} plan, first month`,
       lines: [{ description: `${plan.name} plan, ${plan.monthlyHours} service hours per month`, amount: plan.monthlyFee }], idem: `order-${sub.data.id}`,
     });
+    } catch (e) {
+      // No half-made orders: if Stripe didn't take the invoice, the plan never starts.
+      await admin.from("subscriptions").update({ status: "cancelled", cancelled_at: new Date().toISOString(), notes: `Order not completed: ${(e as Error).message}` }).eq("id", sub.data.id);
+      await admin.from("projects").update({ status: "cancelled" }).eq("subscription_id", sub.data.id);
+      await admin.from("applications").update({ archived_at: new Date().toISOString(), internal_notes: "Order not completed: Stripe invoice failed" }).eq("id", app.data.id);
+      throw e;
+    }
     return { subscriptionId: sub.data.id, invoiceId: inv.id as string };
   });
 
@@ -308,4 +320,50 @@ export const voidInvoices = createServerFn({ method: "POST" })
       voided++;
     }
     return { voided, skipped };
+  });
+
+/** Webhook events the app needs Stripe to send. */
+export const requiredStripeEvents = [
+  "invoice.finalized", "invoice.paid", "invoice.payment_failed", "invoice.marked_uncollectible", "invoice.voided", "invoice.updated",
+  "customer.subscription.created", "customer.subscription.updated", "customer.subscription.paused", "customer.subscription.resumed", "customer.subscription.deleted",
+  "charge.refunded",
+];
+
+/** Billing setup check for staff: key, account, webhook endpoint and events, and plans left waiting for an invoice. */
+export const stripeHealth = createServerFn({ method: "POST" })
+  .middleware([requireSession])
+  .handler(async ({ context }) => {
+    await requireAdmin(context);
+    const { stripe, stripeKey } = await import("@/lib/stripe.server");
+    const { getAdmin } = await import("@/lib/billing.server");
+    const { getRequest } = await import("@tanstack/react-start/server");
+    const admin = await getAdmin();
+    const key = stripeKey();
+    const hookUrl = `${process.env["APP_URL"] ?? new URL(getRequest().url).origin}/api/public/stripe/webhook`;
+    const checks: { label: string; ok: boolean; detail: string }[] = [];
+    checks.push({ label: "Stripe secret key", ok: !!key, detail: key ? `${key.startsWith("sk_live") || key.startsWith("rk_live") ? "Live" : "Test"} mode key found` : "Not set. Add STRIPE_SECRET_KEY in Lovable's secrets." });
+    let account = false;
+    if (key) {
+      try { const a = await stripe("GET", "balance"); account = !!a; checks.push({ label: "Connection to Stripe", ok: true, detail: "Stripe accepted the key" }); }
+      catch (e) { checks.push({ label: "Connection to Stripe", ok: false, detail: (e as Error).message }); }
+    }
+    checks.push({ label: "Webhook signing secret", ok: !!process.env["STRIPE_WEBHOOK_SECRET"], detail: process.env["STRIPE_WEBHOOK_SECRET"] ? "Set" : "Not set. Add STRIPE_WEBHOOK_SECRET (from the Stripe webhook endpoint) in Lovable's secrets." });
+    if (account) {
+      try {
+        const hooks = await stripe("GET", "webhook_endpoints", { limit: 100 });
+        const ours = (hooks.data ?? []).find((h: { url: string }) => h.url === hookUrl);
+        const events: string[] = ours?.enabled_events ?? [];
+        const missing = ours && !events.includes("*") ? requiredStripeEvents.filter((e) => !events.includes(e)) : requiredStripeEvents;
+        checks.push({ label: "Webhook endpoint", ok: !!ours && ours.status === "enabled", detail: ours ? `${hookUrl} (${ours.status})` : `No endpoint for ${hookUrl}. Add it in Stripe, Developers, Webhooks.` });
+        if (ours) checks.push({ label: "Webhook events", ok: missing.length === 0, detail: missing.length ? `Missing: ${missing.join(", ")}` : "All required events are sent" });
+      } catch { checks.push({ label: "Webhook endpoint", ok: false, detail: `Couldn't read webhook settings with this key. Make sure ${hookUrl} is added in Stripe with the required events.` }); }
+    }
+    const { data: lastEvent } = await admin.from("stripe_events").select("type, received_at").order("received_at", { ascending: false }).limit(1).maybeSingle();
+    checks.push({ label: "Last event received", ok: !!lastEvent, detail: lastEvent ? `${lastEvent.type}, ${new Date(lastEvent.received_at).toLocaleString("en-GB")}` : "None yet. Payments won't activate plans until Stripe events arrive." });
+    // Plans waiting for a first invoice that was never created in Stripe.
+    const { data: pending } = await admin.from("subscriptions").select("id, user_id, plan_name, created_at").eq("status", "pending");
+    const { data: firsts } = await admin.from("invoices").select("subscription_id").eq("kind", "first").neq("status", "void");
+    const invoiced = new Set((firsts ?? []).map((i: { subscription_id: string }) => i.subscription_id));
+    const waiting = (pending ?? []).filter((p: { id: string }) => !invoiced.has(p.id));
+    return { checks, webhookUrl: hookUrl, events: requiredStripeEvents, waiting: waiting as { id: string; user_id: string; plan_name: string; created_at: string }[] };
   });

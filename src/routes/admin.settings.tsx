@@ -8,6 +8,7 @@ import { usePopup } from "@/components/popup";
 import { SwitchField } from "@/components/switch-field";
 import { defaultRules, type BillingRules } from "@/lib/billing";
 import { runCollectionsNow } from "@/lib/billing.functions";
+import { StripeHealth } from "@/components/admin/stripe-health";
 
 export const Route = createFileRoute("/admin/settings")({ component: Settings });
 
@@ -31,6 +32,7 @@ function Settings() {
   return (
     <div className="max-w-3xl space-y-6">
       <div><h1 className="text-2xl font-extrabold sm:text-3xl">Billing rules</h1><p className="mt-1 text-sm text-muted-foreground">Extra-hour rates, interest and legal fees. Confirm these with your lawyer and show them in the client agreement.</p></div>
+      <StripeHealth />
       <Section title="Extra hours">
         <div className="grid gap-4 p-5 sm:grid-cols-3">
           {Object.keys(r.overage_rates).map((p) => <F key={p} label={`${p} rate per hour (USD)`}><input className={input} type="number" value={r.overage_rates[p]} onChange={(e) => setR({ ...r, overage_rates: { ...r.overage_rates, [p]: num(e.target.value) } })} /></F>)}
