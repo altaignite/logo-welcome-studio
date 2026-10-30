@@ -3,12 +3,16 @@ import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "rea
 import { ArrowLeft, ArrowRight, Check, Eye, EyeOff, LockKeyhole, Loader2, PenLine, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CountryField } from "@/components/country-field";
+import { MfaChallenge, mfaNeeded } from "@/components/mfa";
+import { Spinner } from "@/components/loading";
+import { useServerFn } from "@tanstack/react-start";
+import { orderAdditionalPlan } from "@/lib/client.functions";
 import { usePopup } from "@/components/popup";
 import { supabase } from "@/integrations/supabase/client";
 import { agreementDocuments } from "@/lib/agreements";
 import { createAccountNumber, accountSchema, countries, personalSchema, plans, type Plan, type CountryCode, type PersonalDetails, formatPhoneInput, switchPhoneCountry, phonePlaceholder, phoneNational } from "@/lib/signup";
 import logo from "@/assets/logo.png.asset.json";
-import { AgreementsList, PlanCards, ReviewRow, ReviewSection, SignDialog, formatAccountNumber } from "@/components/order-flow";
+import { AgreementsList, OrderWizard, PlanCards, ReviewRow, ReviewSection, SignDialog, formatAccountNumber } from "@/components/order-flow";
 
 export const Route = createFileRoute("/signup")({
   head: () => ({ meta: [
@@ -25,12 +29,23 @@ const steps = ["Your plan", "Personal details", "Create account", "Review", "Agr
 const titles = ["CHOOSE YOUR PLAN", "Let's get to know you.", "Make it yours.", "Almost there!", "Your agreements"];
 const subtitles = ["Marketing, design & development. A monthly hours allowance that fits your ambition.", "The person and business behind the ambition.", "Create your FP login details.", "Please check your details carefully.", "Read your agreements before proceeding. Save a copy for your records."];
 
+const gateTitles = {
+  email: ["What's your email?", "We'll check whether you already have an FP account."],
+  password: ["Welcome back.", "Sign in to add this plan to your existing account."],
+  mfa: ["One more step.", "Enter the code from your authenticator app."],
+} as const;
+
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return <label className="block space-y-1.5"><span className="block text-[13px] font-medium text-foreground">{label}<span className="text-primary">*</span></span>{children}</label>;
 }
 
 function Signup() {
   const [step, setStep] = useState(0);
+  // Email first: "email" asks for it, "password" signs an existing account in, null continues as a new client.
+  const [gate, setGate] = useState<"email" | "password" | "mfa" | null>("email");
+  const [existing, setExisting] = useState(false);
+  const [gateBusy, setGateBusy] = useState(false);
+  const [loginPassword, setLoginPassword] = useState("");
   const [selectedPlan, setSelectedPlan] = useState<Plan>(plans[0]);
   const [personal, setPersonal] = useState<PersonalDetails>({ firstName: "", lastName: "", company: "", country: "", phone: "" });
   const [phoneCountry, setPhoneCountry] = useState<string>("");
@@ -82,6 +97,41 @@ function Signup() {
     setPhoneCountry(next.country);
     setPersonal((p) => ({ ...p, phone: next.value }));
   };
+  const checkEmail = async (event: FormEvent) => {
+    event.preventDefault();
+    const email = account.email.trim();
+    const valid = accountSchema.innerType().shape.email.safeParse(email);
+    if (!valid.success) { popup({ type: "error", title: "Let's check your email", description: valid.error.issues[0]?.message ?? "Enter a valid email address.", primaryLabel: "Try again", secondaryLabel: null }); return; }
+    setGateBusy(true);
+    try {
+      const r = await fetch("/api/public/account-check", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email }) });
+      const body = (await r.json().catch(() => ({}))) as { exists?: boolean; error?: string };
+      if (!r.ok) throw new Error(body.error ?? "We couldn't check your email. Please try again.");
+      setGate(body.exists ? "password" : null);
+    } catch (e) { popup({ type: "error", title: "We couldn't check your email", description: (e as Error).message, primaryLabel: "Close", secondaryLabel: null }); }
+    finally { setGateBusy(false); }
+  };
+  const signIn = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!loginPassword) return;
+    setGateBusy(true);
+    const { error } = await supabase.auth.signInWithPassword({ email: account.email.trim(), password: loginPassword });
+    if (error) {
+      setGateBusy(false);
+      popup({ type: "error", title: /banned/i.test(error.message) ? "Your account is suspended" : "That password didn't work", description: /banned/i.test(error.message) ? "Please contact our support team to restore access." : "Check your password and try again, or reset it below.", primaryLabel: "Try again", secondaryLabel: null });
+      return;
+    }
+    setLoginPassword("");
+    try {
+      if (await mfaNeeded()) { setGate("mfa"); return; }
+      setGate(null); setExisting(true);
+    } catch (e) { popup({ type: "error", title: "We couldn't finish signing you in", description: (e as Error).message, primaryLabel: "Close", secondaryLabel: null }); }
+    finally { setGateBusy(false); }
+  };
+  const forgot = async () => {
+    await supabase.auth.resetPasswordForEmail(account.email.trim(), { redirectTo: `${window.location.origin}/reset-password` });
+    popup({ type: "success", title: "Check your email", description: `We sent a reset link to ${account.email.trim()}. Set a new password in the tab it opens, then come back here and sign in. Your order is kept on this page.`, primaryLabel: "Got it", secondaryLabel: null });
+  };
   const advance = (event: FormEvent) => {
     event.preventDefault();
     const result = step === 1 ? personalSchema.safeParse(personal) : step === 2 ? accountSchema.safeParse(account) : null;
@@ -110,7 +160,7 @@ function Signup() {
     // Supabase doesn't reveal existing emails: it returns a user with no identities and creates nothing. Send them to sign in instead.
     if (data.user && (data.user.identities?.length ?? 0) === 0) {
       setConfirmOpen(false);
-      popup({ type: "info", title: "You already have an account", description: `Sign in to add the ${selectedPlan.name} plan to your existing account. Your projects, plans and invoices stay together there.`, primaryLabel: "Sign in to continue", onPrimary: () => { void navigate({ to: "/", search: { plan: selectedPlan.id } }); }, secondaryLabel: "Cancel" });
+      popup({ type: "info", title: "You already have an account", description: `Sign in to add the ${selectedPlan.name} plan to your existing account.`, primaryLabel: "Sign in", onPrimary: () => { setStep(1); setGate("password"); }, secondaryLabel: null });
       return false;
     }
     setSignature({ name: `${personal.firstName} ${personal.lastName}`, at: new Date().toISOString() });
@@ -129,40 +179,53 @@ function Signup() {
           <span aria-hidden className="hidden h-8 w-px bg-border sm:block" />
           <span className="hidden text-sm font-semibold tracking-tight sm:block">New Service Application</span>
         </div>
-        <span className="text-sm font-semibold sm:hidden">{step < 5 ? steps[step] : step === 5 ? "Almost there…" : "Application complete"}</span>
+        <span className="text-sm font-semibold sm:hidden">{existing ? "Add a plan" : step === 1 && gate ? (gate === "email" ? "Your email" : "Sign in") : step < 5 ? steps[step] : step === 5 ? "Almost there…" : "Application complete"}</span>
         <div className="flex items-center gap-3">
-          <span className="hidden text-sm text-muted-foreground sm:block">{step < 5 ? `${steps[step]} · ${step + 1} of 5` : step === 5 ? "Almost there…" : "Application complete"}</span>
+          <span className="hidden text-sm text-muted-foreground sm:block">{existing ? "Add a plan" : step === 1 && gate ? (gate === "email" ? "Your email" : "Sign in") : step < 5 ? `${steps[step]} · ${step + 1} of 5` : step === 5 ? "Almost there…" : "Application complete"}</span>
           {step < 5 ? <Button variant="ghost" size="icon" aria-label="Close signup" onClick={() => popup({ type: "info", title: "Leave your application?", description: "Your details won't be saved.", primaryLabel: "Leave application", onPrimary: () => { navigate({ to: "/" }); }, secondaryLabel: "Keep going" })}><X /></Button> : <div className="size-9" />}
         </div>
       </div>
     </header>
 
-    {step < 5 ? <>
+    {existing ? <ExistingClientOrder plan={selectedPlan} onDone={() => navigate({ to: "/dashboard" })} /> : step < 5 ? <>
       <div className={`mx-auto px-5 pb-8 pt-6 md:px-6 md:pt-8 ${step === 0 ? "max-w-4xl" : "max-w-lg"}`}>
-        <div className="mb-6 text-center"><h1 className="text-2xl font-extrabold leading-tight lg:text-3xl">{titles[step]}</h1><p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">{subtitles[step]}</p></div>
+        <div className="mb-6 text-center"><h1 className="text-2xl font-extrabold leading-tight lg:text-3xl">{step === 1 && gate ? gateTitles[gate][0] : titles[step]}</h1><p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">{step === 1 && gate ? gateTitles[gate][1] : subtitles[step]}</p></div>
         {step === 0 && <div>
           <PlanCards onChoose={async (plan) => {
-            // Someone already signed in adds the plan to their account instead of registering again.
+            setSelectedPlan(plan);
+            // Someone already signed in adds the plan to their account right here.
             const { data } = await supabase.auth.getSession();
-            if (data.session) { void navigate({ to: "/dashboard/order", search: { plan: plan.id } }); return; }
-            setSelectedPlan(plan); setStep(1);
+            if (data.session && !(await mfaNeeded())) { setExisting(true); return; }
+            setGate("email"); setStep(1);
           }} />
-          <p className="mt-4 text-center text-sm text-muted-foreground">Already have an account? <Button asChild variant="link" className="h-auto p-0 font-semibold text-foreground"><Link to="/" search={{}}>Log in</Link></Button></p>
+          <p className="mt-4 text-center text-sm text-muted-foreground">Already a client? Choose a plan and sign in with your email to add it to your account.</p>
         </div>}
-        {(step === 1 || step === 2) && <form onSubmit={advance} noValidate className="space-y-4">
+        {step === 1 && gate === "email" && <form onSubmit={checkEmail} noValidate className="space-y-4">
+          <Field label="Email Address"><input className="signup-input" type="email" inputMode="email" autoComplete="email" autoFocus value={account.email} maxLength={254} onChange={(e) => setAccount({ ...account, email: e.target.value })} /></Field>
+          <p className="text-xs text-muted-foreground">Already a client? Use the email you sign in with and we'll add this plan to your account.</p>
+          <div className="flex items-center gap-3 pt-4"><Button type="button" variant="secondary" aria-label="Back" className="size-11 shrink-0 rounded-full" onClick={() => setStep(0)}><ArrowLeft /></Button><Button type="submit" disabled={gateBusy} className="signup-primary flex-1">{gateBusy ? <Loader2 className="animate-spin" /> : null}Continue<ArrowRight /></Button></div>
+        </form>}
+        {step === 1 && gate === "password" && <form onSubmit={signIn} noValidate className="space-y-4">
+          <div className="flex items-center justify-between gap-3 border-b pb-3 text-sm"><span className="min-w-0 truncate">{account.email}</span><button type="button" className="shrink-0 text-xs font-medium underline underline-offset-4" onClick={() => { setGate("email"); setLoginPassword(""); }}>Change</button></div>
+          <Field label="Password"><div className="relative"><input className="signup-input pr-12" type={showPassword ? "text" : "password"} autoComplete="current-password" autoFocus maxLength={128} value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} /><Button variant="ghost" size="icon" type="button" aria-label={showPassword ? "Hide password" : "Show password"} className="absolute right-1 top-1/2 -translate-y-1/2" onClick={() => setShowPassword((v) => !v)}>{showPassword ? <EyeOff /> : <Eye />}</Button></div></Field>
+          <button type="button" className="text-xs font-medium underline underline-offset-4" onClick={forgot}>Forgot your password?</button>
+          <div className="flex items-center gap-3 pt-4"><Button type="button" variant="secondary" aria-label="Back" className="size-11 shrink-0 rounded-full" onClick={() => setGate("email")}><ArrowLeft /></Button><Button type="submit" disabled={gateBusy} className="signup-primary flex-1">{gateBusy ? <Loader2 className="animate-spin" /> : null}Sign in and continue<ArrowRight /></Button></div>
+        </form>}
+        {step === 1 && gate === "mfa" && <MfaChallenge onDone={() => { setGate(null); setExisting(true); }} onCancel={async () => { await supabase.auth.signOut(); setGate("password"); }} />}
+        {(step === 2 || (step === 1 && gate === null)) && <form onSubmit={advance} noValidate className="space-y-4">
           {step === 1 ? <>
             <div className="grid gap-4 sm:grid-cols-2"><Field label="First name"><input className="signup-input" autoComplete="given-name" value={personal.firstName} onChange={(e) => setPersonal({ ...personal, firstName: e.target.value })} maxLength={80} /></Field><Field label="Last name"><input className="signup-input" autoComplete="family-name" value={personal.lastName} onChange={(e) => setPersonal({ ...personal, lastName: e.target.value })} maxLength={80} /></Field></div>
             <Field label="Business name"><input className="signup-input" autoComplete="organization" value={personal.company} onChange={(e) => setPersonal({ ...personal, company: e.target.value })} maxLength={160} /></Field>
             <div className="space-y-1.5"><span className="block text-[13px] font-medium">Country<span className="text-primary">*</span></span><CountryField value={personal.country} onChange={setCountry} /></div>
             <div className="space-y-1.5"><label htmlFor="mobile" className="block text-[13px] font-medium">Mobile number<span className="text-primary">*</span></label><div className="signup-group"><CountryField phone value={phoneCountry} onChange={(v) => { phoneTouched.current = true; changePhoneCountry(v); }} /><input id="mobile" autoComplete="tel" type="tel" inputMode="tel" placeholder={phonePlaceholder(phoneCountry as CountryCode | "")} value={phoneNational(personal.phone, phoneCountry as CountryCode | "")} maxLength={24} onChange={(e) => typePhone(e.target.value)} className="h-full min-w-0 flex-1 bg-transparent px-3 text-[15px] outline-none sm:text-sm" /></div></div>
           </> : <>
-            <Field label="Email Address"><input className="signup-input" type="email" inputMode="email" autoComplete="email" value={account.email} maxLength={254} onChange={(e) => setAccount({ ...account, email: e.target.value })} /></Field>
+            <div className="flex items-center justify-between gap-3 border-b pb-3 text-sm"><span className="min-w-0 truncate">{account.email}</span><button type="button" className="shrink-0 text-xs font-medium underline underline-offset-4" onClick={() => { setStep(1); setGate("email"); }}>Change</button></div>
             <Field label="Password"><div className="relative"><input className="signup-input pr-12" type={showPassword ? "text" : "password"} autoComplete="new-password" maxLength={128} value={account.password} onChange={(e) => setAccount({ ...account, password: e.target.value })} /><Button variant="ghost" size="icon" type="button" aria-label={showPassword ? "Hide password" : "Show password"} className="absolute right-1 top-1/2 -translate-y-1/2" onClick={() => setShowPassword((s) => !s)}>{showPassword ? <EyeOff /> : <Eye />}</Button></div></Field>
             <p className="text-xs text-muted-foreground">At least 8 characters.</p>
             <Field label="Confirm password"><input className="signup-input" type={showPassword ? "text" : "password"} autoComplete="new-password" maxLength={128} value={account.confirmPassword} onChange={(e) => setAccount({ ...account, confirmPassword: e.target.value })} /></Field>
             <div className="flex gap-3 border-t pt-5 text-sm text-muted-foreground"><LockKeyhole className="size-5 shrink-0" /><p>Your account is created when you sign your agreement. We'll email you a link to confirm your address.</p></div>
           </>}
-          <div className="flex items-center gap-3 pt-4"><Button type="button" variant="secondary" aria-label="Back" className="size-11 shrink-0 rounded-full" onClick={() => setStep(step - 1)}><ArrowLeft /></Button><Button type="submit" className="signup-primary flex-1">{step === 1 ? "Continue" : "Review application"}<ArrowRight /></Button></div>
+          <div className="flex items-center gap-3 pt-4"><Button type="button" variant="secondary" aria-label="Back" className="size-11 shrink-0 rounded-full" onClick={() => (step === 1 ? setGate("email") : setStep(step - 1))}><ArrowLeft /></Button><Button type="submit" className="signup-primary flex-1">{step === 1 ? "Continue" : "Review application"}<ArrowRight /></Button></div>
         </form>}
         {step === 3 && <div>
           <ReviewSection title="Your application" onEdit={() => setStep(0)}><ReviewRow label="Plan" value={selectedPlan.name} /><ReviewRow label="Service fee" value={`$${selectedPlan.monthlyFee} / month`} /><ReviewRow label="Assigned monthly hours" value={`${selectedPlan.monthlyHours} hours shared across all services; not unlimited`} /><ReviewRow label="Included services" value="Marketing, design & development" /><ReviewRow label="Money-back guarantee" value="90 days if no sales are received. Service fees only; advertising budgets excluded." /></ReviewSection>
@@ -258,3 +321,25 @@ function SuccessScreen({ name, accountNumber, plan, signedAt, email }: { name: s
   </section>;
 }
 
+
+/** An existing client who signed in during signup adds the chosen plan to their account without leaving the flow. */
+function ExistingClientOrder({ plan, onDone }: { plan: Plan; onDone: () => void }) {
+  const fnOrder = useServerFn(orderAdditionalPlan);
+  const [client, setClient] = useState<Parameters<typeof OrderWizard>[0]["client"] | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    void (async () => {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) { setFailed(true); return; }
+      const { data: p } = await supabase.from("profiles").select("first_name, last_name, company, email, phone, country, address_line, city, state, postal_code, account_number").eq("id", u.user.id).maybeSingle();
+      if (!p) { setFailed(true); return; }
+      const address = [p.address_line, [p.city, p.state, p.postal_code].filter(Boolean).join(" ")].filter(Boolean).join(", ") || null;
+      setClient({ name: `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || (p.email ?? ""), company: p.company, email: p.email ?? u.user.email ?? null, phone: p.phone, country: p.country, address, accountNumber: p.account_number });
+    })().catch(() => setFailed(true));
+  }, []);
+  return <div className="px-5 pt-6 md:px-6 md:pt-8">
+    {failed ? <p className="mx-auto max-w-lg text-center text-sm text-muted-foreground">We couldn't load your account. Please refresh the page and try again.</p>
+      : !client ? <div className="grid place-items-center py-16"><Spinner /></div>
+      : <OrderWizard mode="client" initialPlan={plan.id} doneLabel="Go to my dashboard" client={client} onPlace={async (p) => { await fnOrder({ data: { planId: p.id, signed: true } }); }} onDone={onDone} />}
+  </div>;
+}

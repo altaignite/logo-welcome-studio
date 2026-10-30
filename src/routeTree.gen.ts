@@ -30,6 +30,7 @@ import { Route as AdminAccountsIdRouteImport } from './routes/admin.accounts.$id
 import { Route as AdminApplicationsIndexRouteImport } from './routes/admin.applications.index'
 import { Route as AdminApplicationsIdRouteImport } from './routes/admin.applications.$id'
 import { Route as AdminOrderUserIdRouteImport } from './routes/admin.order.$userId'
+import { Route as ApiPublicAccountCheckRouteImport } from './routes/api/public/account-check'
 import { Route as DashboardKindIdRouteImport } from './routes/dashboard.$kind.$id'
 import { Route as AdminRecordsKindIndexRouteImport } from './routes/admin.records.$kind.index'
 import { Route as AdminRecordsKindIdRouteImport } from './routes/admin.records.$kind.$id'
@@ -142,6 +143,11 @@ const AdminOrderUserIdRoute = AdminOrderUserIdRouteImport.update({
   path: '/order/$userId',
   getParentRoute: () => AdminRoute,
 } as any)
+const ApiPublicAccountCheckRoute = ApiPublicAccountCheckRouteImport.update({
+  id: '/api/public/account-check',
+  path: '/api/public/account-check',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardKindIdRoute = DashboardKindIdRouteImport.update({
   id: '/$kind/$id',
   path: '/$kind/$id',
@@ -195,6 +201,7 @@ export interface FileRoutesByFullPath {
   '/admin/accounts/$id': typeof AdminAccountsIdRoute
   '/admin/applications/$id': typeof AdminApplicationsIdRoute
   '/admin/order/$userId': typeof AdminOrderUserIdRoute
+  '/api/public/account-check': typeof ApiPublicAccountCheckRoute
   '/dashboard/$kind/$id': typeof DashboardKindIdRoute
   '/admin/accounts/': typeof AdminAccountsIndexRoute
   '/admin/applications/': typeof AdminApplicationsIndexRoute
@@ -222,6 +229,7 @@ export interface FileRoutesByTo {
   '/admin/accounts/$id': typeof AdminAccountsIdRoute
   '/admin/applications/$id': typeof AdminApplicationsIdRoute
   '/admin/order/$userId': typeof AdminOrderUserIdRoute
+  '/api/public/account-check': typeof ApiPublicAccountCheckRoute
   '/dashboard/$kind/$id': typeof DashboardKindIdRoute
   '/admin/accounts': typeof AdminAccountsIndexRoute
   '/admin/applications': typeof AdminApplicationsIndexRoute
@@ -252,6 +260,7 @@ export interface FileRoutesById {
   '/admin/accounts/$id': typeof AdminAccountsIdRoute
   '/admin/applications/$id': typeof AdminApplicationsIdRoute
   '/admin/order/$userId': typeof AdminOrderUserIdRoute
+  '/api/public/account-check': typeof ApiPublicAccountCheckRoute
   '/dashboard/$kind/$id': typeof DashboardKindIdRoute
   '/admin/accounts/': typeof AdminAccountsIndexRoute
   '/admin/applications/': typeof AdminApplicationsIndexRoute
@@ -283,6 +292,7 @@ export interface FileRouteTypes {
     | '/admin/accounts/$id'
     | '/admin/applications/$id'
     | '/admin/order/$userId'
+    | '/api/public/account-check'
     | '/dashboard/$kind/$id'
     | '/admin/accounts/'
     | '/admin/applications/'
@@ -310,6 +320,7 @@ export interface FileRouteTypes {
     | '/admin/accounts/$id'
     | '/admin/applications/$id'
     | '/admin/order/$userId'
+    | '/api/public/account-check'
     | '/dashboard/$kind/$id'
     | '/admin/accounts'
     | '/admin/applications'
@@ -339,6 +350,7 @@ export interface FileRouteTypes {
     | '/admin/accounts/$id'
     | '/admin/applications/$id'
     | '/admin/order/$userId'
+    | '/api/public/account-check'
     | '/dashboard/$kind/$id'
     | '/admin/accounts/'
     | '/admin/applications/'
@@ -357,6 +369,7 @@ export interface RootRouteChildren {
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SignupRoute: typeof SignupRoute
+  ApiPublicAccountCheckRoute: typeof ApiPublicAccountCheckRoute
   ApiPublicCronCollectionsRoute: typeof ApiPublicCronCollectionsRoute
   ApiPublicCronNotificationsRoute: typeof ApiPublicCronNotificationsRoute
   ApiPublicStripeWebhookRoute: typeof ApiPublicStripeWebhookRoute
@@ -511,6 +524,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminOrderUserIdRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/api/public/account-check': {
+      id: '/api/public/account-check'
+      path: '/api/public/account-check'
+      fullPath: '/api/public/account-check'
+      preLoaderRoute: typeof ApiPublicAccountCheckRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dashboard/$kind/$id': {
       id: '/dashboard/$kind/$id'
       path: '/$kind/$id'
@@ -616,6 +636,7 @@ const rootRouteChildren: RootRouteChildren = {
   ForgotPasswordRoute: ForgotPasswordRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SignupRoute: SignupRoute,
+  ApiPublicAccountCheckRoute: ApiPublicAccountCheckRoute,
   ApiPublicCronCollectionsRoute: ApiPublicCronCollectionsRoute,
   ApiPublicCronNotificationsRoute: ApiPublicCronNotificationsRoute,
   ApiPublicStripeWebhookRoute: ApiPublicStripeWebhookRoute,
