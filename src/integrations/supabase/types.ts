@@ -1552,7 +1552,6 @@ export type Database = {
       account_access_ok: { Args: never; Returns: boolean }
       email_domain_blocked: { Args: { _email: string }; Returns: boolean }
       has_perm: { Args: { _perm: string; _user_id: string }; Returns: boolean }
-      hit_rate_limit: { Args: { _key: string; _max: number; _window_seconds: number }; Returns: boolean }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
