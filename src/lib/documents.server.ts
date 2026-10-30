@@ -24,9 +24,11 @@ export async function ensureAgreements(admin: Admin, applicationId: string) {
   const signedName = /^Plan: (.+)$/.exec(ev?.note ?? "")?.[1];
   const plan = plans.find((p) => p.name === signedName) ?? plans.find((p) => p.id === app.plan_id);
   if (!plan) return [];
-  const prof = must(await admin.from("profiles").select("first_name, last_name").eq("id", app.user_id).maybeSingle());
+  const prof = must(await admin.from("profiles").select("first_name, last_name, company, email, phone, country, address_line, city, state, postal_code").eq("id", app.user_id).maybeSingle());
   const signer = { name: `${prof?.first_name ?? ""} ${prof?.last_name ?? ""}`.trim() || "Client", accountNumber: app.account_number, signedAt: app.signed_at };
-  const rows = await Promise.all(agreementDocuments(plan).map(async (d) => {
+  const address = [prof?.address_line, [prof?.city, prof?.state, prof?.postal_code].filter(Boolean).join(" ")].filter(Boolean).join(", ") || null;
+  const client = { name: signer.name, company: prof?.company, email: prof?.email, phone: prof?.phone, country: prof?.country, address, accountNumber: app.account_number };
+  const rows = await Promise.all(agreementDocuments(plan, client, app.signed_at).map(async (d) => {
     const body = signedAgreementText(d, signer);
     return { user_id: app.user_id, application_id: app.id, title: d.title, body, version: AGREEMENT_VERSION, sha256: await sha256(body), signed_at: app.signed_at };
   }));

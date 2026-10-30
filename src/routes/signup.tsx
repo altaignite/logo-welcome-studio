@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { ArrowLeft, ArrowRight, Check, Clock, ChevronDown, Download, Eye, EyeOff, LockKeyhole, Loader2, PenLine, RefreshCw, ShieldCheck, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Clock, FileText, ChevronDown, Download, Eye, EyeOff, LockKeyhole, Loader2, PenLine, RefreshCw, ShieldCheck, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CountryField, CountryFlag } from "@/components/country-field";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
@@ -33,7 +33,6 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 function Signup() {
   const [step, setStep] = useState(0);
   const [selectedPlan, setSelectedPlan] = useState<Plan>(plans[0]);
-  const documents = agreementDocuments(selectedPlan);
   const [personal, setPersonal] = useState<PersonalDetails>({ firstName: "", lastName: "", company: "", country: "", phone: "" });
   const [phoneCountry, setPhoneCountry] = useState<string>("");
   const [account, setAccount] = useState({ email: "", password: "", confirmPassword: "" });
@@ -45,6 +44,7 @@ function Signup() {
   const [entered, setEntered] = useState("");
   const [documentIndex, setDocumentIndex] = useState<number | null>(null);
   const [signature, setSignature] = useState<{ name: string; at: string; code: string } | null>(null);
+  const documents = agreementDocuments(selectedPlan, { name: `${personal.firstName} ${personal.lastName}`.trim(), company: personal.company, email: account.email, phone: personal.phone, country: personal.country, accountNumber }, signature?.at);
   const usedCodes = useRef(new Set<string>());
   const phoneTouched = useRef(false);
   const countryTouched = useRef(false);
@@ -151,24 +151,21 @@ function Signup() {
         <ol className="flex gap-2 sm:gap-4">{steps.map((name, index) => <li key={name} className="min-w-0 flex-1"><div className={`h-1 rounded-full ${index <= step ? "bg-primary" : "bg-secondary"}`} /><span className={`mt-2 hidden text-xs xl:block ${index === step ? "font-semibold text-foreground" : "text-muted-foreground"}`}>{index + 1}. {name}</span></li>)}</ol>
         <p className="mt-2 text-xs text-muted-foreground xl:hidden">Step {step + 1} of 5</p>
       </nav>
-      <div className="mx-auto max-w-lg px-5 pb-8 pt-6 md:px-6 md:pt-8">
+      <div className={`mx-auto px-5 pb-8 pt-6 md:px-6 md:pt-8 ${step === 0 ? "max-w-4xl" : "max-w-lg"}`}>
         <div className="mb-6 text-center"><h1 className="text-2xl font-extrabold leading-tight lg:text-3xl">{titles[step]}</h1><p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">{subtitles[step]}</p></div>
         {step === 0 && <div>
-          <div className="grid gap-4 pt-2" role="group" aria-label="Subscription plans">{plans.map((plan) => <div key={plan.id} className="rounded-2xl border p-5 sm:p-6">
-            <div className="flex items-start justify-between gap-3">
-              <h2 className="text-xl font-semibold tracking-tight">{plan.name} Plan</h2>
-              {plan.id === "growth" && <span className="rounded-full bg-foreground px-3 py-1 text-xs font-medium text-background">Popular</span>}
+          <div className="grid gap-3 sm:grid-cols-3" role="group" aria-label="Subscription plans">{plans.map((plan) => <div key={plan.id} className={`flex flex-col rounded-2xl border p-4 sm:p-5 ${plan.id === "growth" ? "border-foreground/50" : ""}`}>
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-base font-semibold">{plan.name}</h2>
+              {plan.id === "growth" && <span className="rounded-full bg-foreground px-2 py-0.5 text-[11px] font-medium text-background">Popular</span>}
             </div>
-            <p className="mt-2 flex items-baseline gap-1.5"><span className="text-3xl font-bold tracking-tight">${plan.monthlyFee}</span><span className="text-sm text-muted-foreground">/month</span></p>
-            <p className="mt-2 text-sm text-muted-foreground">{plan.description}</p>
-            <ul className="mt-4 space-y-2 border-t pt-4 text-sm">
-              <li className="flex items-center gap-2.5"><Clock className="size-4 shrink-0 text-muted-foreground" /><span><span className="font-medium">{plan.monthlyHours} service hours</span> assigned every month</span></li>
-              <li className="flex items-center gap-2.5"><Check className="size-4 shrink-0 text-muted-foreground" />Marketing, design and development</li>
-            </ul>
-            <Button className="mt-5 h-12 w-full rounded-2xl bg-foreground text-[15px] font-semibold text-background hover:bg-foreground/90" onClick={() => { setSelectedPlan(plan); setStep(1); }}>Choose {plan.name}</Button>
+            <p className="mt-1 flex items-baseline gap-1"><span className="text-2xl font-bold tracking-tight">${plan.monthlyFee}</span><span className="text-xs text-muted-foreground">/month</span></p>
+            <p className="mt-1 text-xs text-muted-foreground">{plan.description}</p>
+            <p className="mt-3 flex items-center gap-2 border-t pt-3 text-sm sm:mb-4"><Clock className="size-4 shrink-0 text-muted-foreground" /><span><span className="font-semibold">{plan.monthlyHours} hours</span> / month</span></p>
+            <Button className="mt-4 h-10 w-full rounded-xl bg-foreground text-sm font-semibold text-background hover:bg-foreground/90 sm:mt-auto" onClick={() => { setSelectedPlan(plan); setStep(1); }}>Choose {plan.name}</Button>
           </div>)}</div>
-          <div className="mt-5 flex items-start justify-center gap-2 text-center text-xs leading-relaxed text-muted-foreground"><ShieldCheck className="size-4 shrink-0 text-primary" /><p>Hours are shared across all services and are not unlimited. 90-day money-back guarantee on service fees if no sales are received; advertising budgets excluded.</p></div>
-          <p className="mt-5 text-center text-sm text-muted-foreground">Already have an account? <Button asChild variant="link" className="h-auto p-0 font-semibold text-foreground"><Link to="/">Log in</Link></Button></p>
+          <div className="mx-auto mt-4 flex max-w-xl items-start justify-center gap-2 text-center text-xs leading-relaxed text-muted-foreground"><ShieldCheck className="size-4 shrink-0 text-primary" /><p>Every plan includes marketing, design and development. Hours are shared across all services and are not unlimited. 90-day money-back guarantee on service fees if no sales are received; advertising budgets excluded.</p></div>
+          <p className="mt-4 text-center text-sm text-muted-foreground">Already have an account? <Button asChild variant="link" className="h-auto p-0 font-semibold text-foreground"><Link to="/">Log in</Link></Button></p>
         </div>}
         {(step === 1 || step === 2) && <form onSubmit={advance} noValidate className="space-y-4">
           {step === 1 ? <>
@@ -192,12 +189,9 @@ function Signup() {
           <Button className="signup-primary mt-6" onClick={() => setStep(4)}>To your agreements <ArrowRight /></Button>
         </div>}
         {step === 4 && <div>
-          <h2 className="border-b pb-2 text-lg font-semibold">Agreements</h2>
-          {documents.slice(0, 2).map((doc, index) => <DocumentRow key={doc.title} title={doc.title} onRead={() => setDocumentIndex(index)} onDownload={() => downloadDocument(index)} />)}
-          <h2 className="mt-8 border-b pb-2 text-lg font-semibold">Guarantee & privacy</h2>
-          {documents.slice(2).map((doc, index) => <DocumentRow key={doc.title} title={doc.title} onRead={() => setDocumentIndex(index + 2)} onDownload={() => downloadDocument(index + 2)} />)}
-          <p className="mt-6 text-xs leading-relaxed text-muted-foreground">Please read each document. By accepting, you agree to all four and sign them digitally with a confirmation code. You can save a PDF copy of each now, and the signed copies stay in your dashboard.</p>
-          <div className="mt-6 flex gap-3"><Button variant="secondary" aria-label="Back to review" className="size-11 shrink-0 rounded-full" onClick={() => setStep(3)}><ArrowLeft /></Button><Button className="signup-primary flex-1" onClick={openConfirmation}>Accept & continue <PenLine /></Button></div>
+          <ul className="divide-y rounded-xl border">{documents.map((doc, index) => <DocumentRow key={doc.title} title={doc.title} onRead={() => setDocumentIndex(index)} onDownload={() => downloadDocument(index)} />)}</ul>
+          <p className="mt-4 text-xs leading-relaxed text-muted-foreground">Please read each document. By accepting, you agree to all four and sign them digitally with a confirmation code. You can save a PDF copy of each now, and the signed copies stay in your dashboard.</p>
+          <div className="mt-5 flex gap-3"><Button variant="secondary" aria-label="Back to review" className="size-11 shrink-0 rounded-full" onClick={() => setStep(3)}><ArrowLeft /></Button><Button className="signup-primary flex-1" onClick={openConfirmation}>Accept & continue <PenLine /></Button></div>
         </div>}
       </div>
     </> : step === 5 ? <ProcessingScreen hours={selectedPlan.monthlyHours} accountNumber={accountNumber} onDone={() => { setAccount((a) => ({ ...a, password: "", confirmPassword: "" })); setStep(6); }} /> : <SuccessScreen name={personal.firstName} accountNumber={accountNumber} plan={selectedPlan} signedAt={signature?.at ?? new Date().toISOString()} email={account.email} />}
@@ -227,7 +221,7 @@ function ReviewRow({ label, value, country }: { label: string; value: string; co
   return <div className="flex flex-col gap-0.5 py-3 sm:flex-row sm:justify-between sm:gap-6"><p className="shrink-0 text-sm text-muted-foreground">{label}</p><p className="flex items-center gap-2 break-words text-sm font-medium sm:text-right">{country && <CountryFlag code={country} />}{value}</p></div>;
 }
 function DocumentRow({ title, onRead, onDownload }: { title: string; onRead: () => void; onDownload: () => void }) {
-  return <div className="flex items-center justify-between gap-3 border-b py-3"><Button variant="link" className="h-auto whitespace-normal p-0 text-left text-base font-semibold" onClick={onRead}>{title}</Button><Button variant="ghost" size="icon" aria-label={`Download ${title}`} title={`Download ${title}`} className="shrink-0 text-primary" onClick={onDownload}><Download /></Button></div>;
+  return <li className="flex items-center gap-3 px-4 py-2.5 text-sm"><FileText className="size-4 shrink-0 text-muted-foreground" /><button type="button" className="min-w-0 flex-1 truncate text-left font-medium hover:underline" onClick={onRead}>{title}</button><button type="button" className="text-xs font-medium text-primary hover:underline" onClick={onRead}>Read</button><button type="button" aria-label={`Save ${title} as PDF`} title="Save as PDF" className="grid size-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground" onClick={onDownload}><Download className="size-4" /></button></li>;
 }
 const processingStages = (hours: number) => [
   { label: "Verifying your details", ms: 1400 },

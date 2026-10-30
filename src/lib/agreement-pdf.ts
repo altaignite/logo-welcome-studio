@@ -4,16 +4,19 @@ import { AGREEMENT_VERSION, company } from "@/lib/signup";
 type Signer = { name: string; accountNumber: string; signedAt: string };
 
 async function logoData(): Promise<{ data: string; w: number; h: number } | null> {
-  try {
-    const blob = await (await fetch(logo.url)).blob();
-    const data = await new Promise<string>((ok, fail) => { const r = new FileReader(); r.onload = () => ok(String(r.result)); r.onerror = fail; r.readAsDataURL(blob); });
-    const img = await new Promise<HTMLImageElement>((ok, fail) => { const i = new Image(); i.onload = () => ok(i); i.onerror = fail; i.src = data; });
-    // Redraw as PNG so any image format embeds.
-    const canvas = document.createElement("canvas");
-    canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
-    canvas.getContext("2d")!.drawImage(img, 0, 0);
-    return { data: canvas.toDataURL("image/png"), w: img.naturalWidth, h: img.naturalHeight };
-  } catch { return null; }
+  // Load the logo like the page does (same origin, so the canvas stays readable), then shrink it to a print-sized PNG.
+  const load = (src: string) => new Promise<HTMLImageElement>((ok, fail) => { const i = new Image(); i.decoding = "async"; i.onload = () => ok(i); i.onerror = () => fail(new Error("logo")); i.src = src; });
+  for (const src of [logo.url, new URL(logo.url, window.location.origin).href]) {
+    try {
+      const img = await load(src);
+      const scale = Math.min(1, 480 / Math.max(img.naturalWidth, img.naturalHeight));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(img.naturalWidth * scale); canvas.height = Math.round(img.naturalHeight * scale);
+      canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
+      return { data: canvas.toDataURL("image/png"), w: canvas.width, h: canvas.height };
+    } catch { /* try the next source */ }
+  }
+  return null;
 }
 
 /** Strips the plain-text signature footer stored on signed copies, so the PDF can draw a proper signature block instead. */
@@ -32,18 +35,19 @@ export async function downloadAgreementPdf(doc: { title: string; body: string; v
   const version = doc.version ?? AGREEMENT_VERSION;
 
   const header = () => {
-    if (mark) { const h = 28, w = (mark.w / mark.h) * h; pdf.addImage(mark.data, "PNG", M, 36, w, h); }
-    else { pdf.setFont("helvetica", "bold").setFontSize(16).text(company.short, M, 56); }
+    if (mark) { const h = 34, w = Math.min((mark.w / mark.h) * h, 180); pdf.addImage(mark.data, "PNG", M, 36, w, h); }
+    else { pdf.setFont("helvetica", "bold").setFontSize(14).text(company.name, M, 56); }
     pdf.setFont("helvetica", "normal").setFontSize(9).setTextColor(110);
-    pdf.text([company.name, company.website], W - M, 46, { align: "right" });
-    pdf.setDrawColor(220).setLineWidth(0.5).line(M, 76, W - M, 76);
+    pdf.setFont("helvetica", "bold").text(company.name, W - M, 42, { align: "right" });
+    pdf.setFont("helvetica", "normal").text([`Operated by ${company.legalName}`, ...company.address, company.website], W - M, 53, { align: "right" });
+    pdf.setDrawColor(220).setLineWidth(0.5).line(M, 112, W - M, 112);
     pdf.setTextColor(20);
   };
   let y = 0;
-  const newPage = () => { pdf.addPage(); header(); y = 104; };
+  const newPage = () => { pdf.addPage(); header(); y = 138; };
   const need = (h: number) => { if (y + h > H - 64) newPage(); };
 
-  header(); y = 112;
+  header(); y = 148;
   pdf.setFont("helvetica", "bold").setFontSize(20).text(doc.title, M, y); y += 18;
   pdf.setFont("helvetica", "normal").setFontSize(9).setTextColor(110).text(`Version ${version}${signer ? ` · Account ${signer.accountNumber}` : ""}`, M, y); y += 26;
   pdf.setTextColor(20);
@@ -51,7 +55,7 @@ export async function downloadAgreementPdf(doc: { title: string; body: string; v
   for (const para of text.split(/\n\s*\n/)) {
     const lines = para.split("\n");
     for (const [i, line] of lines.entries()) {
-      const heading = /^\d+\.\s/.test(line) && line.length < 80;
+      const heading = (/^\d+\.\s/.test(line) && line.length < 80) || /^(PARTIES|Provider:|Client:)$/.test(line);
       pdf.setFont("helvetica", heading ? "bold" : "normal").setFontSize(heading ? 11.5 : 10.5);
       const wrapped = pdf.splitTextToSize(line, maxW) as string[];
       const lh = heading ? 16 : 15;
