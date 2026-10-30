@@ -57,6 +57,8 @@ function Signup() {
   const [accountNumber, setAccountNumber] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [signature, setSignature] = useState<{ name: string; at: string } | null>(null);
+  // The Stripe payment page for the first invoice, when the signup was approved automatically (undefined while it's prepared).
+  const [payUrl, setPayUrl] = useState<string | null | undefined>(undefined);
   const documents = agreementDocuments(selectedPlan, { name: `${personal.firstName} ${personal.lastName}`.trim(), company: personal.company, email: account.email, phone: personal.phone, country: personal.country, accountNumber }, signature?.at);
   const phoneTouched = useRef(false);
   const countryTouched = useRef(false);
@@ -213,6 +215,9 @@ function Signup() {
       if (r.ok && ((await r.json()) as { restricted?: boolean }).restricted) { setConfirmOpen(false); window.location.assign("/kyc"); return true; }
     } catch { /* the check is best effort; staff still see the flag */ }
     setSignature({ name: `${personal.firstName} ${personal.lastName}`, at: new Date().toISOString() });
+    // Prepare the first invoice while the processing screen runs, so the client can pay before leaving signup.
+    void fetch("/api/public/signup-payment", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ userId: data.user?.id, email: account.email.trim() }) })
+      .then(async (r) => setPayUrl(r.ok ? ((await r.json()) as { payUrl?: string | null }).payUrl ?? null : null)).catch(() => setPayUrl(null));
     setStep(5);
     return true;
   };
@@ -288,7 +293,7 @@ function Signup() {
           <div className="mt-5 flex gap-3"><Button variant="secondary" aria-label="Back to review" className="size-11 shrink-0 rounded-full" onClick={() => setStep(3)}><ArrowLeft /></Button><Button className="signup-primary flex-1" onClick={openConfirmation}>Accept & continue <PenLine /></Button></div>
         </div>}
       </div>
-    </> : step === 5 ? <ProcessingScreen hours={selectedPlan.monthlyHours} accountNumber={accountNumber} onDone={() => { setAccount((a) => ({ ...a, password: "", confirmPassword: "" })); setStep(6); }} /> : <SuccessScreen name={personal.firstName} accountNumber={accountNumber} plan={selectedPlan} signedAt={signature?.at ?? new Date().toISOString()} email={account.email} />}
+    </> : step === 5 ? <ProcessingScreen hours={selectedPlan.monthlyHours} accountNumber={accountNumber} onDone={() => { setAccount((a) => ({ ...a, password: "", confirmPassword: "" })); setStep(6); }} /> : <SuccessScreen name={personal.firstName} accountNumber={accountNumber} plan={selectedPlan} signedAt={signature?.at ?? new Date().toISOString()} email={account.email} payUrl={payUrl} />}
 
       </section>
     </div>
@@ -343,7 +348,7 @@ function ProcessingScreen({ hours, accountNumber, onDone }: { hours: number; acc
 }
 
 
-function SuccessScreen({ name, accountNumber, plan, signedAt, email }: { name: string; accountNumber: string; plan: Plan; signedAt: string; email: string }) {
+function SuccessScreen({ name, accountNumber, plan, signedAt, email, payUrl }: { name: string; accountNumber: string; plan: Plan; signedAt: string; email: string; payUrl: string | null | undefined }) {
   const popup = usePopup();
   // Supabase allows one confirmation email a minute, so the link counts down instead of failing.
   const [cooldown, setCooldown] = useState(60);
@@ -360,13 +365,18 @@ function SuccessScreen({ name, accountNumber, plan, signedAt, email }: { name: s
   const timeline = [
     { title: "Application submitted", text: time, state: "done" },
     { title: "Agreement signed digitally", text: "Your confirmation code was accepted.", state: "done" },
-    { title: "Confirm your email", text: `We sent a link to ${email}. Open it to activate your dashboard login.`, state: "current" },
-    { title: "Approval and first invoice", text: "When you first sign in we check your details, usually instantly. Once approved, your first invoice appears in your dashboard and inbox; your plan starts as soon as it's paid.", state: "todo" },
+    ...(payUrl ? [
+      { title: "Pay your first month", text: `Your application was approved. Pay $${plan.monthlyFee} securely with Stripe to start your plan; the invoice is also in your inbox.`, state: "current" },
+      { title: "Confirm your email", text: `We sent a link to ${email}. Open it to activate your dashboard login.`, state: "todo" },
+    ] : [
+      { title: "Confirm your email", text: `We sent a link to ${email}. Open it to activate your dashboard login.`, state: "current" },
+      { title: "Approval and first invoice", text: payUrl === undefined ? "Preparing your first invoice…" : "We're reviewing your details, usually within one business day. Your first invoice then appears in your dashboard and inbox; your plan starts as soon as it's paid.", state: "todo" },
+    ]),
     { title: "Onboarding call", text: `We'll contact you at ${email} to plan your first month.`, state: "todo" },
     { title: "Your accelerator starts", text: `${plan.monthlyHours} service hours assigned every month.`, state: "todo" },
   ] as const;
   return <section className="mx-auto max-w-lg px-5 pb-12 pt-8 md:px-6 md:pt-12">
-    <div className="text-center"><span className="mx-auto grid size-14 place-items-center rounded-full bg-foreground text-background"><Check className="size-7" /></span><h1 className="mt-5 text-2xl font-bold leading-tight sm:text-3xl">Application submitted, {name}!</h1><p className="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-muted-foreground">Confirm your email to activate your login. Here's what happens next.</p></div>
+    <div className="text-center"><span className="mx-auto grid size-14 place-items-center rounded-full bg-foreground text-background"><Check className="size-7" /></span><h1 className="mt-5 text-2xl font-bold leading-tight sm:text-3xl">Application submitted, {name}!</h1><p className="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-muted-foreground">{payUrl ? "Pay your first month to start, then confirm your email." : "Confirm your email to activate your login. Here's what happens next."}</p></div>
     <dl className="mt-8 divide-y border-y text-sm">
       <div className="flex items-center justify-between gap-3 py-3"><dt className="text-muted-foreground">Account number</dt><dd className="flex items-center gap-2 font-semibold tabular-nums">{formatAccountNumber(accountNumber)}<button type="button" onClick={copy} className="text-xs font-medium underline underline-offset-4 hover:text-muted-foreground">{copied ? "Copied" : "Copy"}</button></dd></div>
       <div className="flex items-center justify-between gap-3 py-3"><dt className="text-muted-foreground">Plan</dt><dd className="font-semibold">{plan.name}, {plan.monthlyHours} hours / month, ${plan.monthlyFee}/month</dd></div>
@@ -376,7 +386,11 @@ function SuccessScreen({ name, accountNumber, plan, signedAt, email }: { name: s
       <span className={`relative grid size-6 shrink-0 place-items-center rounded-full ${item.state === "done" ? "bg-foreground text-background" : item.state === "current" ? "border-2 border-primary bg-background" : "border bg-background"}`}>{item.state === "done" ? <Check className="size-3.5" /> : item.state === "current" ? <span className="size-2 rounded-full bg-primary" /> : null}</span>
       <div className="min-w-0"><p className={`text-sm font-semibold ${item.state === "todo" ? "text-muted-foreground" : ""}`}>{item.title}{item.state === "current" && <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">Now</span>}</p><p className="mt-1 text-sm leading-relaxed text-muted-foreground">{item.text}</p></div>
     </li>)}</ol>
-    <Button asChild className="signup-primary mt-8"><Link to="/">Go to sign in</Link></Button>
+    {payUrl ? <>
+      <Button asChild className="signup-primary mt-8"><a href={payUrl} target="_blank" rel="noopener noreferrer">Pay ${plan.monthlyFee} and start</a></Button>
+      <p className="mt-3 text-center text-xs text-muted-foreground">Secure payment by Stripe. The 90-day money-back guarantee applies (conditions in your agreement).</p>
+      <Button asChild variant="outline" className="mt-3 h-12 w-full rounded-full"><Link to="/">Go to sign in</Link></Button>
+    </> : <Button asChild className="signup-primary mt-8"><Link to="/">Go to sign in</Link></Button>}
     <p className="mt-4 text-center text-xs text-muted-foreground">Didn't get the email? Check your spam folder, or{" "}
       <button type="button" disabled={cooldown > 0} onClick={resend} className="font-medium text-foreground underline underline-offset-4 disabled:no-underline disabled:opacity-60">{cooldown > 0 ? `resend in ${cooldown}s` : "resend it"}</button>.</p>
   </section>;

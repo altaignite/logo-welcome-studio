@@ -35,6 +35,7 @@ import { Route as AdminApplicationsIdRouteImport } from './routes/admin.applicat
 import { Route as AdminOrderUserIdRouteImport } from './routes/admin.order.$userId'
 import { Route as ApiPublicAccountCheckRouteImport } from './routes/api/public/account-check'
 import { Route as ApiPublicCspReportRouteImport } from './routes/api/public/csp-report'
+import { Route as ApiPublicSignupPaymentRouteImport } from './routes/api/public/signup-payment'
 import { Route as DashboardKindIdRouteImport } from './routes/dashboard.$kind.$id'
 import { Route as DashboardChangeIdRouteImport } from './routes/dashboard.change.$id'
 import { Route as AdminRecordsKindIndexRouteImport } from './routes/admin.records.$kind.index'
@@ -173,6 +174,11 @@ const ApiPublicCspReportRoute = ApiPublicCspReportRouteImport.update({
   path: '/api/public/csp-report',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicSignupPaymentRoute = ApiPublicSignupPaymentRouteImport.update({
+  id: '/api/public/signup-payment',
+  path: '/api/public/signup-payment',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardKindIdRoute = DashboardKindIdRouteImport.update({
   id: '/$kind/$id',
   path: '/$kind/$id',
@@ -236,6 +242,7 @@ export interface FileRoutesByFullPath {
   '/admin/order/$userId': typeof AdminOrderUserIdRoute
   '/api/public/account-check': typeof ApiPublicAccountCheckRoute
   '/api/public/csp-report': typeof ApiPublicCspReportRoute
+  '/api/public/signup-payment': typeof ApiPublicSignupPaymentRoute
   '/dashboard/$kind/$id': typeof DashboardKindIdRoute
   '/dashboard/change/$id': typeof DashboardChangeIdRoute
   '/admin/accounts/': typeof AdminAccountsIndexRoute
@@ -269,6 +276,7 @@ export interface FileRoutesByTo {
   '/admin/order/$userId': typeof AdminOrderUserIdRoute
   '/api/public/account-check': typeof ApiPublicAccountCheckRoute
   '/api/public/csp-report': typeof ApiPublicCspReportRoute
+  '/api/public/signup-payment': typeof ApiPublicSignupPaymentRoute
   '/dashboard/$kind/$id': typeof DashboardKindIdRoute
   '/dashboard/change/$id': typeof DashboardChangeIdRoute
   '/admin/accounts': typeof AdminAccountsIndexRoute
@@ -305,6 +313,7 @@ export interface FileRoutesById {
   '/admin/order/$userId': typeof AdminOrderUserIdRoute
   '/api/public/account-check': typeof ApiPublicAccountCheckRoute
   '/api/public/csp-report': typeof ApiPublicCspReportRoute
+  '/api/public/signup-payment': typeof ApiPublicSignupPaymentRoute
   '/dashboard/$kind/$id': typeof DashboardKindIdRoute
   '/dashboard/change/$id': typeof DashboardChangeIdRoute
   '/admin/accounts/': typeof AdminAccountsIndexRoute
@@ -342,6 +351,7 @@ export interface FileRouteTypes {
     | '/admin/order/$userId'
     | '/api/public/account-check'
     | '/api/public/csp-report'
+    | '/api/public/signup-payment'
     | '/dashboard/$kind/$id'
     | '/dashboard/change/$id'
     | '/admin/accounts/'
@@ -375,6 +385,7 @@ export interface FileRouteTypes {
     | '/admin/order/$userId'
     | '/api/public/account-check'
     | '/api/public/csp-report'
+    | '/api/public/signup-payment'
     | '/dashboard/$kind/$id'
     | '/dashboard/change/$id'
     | '/admin/accounts'
@@ -410,6 +421,7 @@ export interface FileRouteTypes {
     | '/admin/order/$userId'
     | '/api/public/account-check'
     | '/api/public/csp-report'
+    | '/api/public/signup-payment'
     | '/dashboard/$kind/$id'
     | '/dashboard/change/$id'
     | '/admin/accounts/'
@@ -432,6 +444,7 @@ export interface RootRouteChildren {
   SignupRoute: typeof SignupRoute
   ApiPublicAccountCheckRoute: typeof ApiPublicAccountCheckRoute
   ApiPublicCspReportRoute: typeof ApiPublicCspReportRoute
+  ApiPublicSignupPaymentRoute: typeof ApiPublicSignupPaymentRoute
   ApiPublicCronCollectionsRoute: typeof ApiPublicCronCollectionsRoute
   ApiPublicCronNotificationsRoute: typeof ApiPublicCronNotificationsRoute
   ApiPublicStripeWebhookRoute: typeof ApiPublicStripeWebhookRoute
@@ -621,6 +634,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicCspReportRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/signup-payment': {
+      id: '/api/public/signup-payment'
+      path: '/api/public/signup-payment'
+      fullPath: '/api/public/signup-payment'
+      preLoaderRoute: typeof ApiPublicSignupPaymentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dashboard/$kind/$id': {
       id: '/dashboard/$kind/$id'
       path: '/$kind/$id'
@@ -742,6 +762,7 @@ const rootRouteChildren: RootRouteChildren = {
   SignupRoute: SignupRoute,
   ApiPublicAccountCheckRoute: ApiPublicAccountCheckRoute,
   ApiPublicCspReportRoute: ApiPublicCspReportRoute,
+  ApiPublicSignupPaymentRoute: ApiPublicSignupPaymentRoute,
   ApiPublicCronCollectionsRoute: ApiPublicCronCollectionsRoute,
   ApiPublicCronNotificationsRoute: ApiPublicCronNotificationsRoute,
   ApiPublicStripeWebhookRoute: ApiPublicStripeWebhookRoute,

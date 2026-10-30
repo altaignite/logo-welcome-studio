@@ -88,6 +88,7 @@ function Login() {
           <div className="mt-3 text-center lg:mt-12">
             <h1 className="text-2xl font-extrabold tracking-tight text-foreground sm:text-4xl">WELCOME BACK!</h1>
             <p className="mt-1 text-sm text-muted-foreground sm:mt-2 sm:text-base">Access your personal account by logging in.</p>
+            <p className="mt-3 text-sm text-muted-foreground">New to First Person Marketing? <Link to="/signup" className="font-semibold text-foreground underline underline-offset-4">Choose a plan and get started</Link></p>
           </div>
 
           {mfa ? <div className="mt-5 flex w-full justify-center sm:mt-8"><MfaChallenge onDone={() => void next()} onCancel={async () => { await supabase.auth.signOut(); setMfa(false); }} /></div> :

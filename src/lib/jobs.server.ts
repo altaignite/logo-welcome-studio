@@ -69,6 +69,14 @@ export async function runDailyReminders(admin: Admin, now = new Date()) {
   }
   const reviews = must(await admin.from("deliverables").select("id, user_id, title, review_round").eq("status", "in_review").lte("submitted_at", addDays(now, -5).toISOString())) ?? [];
   for (const d of reviews) { await notify(admin, d.user_id, "deliverable", `Reminder: ${d.title} is waiting for your review`, null, `/dashboard/deliverable/${d.id}`, `review-reminder:${d.id}:${d.review_round}`); sent++; }
+  // Unpaid first invoices: remind the client 2 and 5 days after it was sent, and alert billing staff after 7 days.
+  const firsts = must(await admin.from("invoices").select("id, user_id, number, issued_at, created_at").eq("kind", "first").eq("status", "open").lte("created_at", addDays(now, -2).toISOString())) ?? [];
+  for (const i of firsts) {
+    const age = Math.floor((now.getTime() - new Date(i.issued_at ?? i.created_at).getTime()) / 86_400_000);
+    const bucket = age >= 5 ? 5 : 2;
+    await notify(admin, i.user_id, "invoice", "Your plan starts when your first invoice is paid", "Pay securely with Stripe from your dashboard to get started.", `/dashboard/invoice/${i.id}`, `first-invoice-reminder:${i.id}:${bucket}`); sent++;
+    if (age >= 7) { await notifyStaff(admin, "billing", null, "invoice", `First invoice ${i.number ?? ""} unpaid for a week`, "The client signed up but hasn't paid. Consider a call.", `/admin/records/invoices/${i.id}`, `first-invoice-unpaid:${i.id}`); sent++; }
+  }
   // Old rate limit counters are no longer needed after a day.
   await admin.from("rate_limit_hits").delete().lt("window_start", addDays(now, -2).toISOString());
   // The security log keeps 180 days of history.

@@ -9,7 +9,7 @@ describe("service agreement", () => {
   const body = docs[0]!.body;
   it("is one plain-language agreement naming both parties, the plan and the date", () => {
     expect(docs.map((d) => d.title)).toEqual(["Service Agreement"]);
-    for (const t of [company.legalName, "Cal Client", "Netherlands", "1234567890", "October 30, 2026", "Growth"]) expect(body).toContain(t);
+    for (const t of [company.legalName, "Cal Client", "Netherlands", "1234 567 890", "October 30, 2026", "Growth"]) expect(body).toContain(t);
     expect(body).not.toMatch(/demonstration|lorem|placeholder/i);
   });
   it("discloses automatic renewal and cancellation, and incorporates the full policies by reference", () => {

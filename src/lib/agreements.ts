@@ -17,7 +17,7 @@ export const companyLine = `${company.legalName}, ${company.entity} doing busine
 export type AgreementClient = { name: string; company?: string | null; email?: string | null; phone?: string | null; country?: string | null; address?: string | null; accountNumber?: string | null };
 
 /** Bump when agreement wording changes; signed copies record the version they were rendered from. */
-export const AGREEMENT_VERSION = "2026-10-30.8";
+export const AGREEMENT_VERSION = "2026-10-30.9";
 
 /**
  * Agreement body markup, shared by the reading dialog and the PDF:
@@ -64,9 +64,9 @@ function partiesTable(client: AgreementClient | undefined, date: string | undefi
     "|| | Provider | Client",
     row("Party", `${company.legalName}, d/b/a ${company.name}`, c ? c.name : "As identified at signature"),
     row("Business", company.name, c?.company),
-    row("Address", company.address.join(", "), [c?.address, countryLabel(c?.country)].filter(Boolean).join(", ")),
+    row(c?.address ? "Address" : "Address / country", company.address.join(", "), [c?.address, countryLabel(c?.country)].filter(Boolean).join(", ")),
     row("Contact", company.website, [c?.email, c?.phone].filter(Boolean).join(", ")),
-    row("Account number", "—", c?.accountNumber),
+    row("Account number", "—", c?.accountNumber?.replace(/^(\d{4})(\d{3})(\d{3})$/, "$1 $2 $3")),
     `| Effective date | ${longDate(date)} | `,
   ].join("\n");
 }
