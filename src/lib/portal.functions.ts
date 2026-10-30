@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSession } from "@/lib/session.middleware";
+import { limited, requireSession } from "@/lib/session.middleware";
 import { clientResponse } from "@/lib/admin";
 import { guaranteeClaimSchema, infoResponseSchema } from "@/lib/client";
 import { briefSchema, missingAnswers } from "@/lib/onboarding";
@@ -12,7 +12,7 @@ const fileInput = z.object({ name: z.string().min(1).max(255), size: z.number().
 
 /** Client answers an information request: their reply is shared on the timeline and the application goes back to review. */
 export const respondToInfoRequest = createServerFn({ method: "POST" })
-  .middleware([requireSession])
+  .middleware([limited("infoReply")])
   .inputValidator((d: unknown) => infoResponseSchema.parse(d))
   .handler(async ({ data, context }) => {
     const { getAdmin, must } = await import("@/lib/billing.server");
@@ -29,7 +29,7 @@ export const respondToInfoRequest = createServerFn({ method: "POST" })
 
 /** Client claims the 90-day money-back guarantee. Staff review it from a high-priority billing ticket and refund through Stripe. */
 export const claimGuarantee = createServerFn({ method: "POST" })
-  .middleware([requireSession])
+  .middleware([limited("guarantee")])
   .inputValidator((d: unknown) => guaranteeClaimSchema.parse(d))
   .handler(async ({ data, context }) => {
     const { getAdmin, must } = await import("@/lib/billing.server");
@@ -51,7 +51,7 @@ export const claimGuarantee = createServerFn({ method: "POST" })
 
 /** Client approves a deliverable or asks for changes. */
 export const reviewDeliverable = createServerFn({ method: "POST" })
-  .middleware([requireSession])
+  .middleware([limited("review")])
   .inputValidator((d: unknown) => reviewDecision.parse(d))
   .handler(async ({ data, context }) => {
     const { getAdmin, must } = await import("@/lib/billing.server");
@@ -69,7 +69,7 @@ export const reviewDeliverable = createServerFn({ method: "POST" })
 
 /** Saves the onboarding brief as a draft, or submits it once every required answer is there. */
 export const saveOnboardingBrief = createServerFn({ method: "POST" })
-  .middleware([requireSession])
+  .middleware([limited("brief")])
   .inputValidator((d: unknown) => z.object({ answers: briefSchema, submit: z.boolean() }).parse(d))
   .handler(async ({ data, context }) => {
     const { getAdmin, must } = await import("@/lib/billing.server");
@@ -87,7 +87,7 @@ export const saveOnboardingBrief = createServerFn({ method: "POST" })
 
 /** The client's signed agreements, stored on first request. */
 export const myAgreements = createServerFn({ method: "POST" })
-  .middleware([requireSession])
+  .middleware([limited("agreements")])
   .handler(async ({ context }) => {
     const { getAdmin, must } = await import("@/lib/billing.server");
     const { ensureAgreements } = await import("@/lib/documents.server");
@@ -100,7 +100,7 @@ export const myAgreements = createServerFn({ method: "POST" })
 
 /** Staff (work permission) upload for a client, or a client uploading their own file. Returns a one-time upload URL token. */
 export const startFileUpload = createServerFn({ method: "POST" })
-  .middleware([requireSession])
+  .middleware([limited("upload")])
   .inputValidator((d: unknown) => z.object({
     clientId: uuid.optional(), title: z.string().trim().max(200), file: fileInput,
     relatedTable: z.string().max(40).optional(), relatedId: uuid.optional(), visibleToClient: z.boolean().optional(),
@@ -131,7 +131,7 @@ export const startFileUpload = createServerFn({ method: "POST" })
   });
 
 export const finishFileUpload = createServerFn({ method: "POST" })
-  .middleware([requireSession])
+  .middleware([limited("upload")])
   .inputValidator((d: unknown) => z.object({ documentId: uuid }).parse(d))
   .handler(async ({ data, context }) => {
     const { getAdmin, must } = await import("@/lib/billing.server");
@@ -149,7 +149,7 @@ export const finishFileUpload = createServerFn({ method: "POST" })
 
 /** Short-lived download link: staff for any file, clients for their own shared files. */
 export const fileLink = createServerFn({ method: "POST" })
-  .middleware([requireSession])
+  .middleware([limited("download")])
   .inputValidator((d: unknown) => z.object({ documentId: uuid }).parse(d))
   .handler(async ({ data, context }) => {
     const { getAdmin, must } = await import("@/lib/billing.server");
@@ -174,7 +174,7 @@ const ticketInput = z.object({
 
 /** Client opens a support ticket. Every field is checked here; clients can't write tickets directly. */
 export const createSupportTicket = createServerFn({ method: "POST" })
-  .middleware([requireSession])
+  .middleware([limited("ticket")])
   .inputValidator((d: unknown) => ticketInput.parse(d))
   .handler(async ({ data, context }) => {
     const { getAdmin, must } = await import("@/lib/billing.server");
@@ -195,7 +195,7 @@ export const createSupportTicket = createServerFn({ method: "POST" })
 
 /** Client replies on their own open ticket. */
 export const replyToTicket = createServerFn({ method: "POST" })
-  .middleware([requireSession])
+  .middleware([limited("reply")])
   .inputValidator((d: unknown) => z.object({ ticketId: uuid, body: z.string().trim().min(1).max(5000) }).parse(d))
   .handler(async ({ data, context }) => {
     const { getAdmin, must } = await import("@/lib/billing.server");

@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSession } from "@/lib/session.middleware";
+import { limited, requireSession } from "@/lib/session.middleware";
 
 const uuid = z.string().uuid();
 const label = (c: { claims: any }) => String(c.claims?.email ?? "Staff");
@@ -14,7 +14,7 @@ async function requireTarget(context: any, userId: string) {
 
 /** Sign-in details for the account Security tab: auth record, sessions, two-factor factors and recent sign-ins. Any staff may view. */
 export const getAccountSecurity = createServerFn({ method: "POST" })
-  .middleware([requireSession])
+  .middleware([limited("lookup")])
   .inputValidator((d: unknown) => z.object({ userId: uuid }).parse(d))
   .handler(async ({ data, context }) => {
     const { isStaff } = await import("@/lib/access.server");
@@ -43,7 +43,7 @@ export const getAccountSecurity = createServerFn({ method: "POST" })
 
 /** Ends one session or every session of a user. Access tokens already issued expire within the hour, and suspended accounts are refused at once. */
 export const revokeSessions = createServerFn({ method: "POST" })
-  .middleware([requireSession])
+  .middleware([limited("sessionAdmin")])
   .inputValidator((d: unknown) => z.object({ userId: uuid, sessionId: uuid.optional(), reason: z.string().trim().min(3).max(500) }).parse(d))
   .handler(async ({ data, context }) => {
     await requireTarget(context, data.userId);
@@ -57,7 +57,7 @@ export const revokeSessions = createServerFn({ method: "POST" })
 
 /** Replaces the user's profile metadata (short flat values only). */
 export const updateUserMetadata = createServerFn({ method: "POST" })
-  .middleware([requireSession])
+  .middleware([limited("sessionAdmin")])
   .inputValidator((d: unknown) => z.object({ userId: uuid, metadata: z.record(z.union([z.string(), z.number(), z.boolean(), z.null()])) }).parse(d))
   .handler(async ({ data, context }) => {
     await requireTarget(context, data.userId);
@@ -75,7 +75,7 @@ export const updateUserMetadata = createServerFn({ method: "POST" })
 
 /** Removes a two-factor factor (for a client who lost their phone) and ends their sessions so they sign in again. */
 export const removeMfaFactor = createServerFn({ method: "POST" })
-  .middleware([requireSession])
+  .middleware([limited("sessionAdmin")])
   .inputValidator((d: unknown) => z.object({ userId: uuid, factorId: uuid, reason: z.string().trim().min(3).max(500) }).parse(d))
   .handler(async ({ data, context }) => {
     await requireTarget(context, data.userId);
@@ -90,7 +90,7 @@ export const removeMfaFactor = createServerFn({ method: "POST" })
 
 /** Emails the user a password reset link. */
 export const sendPasswordReset = createServerFn({ method: "POST" })
-  .middleware([requireSession])
+  .middleware([limited("passwordReset")])
   .inputValidator((d: unknown) => z.object({ userId: uuid }).parse(d))
   .handler(async ({ data, context }) => {
     await requireTarget(context, data.userId);

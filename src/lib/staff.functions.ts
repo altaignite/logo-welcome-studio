@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSession } from "@/lib/session.middleware";
+import { limited, requireSession } from "@/lib/session.middleware";
 import { leavesAnOwner, staffLevels } from "@/lib/staff";
 
 const uuid = z.string().uuid();
@@ -14,7 +14,7 @@ async function staffList(context: any) {
 
 /** Owners set another staff member's level. At least one owner always remains. */
 export const setStaffLevel = createServerFn({ method: "POST" })
-  .middleware([requireSession])
+  .middleware([limited("staffAdmin")])
   .inputValidator((d: unknown) => z.object({ userId: uuid, level: z.enum(staffLevels) }).parse(d))
   .handler(async ({ data, context }) => {
     const { requirePerm } = await import("@/lib/access.server");
@@ -33,7 +33,7 @@ export const setStaffLevel = createServerFn({ method: "POST" })
 
 /** Owners remove someone's staff access. They keep their sign-in but lose the admin. */
 export const revokeStaff = createServerFn({ method: "POST" })
-  .middleware([requireSession])
+  .middleware([limited("staffAdmin")])
   .inputValidator((d: unknown) => z.object({ userId: uuid, reason: z.string().trim().min(3).max(500) }).parse(d))
   .handler(async ({ data, context }) => {
     const { requirePerm } = await import("@/lib/access.server");
@@ -53,7 +53,7 @@ export const revokeStaff = createServerFn({ method: "POST" })
 
 /** Require two-factor sign-in for every staff member. The owner turning it on must already use it, so they aren't locked out. */
 export const setStaffMfaRequired = createServerFn({ method: "POST" })
-  .middleware([requireSession])
+  .middleware([limited("staffAdmin")])
   .inputValidator((d: unknown) => z.object({ required: z.boolean() }).parse(d))
   .handler(async ({ data, context }) => {
     const { requirePerm } = await import("@/lib/access.server");
@@ -69,7 +69,7 @@ export const setStaffMfaRequired = createServerFn({ method: "POST" })
 
 /** Email clients from a template or a one-off message. Shows in their inbox, is emailed, and is logged as an activity. */
 export const sendClientMessage = createServerFn({ method: "POST" })
-  .middleware([requireSession])
+  .middleware([limited("clientEmail")])
   .inputValidator((d: unknown) => z.object({
     userIds: z.array(uuid).min(1).max(200), subject: z.string().trim().min(2).max(200), body: z.string().trim().min(2).max(2000), purpose: z.enum(["service", "marketing"]),
   }).parse(d))
@@ -102,7 +102,7 @@ export const sendClientMessage = createServerFn({ method: "POST" })
 
 /** Signed agreements for an application, stored on first view (staff). */
 export const applicationAgreements = createServerFn({ method: "POST" })
-  .middleware([requireSession])
+  .middleware([limited("agreements")])
   .inputValidator((d: unknown) => z.object({ applicationId: uuid }).parse(d))
   .handler(async ({ data, context }) => {
     const { isStaff } = await import("@/lib/access.server");
@@ -114,7 +114,7 @@ export const applicationAgreements = createServerFn({ method: "POST" })
 
 /** Fulfils an access request: exports the client's data to a file they can download, then completes the request. */
 export const fulfilAccessRequest = createServerFn({ method: "POST" })
-  .middleware([requireSession])
+  .middleware([limited("privacyFulfil")])
   .inputValidator((d: unknown) => z.object({ requestId: uuid }).parse(d))
   .handler(async ({ data, context }) => {
     const { requirePerm } = await import("@/lib/access.server");
@@ -140,7 +140,7 @@ export const fulfilAccessRequest = createServerFn({ method: "POST" })
 
 /** Fulfils a closure request: cancels nothing itself, refuses while money or plans are open, then anonymises and blocks sign-in. */
 export const fulfilDeletionRequest = createServerFn({ method: "POST" })
-  .middleware([requireSession])
+  .middleware([limited("privacyFulfil")])
   .inputValidator((d: unknown) => z.object({ requestId: uuid, note: z.string().trim().min(3).max(1000) }).parse(d))
   .handler(async ({ data, context }) => {
     const { requirePerm } = await import("@/lib/access.server");

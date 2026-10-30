@@ -69,6 +69,8 @@ export async function runDailyReminders(admin: Admin, now = new Date()) {
   }
   const reviews = must(await admin.from("deliverables").select("id, user_id, title, review_round").eq("status", "in_review").lte("submitted_at", addDays(now, -5).toISOString())) ?? [];
   for (const d of reviews) { await notify(admin, d.user_id, "deliverable", `Reminder: ${d.title} is waiting for your review`, null, `/dashboard/deliverable/${d.id}`, `review-reminder:${d.id}:${d.review_round}`); sent++; }
+  // Old rate limit counters are no longer needed after a day.
+  await admin.from("rate_limit_hits").delete().lt("window_start", addDays(now, -2).toISOString());
   // Money-back guarantee: tell clients when their refund window opens, and close it when it ends.
   const running = must(await admin.from("subscriptions").select("id, user_id, plan_name, started_at").eq("guarantee_status", "running").not("started_at", "is", null)) ?? [];
   for (const g of running) {

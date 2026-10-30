@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSession } from "@/lib/session.middleware";
+import { limited, requireSession } from "@/lib/session.middleware";
 import { accountStatuses, signInBlocked, subscriptionEffect } from "@/lib/admin";
 
 const input = z.object({
@@ -13,7 +13,7 @@ const input = z.object({
  * closed accounts, plans are paused (on hold, suspended) or cancelled (cancelled, closed) in Stripe first, and plans paused by an
  * earlier hold resume when the account becomes active again. Returns what was done so staff can see it. */
 export const setAccountStatus = createServerFn({ method: "POST" })
-  .middleware([requireSession])
+  .middleware([limited("accountStatus")])
   .inputValidator((d: unknown) => input.parse(d))
   .handler(async ({ data, context }) => {
     const { requirePerm } = await import("@/lib/access.server");
@@ -78,7 +78,7 @@ const inviteInput = z.object({
 
 /** Staff add a client by email: Supabase sends an invitation to set a password, and the signup trigger builds the profile. */
 export const inviteClient = createServerFn({ method: "POST" })
-  .middleware([requireSession])
+  .middleware([limited("invite")])
   .inputValidator((d: unknown) => inviteInput.parse(d))
   .handler(async ({ data, context }) => {
     const { requirePerm } = await import("@/lib/access.server");

@@ -74,7 +74,7 @@ describe("support and server-side writes", () => {
   it("cover every table signed-in users can reach with the active-account rule", () => {
     const all = readdirSync("drizzle/migrations").filter((f) => f.endsWith(".sql")).map((f) => readFileSync(`drizzle/migrations/${f}`, "utf8")).join("\n");
     const rls = new Set([...all.matchAll(/ALTER TABLE public\.(\w+) ENABLE ROW LEVEL SECURITY/gi)].map((m) => m[1]!));
-    for (const t of ["stripe_events", "job_runs"]) rls.delete(t);
+    for (const t of ["stripe_events", "job_runs", "rate_limit_hits"]) rls.delete(t);
     const covered = new Set<string>();
     for (const m of all.matchAll(/FOREACH t IN ARRAY ARRAY\[([^\]]*)\] LOOP\s*EXECUTE format\('CREATE POLICY "active account"/g)) for (const t of m[1]!.matchAll(/'(\w+)'/g)) covered.add(t[1]!);
     expect([...rls].filter((t) => !covered.has(t))).toEqual([]);
