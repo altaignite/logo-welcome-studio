@@ -18,3 +18,17 @@ describe("security log", () => {
   });
   it("has guidance for unknown kinds too", () => expect(guideFor("something_new").actions.length).toBeGreaterThan(0));
 });
+
+describe("Turnstile", () => {
+  it("uses the project's widget, keeps the secret server-side and only owners can set it", () => {
+    const srv = readFileSync("src/lib/turnstile.server.ts", "utf8");
+    expect(srv).toContain('TURNSTILE_SITE_KEY = "0x4AAAAAAFsskqAgEnHzOGC5"');
+    const fns = readFileSync("src/lib/security.functions.ts", "utf8");
+    const save = fns.slice(fns.indexOf("export const saveTurnstileKeys"));
+    expect(save).toMatch(/requirePerm\(context, "staff"\)/);
+    expect(save).toMatch(/secretKeyValid/);
+    expect(save).not.toMatch(/return \{[^}]*secret/i);
+    const cfg = readFileSync("src/routes/api/public/turnstile-config.ts", "utf8");
+    expect(cfg).not.toMatch(/secretKey\b(?! \?)/);
+  });
+});
