@@ -1,0 +1,1 @@
+COMMENT ON TABLE public.sign_in_events IS 'One row per signed-in session, recorded by requireSession.';

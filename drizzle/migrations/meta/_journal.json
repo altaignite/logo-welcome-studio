@@ -92,6 +92,13 @@
       "when": 1793321896298,
       "tag": "0012_account_security_saas",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1793324375388,
+      "tag": "0013_apply_pending_security",
+      "breakpoints": true
     }
   ]
 }

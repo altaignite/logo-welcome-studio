@@ -1551,8 +1551,6 @@ export type Database = {
     Functions: {
       account_access_ok: { Args: never; Returns: boolean }
       email_domain_blocked: { Args: { _email: string }; Returns: boolean }
-      revoke_user_sessions: { Args: { _session?: string; _user: string }; Returns: number }
-      user_sessions: { Args: { _user: string }; Returns: Json[] }
       has_perm: { Args: { _perm: string; _user_id: string }; Returns: boolean }
       has_role: {
         Args: {
@@ -1592,6 +1590,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      revoke_user_sessions: {
+        Args: { _session?: string; _user: string }
+        Returns: number
+      }
       staff_directory: {
         Args: never
         Returns: {
@@ -1613,6 +1615,7 @@ export type Database = {
           title: string
         }[]
       }
+      user_sessions: { Args: { _user: string }; Returns: Json[] }
     }
     Enums: {
       app_role: "admin" | "user"
