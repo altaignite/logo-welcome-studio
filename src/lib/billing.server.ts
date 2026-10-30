@@ -83,14 +83,15 @@ export async function issueStripeInvoice(admin: Admin, o: {
     due_at: due, status: "open", kind: o.kind, stripe_invoice_id: inv.id, hosted_url: fin.hosted_invoice_url, pdf_url: fin.invoice_pdf,
   }, { onConflict: "stripe_invoice_id" }).select("*").single();
   if (error) throw new Error("Invoice was sent but couldn't be saved locally.");
+  if (o.subscriptionId) await applySubscriptionStanding(admin, o.subscriptionId, `Invoice ${row.number} issued`);
   return row;
 }
 
 /** Activation after the first invoice is paid: starts the Stripe subscription, project and guarantee window. */
 export async function activateSubscription(admin: Admin, subId: string) {
   const sub = must(await admin.from("subscriptions").select("*").eq("id", subId).maybeSingle());
-  if (!sub || sub.status === "active") return;
-  if (sub.status !== "pending") {
+  if (!sub || sub.started_at) return;
+  if (!["pending", "past_due", "suspended"].includes(sub.status)) {
     // Paid after staff paused or cancelled it: don't start billing, flag it for staff instead.
     const warning = `First invoice paid while the subscription was ${sub.status}. Review and refund or reactivate.`;
     must(await admin.from("subscriptions").update({ payment_warning: warning }).eq("id", subId));
@@ -114,43 +115,32 @@ export async function activateSubscription(admin: Admin, subId: string) {
     status: "active", started_at: now.toISOString(), first_paid_at: sub.first_paid_at ?? now.toISOString(), renews_at: next.toISOString(),
     guarantee_ends_at: guaranteeEnd(now).toISOString(), guarantee_status: "running", stripe_subscription_id: stripeSubId, payment_warning: null,
   }).eq("id", subId));
-  must(await admin.from("projects").update({ status: "active", started_at: today() }).eq("subscription_id", subId).in("status", ["planned", "pending", "on_hold"]));
+  
   if (sub.application_id) must(await admin.from("applications").update({ status: "approved", decided_at: now.toISOString() }).eq("id", sub.application_id).in("status", ["submitted", "in_review", "escalated", "info_requested"]));
   await audit(admin, sub.user_id, "subscriptions", subId, "activated", { status: { from: sub.status, to: "active" }, reason: "First invoice paid" }, null, "Stripe");
 }
 
-/** Suspends subscription, its projects and its application after payment failure retries end. */
+/** Linked work is updated transactionally by sync_linked_billing_work. */
 export async function suspendForNonPayment(admin: Admin, subId: string, note: string) {
   const sub = must(await admin.from("subscriptions").select("*").eq("id", subId).maybeSingle());
-  if (!sub || sub.status === "suspended" || sub.status === "cancelled") return;
-  const warning = `Suspended for non-payment: ${note}`;
-  must(await admin.from("subscriptions").update({ status: "suspended", payment_warning: warning, notes: [sub.notes, `${today()} ${warning}`].filter(Boolean).join("\n") }).eq("id", subId));
-  must(await admin.from("projects").update({ status: "on_hold" }).eq("subscription_id", subId).eq("status", "active"));
-  if (sub.application_id) {
-    must(await admin.from("applications").update({ status: "suspended" }).eq("id", sub.application_id));
-    await admin.from("application_events").insert({ application_id: sub.application_id, actor_label: "Stripe", action: "Suspended for non-payment", to_status: "suspended", note });
-  }
-  await audit(admin, sub.user_id, "subscriptions", subId, "suspended", { status: { from: sub.status, to: "suspended" }, reason: note }, null, "Stripe");
+  if (!sub || sub.status === "cancelled") return;
+  must(await admin.from("subscriptions").update({ status: "suspended", payment_warning: `Suspended for non-payment: ${note}` }).eq("id", subId));
+  if (sub.status !== "suspended") await audit(admin, sub.user_id, "subscriptions", subId, "suspended", { reason: note }, null, "Stripe");
 }
 
 export async function reinstateAfterPayment(admin: Admin, subId: string) {
   const sub = must(await admin.from("subscriptions").select("*").eq("id", subId).maybeSingle());
-  if (!sub || (sub.status !== "suspended" && sub.status !== "past_due")) return;
+  if (!sub || !sub.started_at || sub.status === "cancelled") return;
   must(await admin.from("subscriptions").update({ status: "active", payment_warning: null }).eq("id", subId));
-  must(await admin.from("projects").update({ status: "active" }).eq("subscription_id", subId).eq("status", "on_hold"));
-  if (sub.application_id && sub.status === "suspended") {
-    must(await admin.from("applications").update({ status: "approved" }).eq("id", sub.application_id).eq("status", "suspended"));
-    await admin.from("application_events").insert({ application_id: sub.application_id, actor_label: "Stripe", action: "Reinstated after payment", to_status: "approved", note: "Outstanding invoice paid" });
-  }
-  await audit(admin, sub.user_id, "subscriptions", subId, "reinstated", { status: { from: sub.status, to: "active" }, reason: "Payment received" }, null, "Stripe");
+  if (sub.status !== "active") await audit(admin, sub.user_id, "subscriptions", subId, "reinstated", { reason: "All outstanding invoices resolved" }, null, "Stripe");
 }
 
 export async function markPastDue(admin: Admin, subId: string, note: string) {
   const sub = must(await admin.from("subscriptions").select("*").eq("id", subId).maybeSingle());
-  if (!sub) return;
+  if (!sub || sub.status === "cancelled") return;
   const voids = failedPaymentVoidsGuarantee(sub.first_paid_at) && sub.guarantee_status === "running";
   must(await admin.from("subscriptions").update({
-    status: sub.status === "suspended" ? "suspended" : "past_due", payment_warning: `Payment failed: ${note}`,
+    status: ["suspended", "paused"].includes(sub.status) ? sub.status : "past_due", payment_warning: `Payment failed: ${note}`,
     ...(voids ? { guarantee_status: "void", guarantee_void_reason: "Failed payment after the initial successful payment" } : {}),
   }).eq("id", subId));
   await audit(admin, sub.user_id, "subscriptions", subId, "payment_failed", { note, ...(voids ? { guarantee: { from: "running", to: "void" } } : {}) }, null, "Stripe");
@@ -212,31 +202,20 @@ export async function syncSubscriptionFromStripe(admin: Admin, subId: string, s:
   if (!sub) return;
   const paused = s.status === "paused" || !!s.pause_collection;
   const periodEnd = s.current_period_end ?? s.items?.data?.[0]?.current_period_end ?? null;
-  const live = paused ? "paused" : String(s.status);
-  must(await admin.from("subscriptions").update({
-    stripe_status: live, stripe_synced_at: new Date().toISOString(), cancel_at_period_end: !!s.cancel_at_period_end,
+  // A pause initiated by debt recovery is not a client pause and must retain its debt state.
+  const live = ["canceled", "incomplete_expired"].includes(s.status) ? "canceled" : paused && !sub.paused_for_nonpayment ? "paused" : String(s.status);
+  const patch: any = {
+    stripe_subscription_id: s.id, stripe_status: live, stripe_synced_at: new Date().toISOString(), cancel_at_period_end: !!s.cancel_at_period_end,
     ...(periodEnd ? { current_period_end: new Date(periodEnd * 1000).toISOString(), renews_at: new Date(periodEnd * 1000).toISOString() } : {}),
-  }).eq("id", subId));
-  if (live === "canceled") {
-    if (sub.status !== "cancelled") {
-      must(await admin.from("subscriptions").update({ status: "cancelled", cancelled_at: new Date().toISOString() }).eq("id", subId));
-      must(await admin.from("projects").update({ status: "cancelled" }).eq("subscription_id", subId).in("status", ["planned", "active", "on_hold"]));
-      await audit(admin, sub.user_id, "subscriptions", subId, "cancelled", { status: { from: sub.status, to: "cancelled" }, reason: "Cancelled in Stripe" }, null, "Stripe");
-    }
-  } else if (live === "unpaid") await suspendForNonPayment(admin, subId, "Payment retries exhausted");
-  else if (live === "past_due") { if (sub.status === "active") await markPastDue(admin, subId, "Renewal payment overdue"); }
-  else if (live === "paused") {
-    if (sub.status === "active" || sub.status === "past_due") {
-      must(await admin.from("subscriptions").update({ status: "paused" }).eq("id", subId));
-      await audit(admin, sub.user_id, "subscriptions", subId, "paused", { status: { from: sub.status, to: "paused" }, reason: "Paused in Stripe" }, null, "Stripe");
-    }
-  } else if (live === "active" || live === "trialing") {
-    if (sub.status === "past_due" || sub.status === "suspended") await reinstateAfterPayment(admin, subId);
-    else if (sub.status === "paused" && !sub.paused_by_account_status) {
-      must(await admin.from("subscriptions").update({ status: "active" }).eq("id", subId));
-      await audit(admin, sub.user_id, "subscriptions", subId, "resume", { status: { from: "paused", to: "active" }, reason: "Resumed in Stripe" }, null, "Stripe");
-    }
-  }
+  };
+  if (live === "canceled") Object.assign(patch, { status: "cancelled", cancelled_at: new Date().toISOString() });
+  else if (live === "paused" && !sub.paused_for_nonpayment) {
+    Object.assign(patch, { status: "paused" });
+    const { pauseVoidsGuarantee } = await import("@/lib/billing");
+    if (sub.guarantee_status === "running" && pauseVoidsGuarantee(sub.started_at)) Object.assign(patch, { guarantee_status: "void", guarantee_void_reason: "Paused within the first 90 days" });
+  } else if (["active", "trialing"].includes(live) && sub.status === "paused" && !sub.paused_by_account_status && !sub.paused_for_nonpayment) patch.status = sub.started_at ? "past_due" : "pending";
+  must(await admin.from("subscriptions").update(patch).eq("id", subId));
+  await applySubscriptionStanding(admin, subId, "Stripe subscription updated", "Stripe");
 }
 
 /** Daily check that local subscriptions and unpaid invoices match Stripe, for anything a missed webhook left behind.
@@ -248,20 +227,12 @@ export async function reconcileStripe(admin: Admin, limit = 200) {
     try { await syncSubscriptionFromStripe(admin, r.id, await stripe("GET", `subscriptions/${r.stripe_subscription_id}`)); subs++; }
     catch (e) { console.error("Stripe subscription sync failed", r.id, e); }
   }
-  const open = must(await admin.from("invoices").select("id, user_id, number, status, stripe_invoice_id, subscription_id").in("status", ["open", "overdue"]).not("stripe_invoice_id", "is", null).limit(limit)) ?? [];
+  const open = must(await admin.from("invoices").select("id, user_id, number, status, stripe_invoice_id, subscription_id").in("status", ["open", "overdue", "uncollectible"]).not("stripe_invoice_id", "is", null).order("stripe_synced_at", { ascending: true, nullsFirst: true }).limit(limit)) ?? [];
   for (const inv of open) {
     try {
       const s = await stripe("GET", `invoices/${inv.stripe_invoice_id}`);
-      must(await admin.from("invoices").update({ stripe_status: s.status, stripe_synced_at: new Date().toISOString(), hosted_url: s.hosted_invoice_url ?? undefined, pdf_url: s.invoice_pdf ?? undefined }).eq("id", inv.id));
-      if (s.status === "void") {
-        must(await admin.from("invoices").update({ status: "void", void_reason: "Voided in Stripe", interest_paused: true }).eq("id", inv.id));
-        if (inv.subscription_id) await applySubscriptionStanding(admin, inv.subscription_id, `Invoice ${inv.number} voided in Stripe`, "Stripe");
-      }
-      else if (s.status === "uncollectible" && inv.subscription_id) await suspendForNonPayment(admin, inv.subscription_id, `Invoice ${inv.number} marked uncollectible`);
-      else if (s.status === "paid") {
-        const full = must(await admin.from("invoices").select("*").eq("id", inv.id).single());
-        await recordInvoicePaid(admin, full, s, typeof s.payment_intent === "string" ? s.payment_intent : s.payment_intent?.id ?? null);
-      }
+      const { importInvoice } = await import("@/lib/stripe-import.server");
+      await importInvoice(admin, inv.user_id, s);
       invoices++;
     } catch (e) { console.error("Stripe invoice sync failed", inv.id, e); }
   }
@@ -282,7 +253,7 @@ export async function reconcileStripe(admin: Admin, limit = 200) {
 /** Marks a local invoice paid from verified Stripe data (the signed webhook, or the Stripe API during sync and import),
  * records the payment, and applies its effects: activation, a new hours period on renewal, reinstatement. Idempotent. */
 export async function recordInvoicePaid(admin: Admin, inv: any, o: any, paymentIntent: string | null = null) {
-  if (inv.status === "paid") return;
+  if (o.status !== "paid") throw new Error("Payment must be verified in Stripe.");
   must(await admin.from("invoices").update({ status: "paid", paid_at: o.status_transitions?.paid_at ? new Date(o.status_transitions.paid_at * 1000).toISOString() : new Date().toISOString(),
     hosted_url: o.hosted_invoice_url, pdf_url: o.invoice_pdf, stripe_status: "paid", stripe_synced_at: new Date().toISOString(),
     collection_stage: Number(inv.interest_accrued) + Number(inv.fees_accrued) > 0 ? inv.collection_stage : (inv.collection_stage === "none" ? "none" : "settled") }).eq("id", inv.id).neq("status", "paid"));
@@ -292,20 +263,22 @@ export async function recordInvoicePaid(admin: Admin, inv: any, o: any, paymentI
   if (o.metadata?.original_invoice_id) must(await admin.from("invoices").update({ collection_stage: "settled", interest_paused: true }).eq("id", o.metadata.original_invoice_id).eq("status", "paid"));
   const subId = inv.subscription_id;
   if (subId) {
-    if (inv.kind === "first") await activateSubscription(admin, subId);
+    if (inv.kind === "first") { await activateSubscription(admin, subId); await applySubscriptionStanding(admin, subId, `Invoice ${inv.number} paid`, "Stripe"); }
     else {
       // Only a billing-cycle renewal starts a new hours period; proration and one-off invoices don't.
       if (inv.kind === "renewal") {
         const cur = must(await admin.from("subscriptions").select("pending_plan_id").eq("id", subId).single());
         const { plans } = await import("@/lib/signup");
         const np = cur?.pending_plan_id ? plans.find((p) => p.id === cur.pending_plan_id) : undefined;
-        must(await admin.from("subscriptions").update({ hours_used: 0, overage_billed_hours: 0, renews_at: nextRenewalAt(o).toISOString(), ...(np ? { plan_name: np.name, monthly_fee: np.monthlyFee, monthly_hours: np.monthlyHours, pending_plan_id: null } : {}) }).eq("id", subId));
+        // Reset each renewal once, in a database transaction, never from the browser.
+        const applied = must(await admin.rpc("apply_paid_invoice_effects", { _invoice: inv.id }));
+        if (applied) must(await admin.from("subscriptions").update({ renews_at: nextRenewalAt(o).toISOString(), ...(np ? { plan_name: np.name, monthly_fee: np.monthlyFee, monthly_hours: np.monthlyHours, pending_plan_id: null } : {}) }).eq("id", subId));
       }
       // Reinstate only if nothing else on the plan is still unpaid.
       await applySubscriptionStanding(admin, subId, `Invoice ${inv.number} paid`, "Stripe");
     }
   }
-  await audit(admin, inv.user_id, "invoices", inv.id, "paid", { status: { from: inv.status, to: "paid" } }, null, "Stripe");
+  if (inv.status !== "paid") await audit(admin, inv.user_id, "invoices", inv.id, "paid", { status: { from: inv.status, to: "paid" } }, null, "Stripe");
 }
 
 /** Brings a subscription, its Stripe subscription, its projects and its application in line with its invoices (see
@@ -315,36 +288,29 @@ export async function applySubscriptionStanding(admin: Admin, subId: string, rea
   const { subscriptionStanding } = await import("@/lib/billing");
   const sub = must(await admin.from("subscriptions").select("*").eq("id", subId).maybeSingle());
   if (!sub) return null;
-  const invoices = must(await admin.from("invoices").select("status, kind, due_at, collection_stage").eq("subscription_id", subId)) ?? [];
+  const invoices = must(await admin.from("invoices").select("status, kind, due_at, collection_stage, failed_payment_at, stripe_status").eq("subscription_id", subId)) ?? [];
   const target = subscriptionStanding(sub, invoices);
-  if (!target || target === sub.status) return target;
+  if (!target) return null;
   if (target === "abandoned") {
-    // The order never started: cancel it in Stripe (if it got that far) and close everything linked to it.
     await applyStripeStatus(sub, "cancelled");
-    must(await admin.from("subscriptions").update({ status: "cancelled", cancelled_at: new Date().toISOString(), notes: [sub.notes, `${today()} Order cancelled: first invoice voided`].filter(Boolean).join("\n") }).eq("id", subId));
-    must(await admin.from("projects").update({ status: "cancelled" }).eq("subscription_id", subId).in("status", ["planned", "active", "on_hold"]));
-    if (sub.application_id) must(await admin.from("applications").update({ archived_at: new Date().toISOString() }).eq("id", sub.application_id).is("archived_at", null));
-    await audit(admin, sub.user_id, "subscriptions", subId, "cancelled", { status: { from: sub.status, to: "cancelled" }, reason }, null, actorLabel);
-    return target;
-  }
-  if (target === "suspended") {
-    // Debt recovery: stop Stripe charging further renewals while the debt is recovered.
-    if (sub.stripe_subscription_id && sub.stripe_status !== "paused") await applyStripeStatus(sub, "paused");
+    must(await admin.from("subscriptions").update({ status: "cancelled", cancelled_at: new Date().toISOString(), payment_warning: "Order cancelled: first invoice voided" }).eq("id", subId));
+  } else if (target === "suspended") {
+    // Store why billing was paused before Stripe sends its echo webhook.
+    must(await admin.from("subscriptions").update({ paused_for_nonpayment: true }).eq("id", subId));
+    if (sub.stripe_subscription_id && !sub.paused_for_nonpayment) await applyStripeStatus(sub, "paused");
     await suspendForNonPayment(admin, subId, reason);
-    return target;
-  }
-  if (target === "past_due") {
-    if (sub.status === "suspended") {
-      await reinstateAfterPayment(admin, subId);
-      if (sub.stripe_subscription_id) await applyStripeStatus(sub, "active");
+  } else if (target === "past_due") {
+    must(await admin.from("subscriptions").update({ status: "past_due", payment_warning: `Payment outstanding: ${reason}` }).eq("id", subId));
+  } else {
+    const profile = must(await admin.from("profiles").select("status").eq("id", sub.user_id).maybeSingle());
+    if (!profile || clientActionsBlocked(profile.status) || sub.paused_by_account_status) return null;
+    if (sub.paused_for_nonpayment) {
+      await applyStripeStatus(sub, "active");
+      must(await admin.from("subscriptions").update({ paused_for_nonpayment: false }).eq("id", subId));
     }
-    must(await admin.from("subscriptions").update({ status: "past_due", payment_warning: `Payment overdue: ${reason}` }).eq("id", subId));
-    await audit(admin, sub.user_id, "subscriptions", subId, "past_due", { status: { from: sub.status, to: "past_due" }, reason }, null, actorLabel);
-    return target;
+    await reinstateAfterPayment(admin, subId);
   }
-  // Nothing unpaid: back to active, with renewals charged again if recovery paused them.
-  if (sub.stripe_subscription_id && (sub.status === "suspended" || sub.stripe_status === "paused") && !sub.paused_by_account_status) await applyStripeStatus(sub, "active");
-  await reinstateAfterPayment(admin, subId);
+  if (target !== sub.status) await audit(admin, sub.user_id, "subscriptions", subId, "billing_standing", { status: { from: sub.status, to: target }, reason }, null, actorLabel);
   return target;
 }
 
