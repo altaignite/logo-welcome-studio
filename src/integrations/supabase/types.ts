@@ -965,6 +965,24 @@ export type Database = {
           },
         ]
       }
+      rate_limit_hits: {
+        Row: {
+          count: number
+          key: string
+          window_start: string
+        }
+        Insert: {
+          count?: number
+          key: string
+          window_start: string
+        }
+        Update: {
+          count?: number
+          key?: string
+          window_start?: string
+        }
+        Relationships: []
+      }
       security_settings: {
         Row: {
           id: number
@@ -1557,6 +1575,10 @@ export type Database = {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
+        Returns: boolean
+      }
+      hit_rate_limit: {
+        Args: { _key: string; _max: number; _window_seconds: number }
         Returns: boolean
       }
       level_grants: {
