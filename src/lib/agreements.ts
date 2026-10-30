@@ -1,4 +1,7 @@
 import { planTerms, type Plan } from "@/lib/signup";
+import { defaultRules, type BillingRules } from "@/lib/billing";
+import { firstResponseHours, departments } from "@/lib/support";
+import { MAX_FILE_BYTES } from "@/lib/files";
 
 /** The business clients contract with, as named in every agreement and on the PDF letterhead. */
 export const company = {
@@ -16,7 +19,7 @@ export const companyLine = `${company.legalName}, ${company.entity} doing busine
 export type AgreementClient = { name: string; company?: string | null; email?: string | null; phone?: string | null; country?: string | null; address?: string | null; accountNumber?: string | null };
 
 /** Bump when agreement wording changes; signed copies record the version they were rendered from. */
-export const AGREEMENT_VERSION = "2026-10-30.4";
+export const AGREEMENT_VERSION = "2026-10-30.5";
 
 /**
  * Agreement body markup, shared by the reading dialog and the PDF:
@@ -85,7 +88,9 @@ function planTable(plan: Plan) {
 
 /** The agreements a client signs for a plan, filled in with the client's details when known. Shown at signup and when
  * ordering, and stored server-side as the signed copy. */
-export function agreementDocuments(plan: Plan, client?: AgreementClient, date?: string): { title: string; body: string }[] {
+export function agreementDocuments(plan: Plan, client?: AgreementClient, date?: string, rules: BillingRules = defaultRules): { title: string; body: string }[] {
+  const extraRate = rules.overage_rates[plan.name] ?? Object.values(rules.overage_rates)[0] ?? 0;
+  const yearly = Math.round((Math.pow(1 + rules.monthly_interest_pct / 100, 12) - 1) * 1000) / 10;
   const P = `${company.legalName}, doing business as ${company.name} ("${company.name}", "we", "us" or "our")`;
   const who = client ? `${client.name}${client.company ? `, on behalf of ${client.company}` : ""}` : "the client identified above";
   const parties = partiesTable(client, date);
@@ -110,7 +115,7 @@ ${planTable(plan)}
 3.1 The Services begin once the first invoice is paid and the Client completes the onboarding brief.
 3.2 Time is recorded in increments of fifteen (15) minutes against the work performed and is visible in the Dashboard.
 3.3 Unused Service Hours expire at the end of each calendar month, do not carry over and have no cash value.
-3.4 Work beyond the monthly allowance is performed only with the Client's prior approval in the Dashboard and is billed at the extra-hour rate shown at the time of approval.
+3.4 Work beyond the monthly allowance is performed only with the Client's prior approval in the Dashboard and is billed at ${money(extraRate)} per hour for the ${plan.name} Plan, or the extra-hour rate shown at the time of approval.
 
 4. Client Responsibilities
 4.1 The Client will provide accurate information, timely feedback and approvals, Client Materials, and the access to accounts, platforms and systems reasonably required.
@@ -184,7 +189,7 @@ During the term and for twelve (12) months afterwards, neither party will direct
 18. General
 18.1 Electronic signature. The parties agree that this Agreement and each Order may be signed electronically and that an electronic signature, including the Client's entry of a one-time confirmation code, has the same legal effect as a handwritten signature under the federal ESIGN Act and the New York Electronic Signatures and Records Act.
 18.2 Notices. Notices to the Client may be given through the Dashboard or by email to the address on its account. Notices to us must be sent through the Dashboard support section or to our address above. Notices are effective on receipt.
-18.3 Order of precedence. This Agreement, the Subscription and Billing Terms, the Money-back Guarantee, the Data Processing Addendum and the Privacy Notice form the entire agreement between the parties and supersede all prior discussions. If they conflict, this Agreement prevails, except that the Data Processing Addendum prevails on data protection.
+18.3 Order of precedence. This Agreement, the Subscription and Billing Terms, the Collections and Debt Recovery Policy, the Service and Account Policy, the Money-back Guarantee, the Data Processing Addendum and the Privacy Notice form the entire agreement between the parties and supersede all prior discussions. If they conflict, this Agreement prevails, except that the Data Processing Addendum prevails on data protection.
 18.4 Changes. We may update these documents for future Orders or renewals with at least thirty (30) days' notice. If the Client does not agree, it may cancel before the change takes effect. Other amendments must be in writing, including acceptance in the Dashboard.
 18.5 Assignment. The Client may not assign this Agreement without our written consent. We may assign it to an affiliate or a successor to our business.
 18.6 Relationship. The parties are independent contractors. Nothing creates a partnership, joint venture, agency or employment relationship.
@@ -216,8 +221,8 @@ ${planTerms(plan)}
 
 4. Late Payment and Collection
 4.1 An invoice not paid by its due date is past due, and the Client's Plan becomes past due.
-4.2 Past-due amounts accrue interest from the due date until paid at the rate set out in our billing policy and shown on the overdue invoice, but never more than the maximum rate permitted by applicable law. Reasonable administration and collection fees may also be charged as shown on the overdue invoice.
-4.3 If an invoice remains unpaid, we may suspend the Services, projects and Dashboard access, pause collection of the subscription, and refer the debt to a collection agency or legal counsel. The Client is responsible for reasonable costs of collection, including attorneys' fees and court costs, to the extent permitted by law.
+4.2 Past-due amounts accrue interest, collection fees and costs as set out in the Collections and Debt Recovery Policy, never above the maximum permitted by applicable law.
+4.3 If an invoice remains unpaid, the stages in the Collections and Debt Recovery Policy apply, including suspension of the Services, projects and Dashboard access, pausing of the subscription, and referral to collection agencies, counsel or the courts.
 4.4 Services resume when the balance is paid in full. Suspension does not extend the billing period or the Service Hours.
 
 5. Plan Changes and Extra Hours
@@ -239,6 +244,123 @@ Invoices, payments and receipts are available in the Dashboard and from Stripe. 
 
 9. Governing Law
 These Terms are ${law}, and Section 17 of the Client Services Agreement applies to any dispute.` },
+    { title: "Collections and Debt Recovery Policy", body: `${parties}
+
+This Collections and Debt Recovery Policy (the "Policy") forms part of the Client Services Agreement between ${P} and ${who}, and explains exactly what happens when an invoice is not paid.
+
+! Unpaid invoices move through the stages below automatically. You can stop the process at any stage by paying the balance in full; services are restored once payment clears.
+
+|| Stage | When it starts | What happens
+| Due | Invoice issued | Stripe emails the invoice and charges the payment method on file on the due date, retrying failed charges.
+| Overdue | Day 1 after the due date | The Plan becomes past due, reminders are sent, and new orders and plan changes are blocked.
+| Debt recovery | When we refer the debt | The Plan is suspended: Stripe collection is paused, projects are put on hold and Dashboard work stops.
+| Legal | Day ${rules.legal_after_days} after the due date | A legal collection fee is added and the debt may be passed to collection counsel.
+| Court | When proceedings are filed | Court and service costs are added and recovered through the court.
+| Settled | Balance paid in full | Collection stops, suspensions are lifted and services resume.
+
+1. Payment Reminders
+1.1 We send reminders through the Dashboard and by email when an invoice becomes overdue and at each later stage. Each reminder shows the amount owed, the interest and fees accrued, and how to pay.
+1.2 Notices are sent to the email address on the Client's account. The Client is responsible for keeping it current.
+
+2. Interest
+2.1 Overdue amounts accrue interest at ${rules.monthly_interest_pct}% per month, compounded monthly from the due date (equivalent to about ${yearly}% per year), or at the maximum rate permitted by applicable law if that is lower. Interest is never charged above the legal maximum.
+2.2 Interest and fees accrue in the Client's account and are shown on each overdue invoice. They are billed on a separate arrears invoice when issued by our staff, not added to subscription renewals.
+
+3. Collection Fees and Costs
+3.1 When a debt reaches the legal stage, a legal collection fee of ${rules.legal_fee_pct}% of the outstanding balance, with a minimum of ${money(rules.legal_fee_min)}, is added to cover the cost of collection, to the extent permitted by law.
+3.2 If court proceedings are needed, the Client is also responsible for court and service costs actually incurred, which currently include:
+
+${rules.court_fees.map((f) => `| ${f.name} | ${money(f.amount)}`).join("\n") || "| Court costs | As incurred"}
+
+3.3 The Client is responsible for reasonable attorneys' fees awarded by a court.
+
+4. Effect on Services and Account
+4.1 Overdue: the Plan is marked past due and the Client cannot order new Plans or change Plans until paid. The Services continue unless we notify otherwise.
+4.2 Debt recovery, legal and court stages, or when Stripe marks the subscription unpaid after its retries: the Plan is suspended, Stripe collection is paused so no further renewal charges are attempted, projects are put on hold, and the related application is suspended.
+4.3 We may place the Client's account on hold or suspend it. A suspended account cannot sign in and all active sessions are ended; the Client may still contact us to arrange payment.
+4.4 Suspension does not extend the billing period, Service Hours or the Money-back Guarantee period, and a late or failed payment ends eligibility for the Money-back Guarantee.
+
+5. Payment Arrangements
+The Client may contact the billing department through the Dashboard at any stage to propose a payment plan. An agreed plan is confirmed in writing; missing an instalment returns the debt to the stage it was in.
+
+6. Disputes
+If the Client disputes an invoice, it must tell us in writing within thirty (30) days of the invoice date. Collection of the disputed portion is paused while we review it in good faith; undisputed amounts remain payable.
+
+7. Settlement, Write-off and Reporting
+7.1 Once the full balance, including interest, fees and costs, is paid, the debt is marked settled and suspensions are lifted automatically.
+7.2 We may write off part or all of a debt at our discretion; a write-off does not waive our right to recover it later unless we confirm so in writing.
+7.3 We may share information about an unpaid debt with collection agencies, attorneys and courts as needed to recover it, in line with the Privacy Notice and applicable law, including the Fair Debt Collection Practices Act where it applies.
+
+8. Changes to Rates
+Interest rates and fees in this Policy are those in effect on the effective date. We will give at least thirty (30) days' notice of any increase, which applies only to invoices issued after it takes effect.` },
+    { title: "Service and Account Policy", body: `${parties}
+
+This Service and Account Policy forms part of the Client Services Agreement between ${P} and ${who}, and explains how the Dashboard, support, work and your account operate day to day.
+
+1. Your Dashboard
+1.1 The Dashboard is where you manage your Plans, onboarding brief, projects, tasks, deliverables, reports, documents, invoices, payments, applications, support requests, profile and security settings.
+1.2 Notices, approvals and requests made in the Dashboard are written communications under the Agreement.
+
+2. Applications and Onboarding
+2.1 New signups are reviewed, usually within one (1) business day. We may request more information before approving; you will see the request and your application status in the Dashboard.
+2.2 Once approved, the first invoice is issued. After it is paid, you complete the onboarding brief so we can plan your first month.
+
+3. Support and Response Times
+3.1 Support requests are made through the Dashboard to one of these departments:
+
+${departments.map((d) => `| ${d.label} | ${d.help}`).join("\n")}
+
+3.2 We aim to give a first response within these times, measured in hours from when the request is received:
+
+|| Priority | First response target
+${Object.entries(firstResponseHours).map(([k, h]) => `| ${k.charAt(0).toUpperCase() + k.slice(1)} | ${h} hours`).join("\n")}
+
+3.3 Response targets are goals, not guarantees, and do not create a right to credits. Closed tickets cannot be reopened; please open a new request instead.
+
+4. Work, Hours and Deliverables
+4.1 Work is organised into projects and tasks. Time spent is recorded against tasks and shown against your monthly Service Hours.
+4.2 A task that would exceed your remaining monthly hours is held for your approval. Approved extra hours are billed at ${money(extraRate)} per hour for the ${plan.name} Plan, or the rate shown at approval.
+4.3 Deliverables are sent to you for review in the Dashboard. Only you decide on a deliverable: approve it or request changes. Changes are made within your Service Hours.
+4.4 Reports on results are published in the Dashboard.
+
+5. Files and Documents
+5.1 Files you share are stored privately in your account, up to ${Math.round(MAX_FILE_BYTES / 1024 / 1024)} MB per file, and are accessed through short-lived secure links.
+5.2 Never upload passwords or payment card details. Share account access only through the method we provide.
+5.3 Signed agreements, privacy exports and documents we share with you are kept in your Documents.
+
+6. Account Security
+6.1 You are responsible for keeping your login details confidential and for activity under your account. Two-factor authentication is available and recommended.
+6.2 We record sign-ins with their time, approximate location, IP address and device. A sign-in from a new location is flagged to you and to our team.
+6.3 Tell us immediately through the Dashboard if you suspect unauthorised access.
+
+7. Account Statuses
+|| Status | What it means
+| Active | Services and the Dashboard are fully available.
+| Past due | An invoice is overdue. New orders and plan changes are blocked until it is paid.
+| On hold | Paused by us, for example at your request or pending information. Plans are paused in Stripe and resume when the hold ends.
+| Suspended | Sign-in is blocked, every session is ended and Plans are paused, typically for unpaid debt or a serious breach.
+| Cancelled | Plans have been cancelled in Stripe. Records remain available on request.
+| Closed | The account is closed and sign-in is blocked. Financial and legal records are kept as the law requires.
+
+8. Plan Changes, Pauses and Cancellation
+8.1 Upgrades start immediately with a prorated charge; downgrades start at the next renewal.
+8.2 A Plan paused in its first ninety (90) days loses eligibility for the Money-back Guarantee.
+8.3 You can cancel at any time; cancellation takes effect at the end of the billing period, and you can undo it before then.
+
+9. Notifications
+We notify you in the Dashboard and by email about replies, reviews, invoices, payments, application updates and account changes. You can turn off non-essential emails in your profile; essential account and billing notices are always sent.
+
+10. Privacy Requests
+You can request a copy of your data, which we export to your Documents, or the closure of your account, in which case we remove your personal details and block sign-in while keeping invoices, payments, signed agreements and audit records as the law requires.
+
+11. Acceptable Use
+You must not use the Services or Dashboard to: break the law or infringe others' rights; promote misleading, fraudulent, hateful, violent or adult content; send spam or unsolicited messages; upload malware; attempt to access other accounts or our systems; or interfere with the Services. We may refuse or stop work, remove content, and suspend accounts that breach this section.
+
+12. Complaints
+If you are unhappy with any part of the Services, raise it with the Complaints department in the Dashboard. We will acknowledge it within two (2) business days, investigate, and give you a written response within fifteen (15) business days. If it is not resolved, Section 17 of the Client Services Agreement applies.
+
+13. Records and Audit
+We keep an audit record of changes to your account, plans, invoices and applications, which may be used to resolve disputes.` },
     { title: "Money-back Guarantee", body: `${parties}
 
 This Money-back Guarantee (the "Guarantee") forms part of the Client Services Agreement between ${P} and ${who}.

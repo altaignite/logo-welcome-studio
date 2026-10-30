@@ -176,7 +176,8 @@
   font-weight: 600;
   box-shadow: none;
 }
-.signup-primary:hover { background: var(--primary); color: var(--primary-foreground); }
+.signup-primary:hover { background: color-mix(in oklch, var(--foreground) 85%, var(--background)); color: var(--background); }
+/* Buttons are black; red is reserved for destructive actions. */
 /* One compact modal size for every popup, dialog and confirmation. */
 .app-modal {
   position: fixed;

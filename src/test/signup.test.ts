@@ -81,3 +81,15 @@ describe("Account number", () => {
     expect(new Set(Array.from({ length: 50 }, createAccountNumber)).size).toBe(50);
   });
 });
+
+import { phoneNational, phonePlaceholder } from "@/lib/signup";
+describe("mobile number display", () => {
+  it("shows the dial code once, in the picker, and keeps the stored number international", () => {
+    const typed = formatPhoneInput("0612345678", "NL");
+    expect(typed.value).toBe("+31 6 12345678");
+    expect(phoneNational(typed.value, "NL")).toBe("6 12345678");
+    expect(phoneNational(formatPhoneInput("6 12345678", "NL").value, "NL")).toBe("6 12345678");
+    expect(phonePlaceholder("NL")).not.toContain("+31");
+    expect(phoneNational("+31 ", "NL")).toBe("");
+  });
+});

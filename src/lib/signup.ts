@@ -63,9 +63,19 @@ export function switchPhoneCountry(value: string, from: CountryCode | "", to: Co
   return formatPhoneInput(`+${getCountryCallingCode(to)}${national}`, to).value;
 }
 
+/** The national part of a stored international number, for the input next to the dial-code picker ("+31 6 1234" shows "6 1234"). */
+export function phoneNational(value: string, country: CountryCode | ""): string {
+  if (!country) return value;
+  const prefix = `+${getCountryCallingCode(country)}`;
+  const v = value.trim();
+  return v.startsWith(prefix) ? v.slice(prefix.length).trim() : v;
+}
+
+/** Example national number for the selected country, shown without the dial code the picker already displays. */
 export function phonePlaceholder(country: CountryCode | ""): string {
-  if (!country) return "+31 6 12345678";
-  return getExampleNumber(country, examples)?.formatInternational() ?? `+${getCountryCallingCode(country)}`;
+  if (!country) return "6 12345678";
+  const example = getExampleNumber(country, examples)?.formatInternational();
+  return example ? phoneNational(example, country) : "";
 }
 
 export const personalSchema = z.object({

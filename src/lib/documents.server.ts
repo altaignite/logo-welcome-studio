@@ -1,6 +1,7 @@
 /** Server-only document, agreement and privacy export workflows (service role). */
 import { allowedMimeTypes, FILE_BUCKET, MAX_FILE_BYTES, storagePath, uploadIssue } from "@/lib/files";
 import { plans } from "@/lib/signup";
+import { defaultRules, type BillingRules } from "@/lib/billing";
 import { agreementDocuments, AGREEMENT_VERSION, signedAgreementText } from "@/lib/agreements";
 import { exportTables, omit, profileExportOmit } from "@/lib/privacy";
 import { must } from "@/lib/billing.server";
@@ -29,7 +30,10 @@ export async function ensureAgreements(admin: Admin, applicationId: string) {
   const signer = { name: `${prof?.first_name ?? ""} ${prof?.last_name ?? ""}`.trim() || "Client", accountNumber: app.account_number, signedAt: app.signed_at };
   const address = [prof?.address_line, [prof?.city, prof?.state, prof?.postal_code].filter(Boolean).join(" ")].filter(Boolean).join(", ") || null;
   const client = { name: signer.name, company: prof?.company, email: prof?.email, phone: prof?.phone, country: prof?.country, address, accountNumber: app.account_number };
-  const rows = await Promise.all(agreementDocuments(plan, client, app.signed_at).map(async (d) => {
+  // Signed copies state the rates in effect when they were signed.
+  const settings = (await admin.from("billing_settings").select("*").eq("id", 1).maybeSingle()).data;
+  const rules = settings ? { ...defaultRules, ...Object.fromEntries(Object.entries(settings).filter(([k, v]) => k in defaultRules && v != null)) } as BillingRules : defaultRules;
+  const rows = await Promise.all(agreementDocuments(plan, client, app.signed_at, rules).map(async (d) => {
     const body = signedAgreementText(d, signer);
     return { user_id: app.user_id, application_id: app.id, title: d.title, body, version: AGREEMENT_VERSION, sha256: await sha256(body), signed_at: app.signed_at };
   }));

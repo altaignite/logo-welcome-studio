@@ -45,7 +45,7 @@ export function ReviewRow({ label, value, country }: { label: string; value: str
 }
 
 function DocumentRow({ title, onRead, onDownload }: { title: string; onRead: () => void; onDownload: () => void }) {
-  return <li className="flex items-center gap-3 px-4 py-2.5 text-sm"><FileText className="size-4 shrink-0 text-muted-foreground" /><button type="button" className="min-w-0 flex-1 truncate text-left font-medium hover:underline" onClick={onRead}>{title}</button><button type="button" className="text-xs font-medium text-primary hover:underline" onClick={onRead}>Read</button><button type="button" aria-label={`Save ${title} as PDF`} title="Save as PDF" className="grid size-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground" onClick={onDownload}><Download className="size-4" /></button></li>;
+  return <li className="flex items-center gap-3 px-4 py-2.5 text-sm"><FileText className="size-4 shrink-0 text-muted-foreground" /><button type="button" className="min-w-0 flex-1 truncate text-left font-medium hover:underline" onClick={onRead}>{title}</button><button type="button" className="text-xs font-medium underline underline-offset-4 hover:text-muted-foreground" onClick={onRead}>Read</button><button type="button" aria-label={`Save ${title} as PDF`} title="Save as PDF" className="grid size-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground" onClick={onDownload}><Download className="size-4" /></button></li>;
 }
 
 /** Renders agreement markup (headings, paragraphs, tables, notices) for reading on screen. */
