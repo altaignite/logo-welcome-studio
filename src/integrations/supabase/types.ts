@@ -25,7 +25,6 @@ export type Database = {
           id: string
           note: string | null
           to_status: Database["public"]["Enums"]["application_status"] | null
-          visible_to_client: boolean
         }
         Insert: {
           action: string
@@ -37,7 +36,6 @@ export type Database = {
           id?: string
           note?: string | null
           to_status?: Database["public"]["Enums"]["application_status"] | null
-          visible_to_client?: boolean
         }
         Update: {
           action?: string
@@ -49,7 +47,6 @@ export type Database = {
           id?: string
           note?: string | null
           to_status?: Database["public"]["Enums"]["application_status"] | null
-          visible_to_client?: boolean
         }
         Relationships: [
           {
@@ -187,59 +184,6 @@ export type Database = {
         }
         Relationships: []
       }
-      client_reports: {
-        Row: {
-          actor_label: string
-          archived_at: string | null
-          created_at: string
-          id: string
-          metrics: Json
-          period_start: string
-          published_at: string | null
-          subscription_id: string | null
-          summary: string | null
-          title: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          actor_label?: string
-          archived_at?: string | null
-          created_at?: string
-          id?: string
-          metrics?: Json
-          period_start: string
-          published_at?: string | null
-          subscription_id?: string | null
-          summary?: string | null
-          title: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          actor_label?: string
-          archived_at?: string | null
-          created_at?: string
-          id?: string
-          metrics?: Json
-          period_start?: string
-          published_at?: string | null
-          subscription_id?: string | null
-          summary?: string | null
-          title?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "client_reports_subscription_id_fkey"
-            columns: ["subscription_id"]
-            isOneToOne: false
-            referencedRelation: "subscriptions"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       compliance_requests: {
         Row: {
           actor_label: string
@@ -321,7 +265,6 @@ export type Database = {
           direction: string | null
           duration_minutes: number | null
           follow_up_at: string | null
-          follow_up_done_at: string | null
           id: string
           kind: string
           occurred_at: string
@@ -337,7 +280,6 @@ export type Database = {
           direction?: string | null
           duration_minutes?: number | null
           follow_up_at?: string | null
-          follow_up_done_at?: string | null
           id?: string
           kind?: string
           occurred_at?: string
@@ -353,152 +295,12 @@ export type Database = {
           direction?: string | null
           duration_minutes?: number | null
           follow_up_at?: string | null
-          follow_up_done_at?: string | null
           id?: string
           kind?: string
           occurred_at?: string
           outcome?: string | null
           subject?: string
           user_id?: string
-        }
-        Relationships: []
-      }
-      deliverables: {
-        Row: {
-          actor_label: string
-          archived_at: string | null
-          assigned_to: string | null
-          client_feedback: string | null
-          created_at: string
-          decided_at: string | null
-          description: string | null
-          due_at: string | null
-          id: string
-          project_id: string | null
-          review_round: number
-          status: string
-          submitted_at: string | null
-          subscription_id: string | null
-          task_id: string | null
-          title: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          actor_label?: string
-          archived_at?: string | null
-          assigned_to?: string | null
-          client_feedback?: string | null
-          created_at?: string
-          decided_at?: string | null
-          description?: string | null
-          due_at?: string | null
-          id?: string
-          project_id?: string | null
-          review_round?: number
-          status?: string
-          submitted_at?: string | null
-          subscription_id?: string | null
-          task_id?: string | null
-          title: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          actor_label?: string
-          archived_at?: string | null
-          assigned_to?: string | null
-          client_feedback?: string | null
-          created_at?: string
-          decided_at?: string | null
-          description?: string | null
-          due_at?: string | null
-          id?: string
-          project_id?: string | null
-          review_round?: number
-          status?: string
-          submitted_at?: string | null
-          subscription_id?: string | null
-          task_id?: string | null
-          title?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "deliverables_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "deliverables_subscription_id_fkey"
-            columns: ["subscription_id"]
-            isOneToOne: false
-            referencedRelation: "subscriptions"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "deliverables_task_id_fkey"
-            columns: ["task_id"]
-            isOneToOne: false
-            referencedRelation: "tasks"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      documents: {
-        Row: {
-          archived_at: string | null
-          created_at: string
-          id: string
-          kind: string
-          mime_type: string | null
-          related_id: string | null
-          related_table: string | null
-          size_bytes: number | null
-          status: string
-          storage_path: string
-          title: string
-          uploaded_by: string | null
-          uploaded_by_label: string
-          user_id: string
-          visible_to_client: boolean
-        }
-        Insert: {
-          archived_at?: string | null
-          created_at?: string
-          id?: string
-          kind?: string
-          mime_type?: string | null
-          related_id?: string | null
-          related_table?: string | null
-          size_bytes?: number | null
-          status?: string
-          storage_path: string
-          title: string
-          uploaded_by?: string | null
-          uploaded_by_label?: string
-          user_id: string
-          visible_to_client?: boolean
-        }
-        Update: {
-          archived_at?: string | null
-          created_at?: string
-          id?: string
-          kind?: string
-          mime_type?: string | null
-          related_id?: string | null
-          related_table?: string | null
-          size_bytes?: number | null
-          status?: string
-          storage_path?: string
-          title?: string
-          uploaded_by?: string | null
-          uploaded_by_label?: string
-          user_id?: string
-          visible_to_client?: boolean
         }
         Relationships: []
       }
@@ -645,126 +447,6 @@ export type Database = {
           },
         ]
       }
-      job_runs: {
-        Row: {
-          last_run_at: string | null
-          last_run_on: string | null
-          name: string
-        }
-        Insert: {
-          last_run_at?: string | null
-          last_run_on?: string | null
-          name: string
-        }
-        Update: {
-          last_run_at?: string | null
-          last_run_on?: string | null
-          name?: string
-        }
-        Relationships: []
-      }
-      message_templates: {
-        Row: {
-          body: string
-          created_at: string
-          id: string
-          name: string
-          purpose: string
-          subject: string
-          updated_at: string
-          updated_by_label: string
-        }
-        Insert: {
-          body: string
-          created_at?: string
-          id?: string
-          name: string
-          purpose?: string
-          subject: string
-          updated_at?: string
-          updated_by_label?: string
-        }
-        Update: {
-          body?: string
-          created_at?: string
-          id?: string
-          name?: string
-          purpose?: string
-          subject?: string
-          updated_at?: string
-          updated_by_label?: string
-        }
-        Relationships: []
-      }
-      notifications: {
-        Row: {
-          body: string | null
-          created_at: string
-          dedupe_key: string | null
-          email_attempts: number
-          email_status: string
-          email_to: string | null
-          emailed_at: string | null
-          id: string
-          kind: string
-          link: string | null
-          read_at: string | null
-          title: string
-          user_id: string
-        }
-        Insert: {
-          body?: string | null
-          created_at?: string
-          dedupe_key?: string | null
-          email_attempts?: number
-          email_status?: string
-          email_to?: string | null
-          emailed_at?: string | null
-          id?: string
-          kind: string
-          link?: string | null
-          read_at?: string | null
-          title: string
-          user_id: string
-        }
-        Update: {
-          body?: string | null
-          created_at?: string
-          dedupe_key?: string | null
-          email_attempts?: number
-          email_status?: string
-          email_to?: string | null
-          emailed_at?: string | null
-          id?: string
-          kind?: string
-          link?: string | null
-          read_at?: string | null
-          title?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      onboarding_briefs: {
-        Row: {
-          answers: Json
-          submitted_at: string | null
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          answers?: Json
-          submitted_at?: string | null
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          answers?: Json
-          submitted_at?: string | null
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       profiles: {
         Row: {
           account_manager: string | null
@@ -777,7 +459,6 @@ export type Database = {
           created_at: string
           do_not_sell: boolean
           email: string | null
-          email_notifications: boolean
           first_name: string | null
           id: string
           industry: string | null
@@ -813,7 +494,6 @@ export type Database = {
           created_at?: string
           do_not_sell?: boolean
           email?: string | null
-          email_notifications?: boolean
           first_name?: string | null
           id: string
           industry?: string | null
@@ -849,7 +529,6 @@ export type Database = {
           created_at?: string
           do_not_sell?: boolean
           email?: string | null
-          email_notifications?: boolean
           first_name?: string | null
           id?: string
           industry?: string | null
@@ -934,89 +613,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      security_settings: {
-        Row: {
-          id: number
-          require_staff_mfa: boolean
-          updated_at: string
-        }
-        Insert: {
-          id?: number
-          require_staff_mfa?: boolean
-          updated_at?: string
-        }
-        Update: {
-          id?: number
-          require_staff_mfa?: boolean
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      signed_agreements: {
-        Row: {
-          application_id: string
-          body: string
-          created_at: string
-          id: string
-          sha256: string
-          signed_at: string
-          title: string
-          user_id: string
-          version: string
-        }
-        Insert: {
-          application_id: string
-          body: string
-          created_at?: string
-          id?: string
-          sha256: string
-          signed_at: string
-          title: string
-          user_id: string
-          version: string
-        }
-        Update: {
-          application_id?: string
-          body?: string
-          created_at?: string
-          id?: string
-          sha256?: string
-          signed_at?: string
-          title?: string
-          user_id?: string
-          version?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "signed_agreements_application_id_fkey"
-            columns: ["application_id"]
-            isOneToOne: false
-            referencedRelation: "applications"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      staff_members: {
-        Row: {
-          created_at: string
-          level: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          level?: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          level?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
       }
       stripe_events: {
         Row: {
@@ -1132,10 +728,7 @@ export type Database = {
           category: string
           closed_at: string | null
           created_at: string
-          first_response_at: string | null
           id: string
-          last_client_message_at: string | null
-          last_staff_message_at: string | null
           priority: string
           status: string
           subject: string
@@ -1149,10 +742,7 @@ export type Database = {
           category?: string
           closed_at?: string | null
           created_at?: string
-          first_response_at?: string | null
           id?: string
-          last_client_message_at?: string | null
-          last_staff_message_at?: string | null
           priority?: string
           status?: string
           subject: string
@@ -1166,10 +756,7 @@ export type Database = {
           category?: string
           closed_at?: string | null
           created_at?: string
-          first_response_at?: string | null
           id?: string
-          last_client_message_at?: string | null
-          last_staff_message_at?: string | null
           priority?: string
           status?: string
           subject?: string
@@ -1365,7 +952,6 @@ export type Database = {
           reference: string
           status: string
           stripe_id: string | null
-          stripe_payment_intent: string | null
           subscription_id: string | null
           user_id: string
           void_reason: string | null
@@ -1380,7 +966,6 @@ export type Database = {
           reference: string
           status?: string
           stripe_id?: string | null
-          stripe_payment_intent?: string | null
           subscription_id?: string | null
           user_id: string
           void_reason?: string | null
@@ -1395,7 +980,6 @@ export type Database = {
           reference?: string
           status?: string
           stripe_id?: string | null
-          stripe_payment_intent?: string | null
           subscription_id?: string | null
           user_id?: string
           void_reason?: string | null
@@ -1440,56 +1024,12 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      has_perm: {
-        Args: {
-          _perm: string
-          _user_id: string
-        }
-        Returns: boolean
-      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
         Returns: boolean
-      }
-      mark_notifications_read: {
-        Args: {
-          _ids?: string[]
-        }
-        Returns: number
-      }
-      mfa_satisfied: {
-        Args: never
-        Returns: boolean
-      }
-      mfa_session_ok: {
-        Args: never
-        Returns: boolean
-      }
-      staff_directory: {
-        Args: never
-        Returns: {
-          created_at: string
-          email: string
-          level: string
-          mfa_enabled: boolean
-          name: string
-          user_id: string
-        }[]
-      }
-      staff_search: {
-        Args: {
-          q: string
-        }
-        Returns: {
-          account_id: string
-          id: string
-          kind: string
-          subtitle: string
-          title: string
-        }[]
       }
     }
     Enums: {
