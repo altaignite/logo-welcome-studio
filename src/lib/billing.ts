@@ -1,5 +1,5 @@
 /** Pure billing, overage, guarantee and debt-recovery rules shared by server and UI. */
-import { GUARANTEE_DAYS } from "@/lib/admin";
+import { GUARANTEE_CLAIM_DAYS, GUARANTEE_DAYS } from "@/lib/admin";
 
 export type BillingRules = {
   overage_rates: Record<string, number>;
@@ -108,4 +108,26 @@ export function planRefund(amountCents: number, sources: { pi: string; refundabl
 export function collectionActionAllowed(action: string, status: string) {
   const unpaid = status === "open" || status === "overdue";
   return unpaid || !["flag", "court", "settle", "write_off"].includes(action);
+}
+
+type GuaranteeSub = { status: string; started_at: string | null; guarantee_status: string; guarantee_void_reason?: string | null; sales_received: boolean };
+type GuaranteeInvoice = { status: string; collection_stage?: string | null; failed_payment_at?: string | null };
+export type GuaranteeCheck = { eligible: boolean; opensAt: Date | null; closesAt: Date | null; checks: { label: string; ok: boolean; detail: string }[] };
+
+/** Money-back guarantee rules: the plan has run for 90 days, the request is made within 30 days after that, no invoice on the
+ * plan ever failed or went late, the guarantee wasn't voided (for example by a pause in the first 90 days) and no sales were received. */
+export function guaranteeCheck(sub: GuaranteeSub, invoices: GuaranteeInvoice[], now = new Date()): GuaranteeCheck {
+  const opensAt = sub.started_at ? new Date(new Date(sub.started_at).getTime() + GUARANTEE_DAYS * DAY) : null;
+  const closesAt = opensAt ? new Date(opensAt.getTime() + GUARANTEE_CLAIM_DAYS * DAY) : null;
+  const failed = invoices.filter((i) => !!i.failed_payment_at || ["overdue", "uncollectible"].includes(i.status) || (!!i.collection_stage && i.collection_stage !== "none"));
+  const day = (d: Date) => d.toLocaleDateString("en-GB", { dateStyle: "medium" });
+  const checks = [
+    { label: "Your plan has run for 90 days", ok: !!opensAt && now >= opensAt, detail: opensAt ? (now >= opensAt ? `Since ${day(opensAt)}` : `From ${day(opensAt)}`) : "Starts when your first invoice is paid" },
+    { label: "Requested within 30 days after day 90", ok: !!closesAt && now <= closesAt, detail: closesAt ? `Until ${day(closesAt)}` : "—" },
+    { label: "No failed or late invoices on this plan", ok: failed.length === 0, detail: failed.length ? `${failed.length} invoice${failed.length > 1 ? "s" : ""} failed or went overdue` : "All paid on time" },
+    { label: "Guarantee still active", ok: sub.guarantee_status === "running", detail: sub.guarantee_status === "running" ? "Active" : sub.guarantee_void_reason ?? sub.guarantee_status.replaceAll("_", " ") },
+    { label: "No sales received", ok: !sub.sales_received, detail: sub.sales_received ? "Sales were recorded on this plan" : "You confirm this when you ask" },
+    { label: "Plan isn't cancelled", ok: ["active", "past_due", "paused"].includes(sub.status), detail: sub.status.replaceAll("_", " ") },
+  ];
+  return { eligible: checks.every((c) => c.ok), opensAt, closesAt, checks };
 }

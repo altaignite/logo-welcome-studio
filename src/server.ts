@@ -44,12 +44,33 @@ function isH3SwallowedErrorBody(body: string): boolean {
   }
 }
 
+/** Browser security headers on every response: no framing, no MIME sniffing, HTTPS only, minimal referrer and device access. */
+const securityHeaders: Record<string, string> = {
+  "X-Frame-Options": "DENY",
+  "X-Content-Type-Options": "nosniff",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+  "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=(self)",
+  "Cross-Origin-Opener-Policy": "same-origin",
+};
+function withSecurityHeaders(response: Response) {
+  try {
+    for (const [k, v] of Object.entries(securityHeaders)) if (!response.headers.has(k)) response.headers.set(k, v);
+    return response;
+  } catch {
+    // Some responses have immutable headers; copy them.
+    const r = new Response(response.body, response);
+    for (const [k, v] of Object.entries(securityHeaders)) if (!r.headers.has(k)) r.headers.set(k, v);
+    return r;
+  }
+}
+
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
-      return await normalizeCatastrophicSsrResponse(response);
+      return withSecurityHeaders(await normalizeCatastrophicSsrResponse(response));
     } catch (error) {
       console.error(error);
       return new Response(renderErrorPage(), {

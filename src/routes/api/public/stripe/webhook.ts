@@ -57,6 +57,11 @@ export const Route = createFileRoute("/api/public/stripe/webhook")({
             return idOf(full?.payment_intent) ?? idOf(full?.payments?.data?.[0]?.payment?.payment_intent);
           };
 
+          // Every invoice event records Stripe's live invoice status on the local copy.
+          if (event.type.startsWith("invoice.") && o.id) {
+            must(await admin.from("invoices").update({ stripe_status: o.status ?? null, stripe_synced_at: new Date().toISOString(),
+              ...(event.type === "invoice.payment_failed" ? { failed_payment_at: new Date().toISOString() } : {}) }).eq("stripe_invoice_id", o.id));
+          }
           switch (event.type) {
             case "invoice.finalized": await upsertInvoice("open"); break;
             case "invoice.paid": {
@@ -97,20 +102,17 @@ export const Route = createFileRoute("/api/public/stripe/webhook")({
               break;
             }
             case "invoice.voided": must(await admin.from("invoices").update({ status: "void", void_reason: "Voided in Stripe" }).eq("stripe_invoice_id", o.id).neq("status", "void")); break;
-            case "customer.subscription.updated": {
-              const subId = await localSub();
-              if (subId && o.status === "unpaid") await B.suspendForNonPayment(admin, subId, "Payment retries exhausted");
-              if (subId && o.status === "past_due") await B.markPastDue(admin, subId, "Renewal payment overdue");
-              break;
-            }
+            case "customer.subscription.created":
+            case "customer.subscription.updated":
+            case "customer.subscription.paused":
+            case "customer.subscription.resumed":
             case "customer.subscription.deleted": {
+              // The local plan follows Stripe's live status (shared with the daily reconciliation).
               const subId = await localSub();
-              if (subId) {
-                must(await admin.from("subscriptions").update({ status: "cancelled", cancelled_at: new Date().toISOString() }).eq("id", subId).neq("status", "cancelled"));
-                must(await admin.from("projects").update({ status: "cancelled" }).eq("subscription_id", subId).in("status", ["planned", "active", "on_hold"]));
-              }
+              if (subId) await B.syncSubscriptionFromStripe(admin, subId, event.type === "customer.subscription.deleted" ? { ...o, status: "canceled" } : o);
               break;
             }
+            case "invoice.updated": case "invoice.created": case "invoice.sent": break;
             case "charge.refunded": {
               const pi = idOf(o.payment_intent);
               const stripeInv = idOf(o.invoice);

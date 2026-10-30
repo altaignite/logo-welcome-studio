@@ -15,6 +15,8 @@ import { requestPrivacy, updateMyProfile } from "@/lib/client.functions";
 import { myAgreements, saveOnboardingBrief } from "@/lib/portal.functions";
 import { AgreementList, DocumentList, UploadButton } from "@/components/files";
 import { MfaSettings } from "@/components/mfa";
+import { isBlockedDomain } from "@/lib/disposable-domains";
+import { departmentLabel } from "@/lib/support";
 import { briefQuestions, missingAnswers, type BriefAnswers } from "@/lib/onboarding";
 import { deliverableLabel, hoursByMonth } from "@/lib/work";
 
@@ -124,7 +126,7 @@ function SectionPage() {
     {s === "support" && table("Support tickets", "ticket", data.tickets, [
       { key: "s", label: "Subject", value: (r) => r.subject },
       { key: "st", label: "Status", value: (r) => r.status, render: (r) => <StatusBadge status={r.status} /> },
-      { key: "c", label: "Topic", value: (r) => r.category },
+      { key: "c", label: "Department", value: (r) => departmentLabel(r.department ?? r.category) },
       { key: "u", label: "Updated", value: (r) => r.updated_at, render: (r) => formatDate(r.updated_at) },
       { key: "x", label: "Actions", value: () => "", render: (r) => <Actions kind="ticket" id={r.id}>{r.status !== "closed" && <ActBtn onClick={() => a.reply(r)}>Reply</ActBtn>}</Actions> },
     ], <ActBtn dark onClick={() => a.newTicket()}>New request</ActBtn>)}
@@ -209,6 +211,7 @@ function SecurityPanel() {
     e.preventDefault();
     const email = String(new FormData(e.currentTarget).get("email") ?? "").trim();
     if (!/^\S+@\S+\.\S+$/.test(email)) return popup({ type: "error", title: "Enter a valid email", description: "We'll send a confirmation link there." });
+    if (isBlockedDomain(email)) return popup({ type: "error", title: "Use a permanent email address", description: "Disposable email addresses can't be used." });
     setBusy("email");
     const { error } = await supabase.auth.updateUser({ email }, { emailRedirectTo: `${window.location.origin}/dashboard` });
     setBusy(null);

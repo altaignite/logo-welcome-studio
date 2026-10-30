@@ -16,12 +16,13 @@ import { DocumentList, UploadButton } from "@/components/files";
 import { useStaff, withStaffPicker } from "@/components/admin/staff";
 import { useEmailClients } from "@/components/admin/email-clients";
 import { briefQuestions } from "@/lib/onboarding";
+import { AccountSecurity } from "@/components/admin/account-security";
 import { recordKinds, toPatch, type RecordKind, type Row, type Vals } from "@/lib/records";
 
 export const Route = createFileRoute("/admin/accounts/$id")({ component: AccountDetail });
 const adminRoute = getRouteApi("/admin");
 
-const tabs = ["Overview", "Onboarding", "Contacts", "Applications", "Subscriptions", "Projects", "Deliverables", "Reports", "Documents", "Invoices", "Transactions", "Support tickets", "Activities", "Tasks", "Privacy", "Audit log"] as const;
+const tabs = ["Overview", "Onboarding", "Contacts", "Applications", "Subscriptions", "Projects", "Deliverables", "Reports", "Documents", "Invoices", "Transactions", "Support tickets", "Activities", "Tasks", "Privacy", "Security", "Audit log"] as const;
 type Modal = { title: string; description?: string | undefined; fields: FieldDef[]; submitLabel: string; onSubmit: (v: Vals) => Promise<string | null> };
 const today = () => new Date().toISOString().slice(0, 10);
 type R = Row;
@@ -50,7 +51,8 @@ function AccountDetail() {
         list("deliverables", "updated_at"), list("client_reports", "period_start"), list("documents"),
         supabase.from("onboarding_briefs").select("*").eq("user_id", id).maybeSingle().then((r) => r.data),
       ]);
-      return { profile, applications, subscriptions, projects, invoices, transactions, tickets, activities, tasks, contacts, compliance, audit, deliverables, reports, documents, brief };
+      const flags = (await supabase.from("sign_in_events").select("id", { count: "exact", head: true }).eq("user_id", id).eq("new_location", true).is("reviewed_at", null)).count ?? 0;
+      return { flags, profile, applications, subscriptions, projects, invoices, transactions, tickets, activities, tasks, contacts, compliance, audit, deliverables, reports, documents, brief };
     },
   });
   const refresh = () => qc.invalidateQueries({ queryKey: ["admin"] });
@@ -106,11 +108,18 @@ function AccountDetail() {
   // ---------- actions ----------
   const statusModal = () => setModal({
     title: "Change account status", submitLabel: "Save status",
-    description: "Suspended and closed accounts can't sign in. On hold and suspended pause plans; cancelled and closed cancel them.",
+    description: "Suspended and closed: sign-in blocked and every session ended at once. On hold and suspended pause plans in Stripe; cancelled and closed cancel them. Back to active resumes plans the hold paused.",
     fields: [{ name: "status", label: "Status", type: "select", options: [...accountStatuses], defaultValue: p.status }, { name: "reason", label: "Reason (saved in the audit log)", type: "textarea", required: true }],
     onSubmit: async (v) => {
       if (v.reason.length < 3) return "Add a short reason.";
-      try { await changeStatus({ data: { userIds: [id], status: v.status as AccountStatus, reason: v.reason } }); await refresh(); return null; }
+      try {
+        const r = await changeStatus({ data: { userIds: [id], status: v.status as AccountStatus, reason: v.reason } }); await refresh();
+        if (r.skipped) return "Staff accounts and your own account can't be changed here.";
+        const parts = [r.sessionsEnded ? `${r.sessionsEnded} session${r.sessionsEnded > 1 ? "s" : ""} ended and sign-in blocked` : "", r.plansPaused ? `${r.plansPaused} plan${r.plansPaused > 1 ? "s" : ""} paused` : "",
+          r.plansCancelled ? `${r.plansCancelled} plan${r.plansCancelled > 1 ? "s" : ""} cancelled` : "", r.plansResumed ? `${r.plansResumed} plan${r.plansResumed > 1 ? "s" : ""} resumed` : ""].filter(Boolean);
+        popup({ type: "success", title: `Account is now ${accountStatusLabel[v.status as AccountStatus]}`, description: parts.length ? `${parts.join(", ")}.` : "No plans or sessions needed changing.", primaryLabel: "Done", secondaryLabel: null });
+        return null;
+      }
       catch (e) { return (e as Error).message; }
     },
   });
@@ -203,6 +212,7 @@ function AccountDetail() {
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2"><h1 className="truncate text-2xl font-extrabold sm:text-3xl">{p.first_name} {p.last_name}</h1><StatusBadge status={p.status} label={stat(p.status)} /></div>
           <div className="mt-1 flex flex-wrap gap-x-4 text-sm text-muted-foreground"><span className="font-mono">{formatAccount(p.account_number)}</span>{p.company && <span>{p.company}</span>}</div>
+          {data.flags > 0 && <button type="button" onClick={() => setTab("Security")} className="mt-2 block rounded-lg bg-amber-50 px-3 py-2 text-left text-sm text-amber-900 ring-1 ring-amber-300">New sign-in location to review. Open Security.</button>}
           {p.status_reason && p.status !== "active" && <p className="mt-2 rounded-lg bg-secondary px-3 py-2 text-sm">Reason: {p.status_reason}</p>}
         </div>
         <div className="flex flex-wrap gap-2">
@@ -295,6 +305,8 @@ function AccountDetail() {
       {tab === "Privacy" && <DataTable<R> title="Privacy requests" rows={data.compliance} getId={(r) => r.id} onRowClick={open("compliance_requests")} empty="No privacy requests." toolbar={<Btn icon={Plus} onClick={newPrivacy}>Log request</Btn>}
         bulkActions={[bulkUpdate("compliance_requests", { status: "completed", completed_at: new Date().toISOString() }, "Mark completed")]}
         columns={[col("kind", "Request"), col("details", "Details"), { key: "status", label: "Status", value: (r) => String(r.status), render: (r) => <StatusBadge status={r.status === "open" && String(r.due_at) < today() ? "overdue" : String(r.status)} /> }, { key: "due", label: "Due", value: (r) => formatDay(String(r.due_at)) }, col("actor_label", "Logged by")]} />}
+
+      {tab === "Security" && <AccountSecurity userId={id} adminEmail={adminEmail} />}
 
       {tab === "Audit log" && <Section title="Audit log"><AuditList rows={data.audit} showTable /></Section>}
 

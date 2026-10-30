@@ -187,6 +187,27 @@ export type Database = {
         }
         Relationships: []
       }
+      blocked_email_domains: {
+        Row: {
+          created_at: string
+          created_by_label: string
+          domain: string
+          reason: string
+        }
+        Insert: {
+          created_at?: string
+          created_by_label?: string
+          domain: string
+          reason?: string
+        }
+        Update: {
+          created_at?: string
+          created_by_label?: string
+          domain?: string
+          reason?: string
+        }
+        Relationships: []
+      }
       client_reports: {
         Row: {
           actor_label: string
@@ -568,6 +589,7 @@ export type Database = {
           created_at: string
           description: string | null
           due_at: string | null
+          failed_payment_at: string | null
           fees_accrued: number
           hosted_url: string | null
           id: string
@@ -581,6 +603,8 @@ export type Database = {
           stage_changed_at: string | null
           status: string
           stripe_invoice_id: string | null
+          stripe_status: string | null
+          stripe_synced_at: string | null
           subscription_id: string | null
           user_id: string
           void_reason: string | null
@@ -593,6 +617,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           due_at?: string | null
+          failed_payment_at?: string | null
           fees_accrued?: number
           hosted_url?: string | null
           id?: string
@@ -606,6 +631,8 @@ export type Database = {
           stage_changed_at?: string | null
           status?: string
           stripe_invoice_id?: string | null
+          stripe_status?: string | null
+          stripe_synced_at?: string | null
           subscription_id?: string | null
           user_id: string
           void_reason?: string | null
@@ -618,6 +645,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           due_at?: string | null
+          failed_payment_at?: string | null
           fees_accrued?: number
           hosted_url?: string | null
           id?: string
@@ -631,6 +659,8 @@ export type Database = {
           stage_changed_at?: string | null
           status?: string
           stripe_invoice_id?: string | null
+          stripe_status?: string | null
+          stripe_synced_at?: string | null
           subscription_id?: string | null
           user_id?: string
           void_reason?: string | null
@@ -953,6 +983,51 @@ export type Database = {
         }
         Relationships: []
       }
+      sign_in_events: {
+        Row: {
+          city: string | null
+          country: string | null
+          created_at: string
+          id: string
+          ip: string | null
+          new_location: boolean
+          region: string | null
+          reviewed_at: string | null
+          reviewed_by_label: string | null
+          session_id: string | null
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          id?: string
+          ip?: string | null
+          new_location?: boolean
+          region?: string | null
+          reviewed_at?: string | null
+          reviewed_by_label?: string | null
+          session_id?: string | null
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          id?: string
+          ip?: string | null
+          new_location?: boolean
+          region?: string | null
+          reviewed_at?: string | null
+          reviewed_by_label?: string | null
+          session_id?: string | null
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       signed_agreements: {
         Row: {
           application_id: string
@@ -1043,7 +1118,9 @@ export type Database = {
           cancel_at_period_end: boolean
           cancelled_at: string | null
           created_at: string
+          current_period_end: string | null
           first_paid_at: string | null
+          guarantee_claimed_at: string | null
           guarantee_ends_at: string | null
           guarantee_status: string
           guarantee_void_reason: string | null
@@ -1053,6 +1130,7 @@ export type Database = {
           monthly_hours: number
           notes: string | null
           overage_billed_hours: number
+          paused_by_account_status: boolean
           payment_warning: string | null
           pending_plan_id: string | null
           plan_name: string
@@ -1060,7 +1138,9 @@ export type Database = {
           sales_received: boolean
           started_at: string | null
           status: string
+          stripe_status: string | null
           stripe_subscription_id: string | null
+          stripe_synced_at: string | null
           user_id: string
         }
         Insert: {
@@ -1069,7 +1149,9 @@ export type Database = {
           cancel_at_period_end?: boolean
           cancelled_at?: string | null
           created_at?: string
+          current_period_end?: string | null
           first_paid_at?: string | null
+          guarantee_claimed_at?: string | null
           guarantee_ends_at?: string | null
           guarantee_status?: string
           guarantee_void_reason?: string | null
@@ -1079,6 +1161,7 @@ export type Database = {
           monthly_hours: number
           notes?: string | null
           overage_billed_hours?: number
+          paused_by_account_status?: boolean
           payment_warning?: string | null
           pending_plan_id?: string | null
           plan_name: string
@@ -1086,7 +1169,9 @@ export type Database = {
           sales_received?: boolean
           started_at?: string | null
           status?: string
+          stripe_status?: string | null
           stripe_subscription_id?: string | null
+          stripe_synced_at?: string | null
           user_id: string
         }
         Update: {
@@ -1095,7 +1180,9 @@ export type Database = {
           cancel_at_period_end?: boolean
           cancelled_at?: string | null
           created_at?: string
+          current_period_end?: string | null
           first_paid_at?: string | null
+          guarantee_claimed_at?: string | null
           guarantee_ends_at?: string | null
           guarantee_status?: string
           guarantee_void_reason?: string | null
@@ -1105,6 +1192,7 @@ export type Database = {
           monthly_hours?: number
           notes?: string | null
           overage_billed_hours?: number
+          paused_by_account_status?: boolean
           payment_warning?: string | null
           pending_plan_id?: string | null
           plan_name?: string
@@ -1112,7 +1200,9 @@ export type Database = {
           sales_received?: boolean
           started_at?: string | null
           status?: string
+          stripe_status?: string | null
           stripe_subscription_id?: string | null
+          stripe_synced_at?: string | null
           user_id?: string
         }
         Relationships: [
@@ -1131,12 +1221,16 @@ export type Database = {
           assigned_to: string | null
           category: string
           closed_at: string | null
+          contact_phone: string | null
+          contact_preference: string
           created_at: string
+          department: string
           first_response_at: string | null
           id: string
           last_client_message_at: string | null
           last_staff_message_at: string | null
           priority: string
+          project_id: string | null
           status: string
           subject: string
           subscription_id: string | null
@@ -1148,12 +1242,16 @@ export type Database = {
           assigned_to?: string | null
           category?: string
           closed_at?: string | null
+          contact_phone?: string | null
+          contact_preference?: string
           created_at?: string
+          department?: string
           first_response_at?: string | null
           id?: string
           last_client_message_at?: string | null
           last_staff_message_at?: string | null
           priority?: string
+          project_id?: string | null
           status?: string
           subject: string
           subscription_id?: string | null
@@ -1165,12 +1263,16 @@ export type Database = {
           assigned_to?: string | null
           category?: string
           closed_at?: string | null
+          contact_phone?: string | null
+          contact_preference?: string
           created_at?: string
+          department?: string
           first_response_at?: string | null
           id?: string
           last_client_message_at?: string | null
           last_staff_message_at?: string | null
           priority?: string
+          project_id?: string | null
           status?: string
           subject?: string
           subscription_id?: string | null
@@ -1178,6 +1280,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "support_tickets_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "support_tickets_subscription_id_fkey"
             columns: ["subscription_id"]
@@ -1440,6 +1549,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      account_access_ok: { Args: never; Returns: boolean }
+      email_domain_blocked: { Args: { _email: string }; Returns: boolean }
+      revoke_user_sessions: { Args: { _session?: string; _user: string }; Returns: number }
+      user_sessions: { Args: { _user: string }; Returns: Json[] }
       has_perm: { Args: { _perm: string; _user_id: string }; Returns: boolean }
       has_role: {
         Args: {

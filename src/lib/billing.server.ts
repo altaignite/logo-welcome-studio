@@ -202,3 +202,61 @@ export async function issueArrears(admin: Admin, invoiceId: string) {
   must(await admin.from("invoice_charges").update({ billed_invoice_id: row.id }).in("id", charges.map((c: any) => c.id)));
   return row;
 }
+
+/** Applies Stripe's live subscription state to the local row: status, period, cancel-at-period-end. Used by the webhook and the
+ * daily reconciliation, so the database follows Stripe whichever arrives first. */
+export async function syncSubscriptionFromStripe(admin: Admin, subId: string, s: any) {
+  const sub = must(await admin.from("subscriptions").select("*").eq("id", subId).maybeSingle());
+  if (!sub) return;
+  const paused = s.status === "paused" || !!s.pause_collection;
+  const periodEnd = s.current_period_end ?? s.items?.data?.[0]?.current_period_end ?? null;
+  const live = paused ? "paused" : String(s.status);
+  must(await admin.from("subscriptions").update({
+    stripe_status: live, stripe_synced_at: new Date().toISOString(), cancel_at_period_end: !!s.cancel_at_period_end,
+    ...(periodEnd ? { current_period_end: new Date(periodEnd * 1000).toISOString(), renews_at: new Date(periodEnd * 1000).toISOString() } : {}),
+  }).eq("id", subId));
+  if (live === "canceled") {
+    if (sub.status !== "cancelled") {
+      must(await admin.from("subscriptions").update({ status: "cancelled", cancelled_at: new Date().toISOString() }).eq("id", subId));
+      must(await admin.from("projects").update({ status: "cancelled" }).eq("subscription_id", subId).in("status", ["planned", "active", "on_hold"]));
+      await audit(admin, sub.user_id, "subscriptions", subId, "cancelled", { status: { from: sub.status, to: "cancelled" }, reason: "Cancelled in Stripe" }, null, "Stripe");
+    }
+  } else if (live === "unpaid") await suspendForNonPayment(admin, subId, "Payment retries exhausted");
+  else if (live === "past_due") { if (sub.status === "active") await markPastDue(admin, subId, "Renewal payment overdue"); }
+  else if (live === "paused") {
+    if (sub.status === "active" || sub.status === "past_due") {
+      must(await admin.from("subscriptions").update({ status: "paused" }).eq("id", subId));
+      await audit(admin, sub.user_id, "subscriptions", subId, "paused", { status: { from: sub.status, to: "paused" }, reason: "Paused in Stripe" }, null, "Stripe");
+    }
+  } else if (live === "active" || live === "trialing") {
+    if (sub.status === "past_due" || sub.status === "suspended") await reinstateAfterPayment(admin, subId);
+    else if (sub.status === "paused" && !sub.paused_by_account_status) {
+      must(await admin.from("subscriptions").update({ status: "active" }).eq("id", subId));
+      await audit(admin, sub.user_id, "subscriptions", subId, "resume", { status: { from: "paused", to: "active" }, reason: "Resumed in Stripe" }, null, "Stripe");
+    }
+  }
+}
+
+/** Daily check that local subscriptions and unpaid invoices match Stripe, for anything a missed webhook left behind.
+ * A paid invoice is never marked paid here (only the signed webhook does that); staff are told to check it instead. */
+export async function reconcileStripe(admin: Admin) {
+  let subs = 0, invoices = 0;
+  const rows = must(await admin.from("subscriptions").select("id, stripe_subscription_id").not("stripe_subscription_id", "is", null).neq("status", "cancelled").order("stripe_synced_at", { ascending: true, nullsFirst: true }).limit(200)) ?? [];
+  for (const r of rows) {
+    try { await syncSubscriptionFromStripe(admin, r.id, await stripe("GET", `subscriptions/${r.stripe_subscription_id}`)); subs++; }
+    catch (e) { console.error("Stripe subscription sync failed", r.id, e); }
+  }
+  const open = must(await admin.from("invoices").select("id, user_id, number, status, stripe_invoice_id, subscription_id").in("status", ["open", "overdue"]).not("stripe_invoice_id", "is", null).limit(200)) ?? [];
+  for (const inv of open) {
+    try {
+      const s = await stripe("GET", `invoices/${inv.stripe_invoice_id}`);
+      must(await admin.from("invoices").update({ stripe_status: s.status, stripe_synced_at: new Date().toISOString(), hosted_url: s.hosted_invoice_url ?? undefined, pdf_url: s.invoice_pdf ?? undefined }).eq("id", inv.id));
+      if (s.status === "void") must(await admin.from("invoices").update({ status: "void", void_reason: "Voided in Stripe", interest_paused: true }).eq("id", inv.id));
+      else if (s.status === "uncollectible" && inv.subscription_id) await suspendForNonPayment(admin, inv.subscription_id, `Invoice ${inv.number} marked uncollectible`);
+      else if (s.status === "paid") must(await admin.rpc("notify_staff", { _perm: "billing", _assigned: null, _kind: "billing", _title: `Stripe shows invoice ${inv.number} paid`,
+        _body: "The payment wasn't recorded here. Check the Stripe webhook delivery and resend the invoice.paid event.", _link: `/admin/records/invoices/${inv.id}`, _dedupe: `unrecorded-paid:${inv.id}` }));
+      invoices++;
+    } catch (e) { console.error("Stripe invoice sync failed", inv.id, e); }
+  }
+  return { subs, invoices };
+}

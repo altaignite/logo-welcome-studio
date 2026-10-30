@@ -112,11 +112,12 @@ export const recordKinds: Record<RecordKind, KindConfig> = {
   support_tickets: {
     singular: "Support ticket", plural: "Support tickets", archivable: true, files: true,
     title: (r) => s(r.subject),
-    fields: [["Subject", "subject", "text"], ["Status", "status", "status"], ["Priority", "priority", "text"], ["Category", "category", "text"], ["Assigned to", "assigned_to", "text"],
+    fields: [["Subject", "subject", "text"], ["Status", "status", "status"], ["Department", "department", "text"], ["Priority", "priority", "text"], ["Reply by", "contact_preference", "text"], ["Phone to call", "contact_phone", "text"], ["Assigned to", "assigned_to", "text"],
       ["Opened", "created_at", "date"], ["Closed", "closed_at", "date"]],
-    edit: [{ name: "subject", label: "Subject", required: true }, sel("status", "Status", ["open", "in_progress", "waiting_on_client", "closed"]),
-      sel("priority", "Priority", ["low", "normal", "high", "urgent"]), sel("category", "Category", ["general", "billing", "project", "technical", "complaint"]), { name: "assigned_to", label: "Assigned to" }],
-    parents: [{ label: "Subscription", kind: "subscriptions", fk: "subscription_id" }],
+    edit: [{ name: "subject", label: "Subject", required: true }, sel("department", "Department", ["account", "billing", "technical", "projects", "marketing", "complaints"]),
+      sel("status", "Status", ["open", "in_progress", "waiting_on_client", "closed"]), sel("priority", "Priority", ["low", "normal", "high", "urgent"]),
+      sel("contact_preference", "Reply by", ["dashboard", "email", "phone"]), { name: "contact_phone", label: "Phone to call" }, { name: "assigned_to", label: "Assigned to" }],
+    parents: [{ label: "Subscription", kind: "subscriptions", fk: "subscription_id" }, { label: "Project", kind: "projects", fk: "project_id" }],
     children: [{ label: "Conversation", kind: "ticket_messages", fk: "ticket_id", columns: [["When", "created_at", "date"], ["Message", "body", "text"], ["By", "actor_label", "text"]] }],
   },
   crm_activities: {

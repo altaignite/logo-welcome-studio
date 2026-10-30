@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { plans } from "@/lib/signup";
-import { guaranteeEligible } from "@/lib/admin";
+import { guaranteeCheck } from "@/lib/billing";
 
 /** Profile fields a client may edit themselves. Everything else (account number, email, status, notes, legal) is staff-only. */
 export const clientEditableFields = ["first_name", "last_name", "company", "phone", "country", "address_line", "city", "state", "postal_code", "website", "timezone", "industry", "company_size", "marketing_opt_in", "sms_opt_in", "email_notifications"] as const;
@@ -31,9 +31,9 @@ export function planChangeTiming(fromPlanName: string, toPlanId: string): "now" 
   return !from || to.monthlyFee > from.monthlyFee ? "now" : "renewal";
 }
 
-/** The client can claim the money-back guarantee on a running guarantee, inside the window, with no sales recorded. */
-export function guaranteeClaimable(sub: { status: string; guarantee_status: string; guarantee_ends_at: string | null; sales_received: boolean }, now = new Date()) {
-  return ["active", "past_due", "paused"].includes(sub.status) && sub.guarantee_status === "running" && guaranteeEligible(sub, now);
+/** The client can request the money-back refund when every guarantee rule passes (see guaranteeCheck). */
+export function guaranteeClaimable(sub: Parameters<typeof guaranteeCheck>[0], invoices: Parameters<typeof guaranteeCheck>[1], now = new Date()) {
+  return guaranteeCheck(sub, invoices, now).eligible;
 }
 export const guaranteeClaimSchema = z.object({
   subscriptionId: z.string().uuid(),

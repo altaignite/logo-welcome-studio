@@ -8,7 +8,9 @@ import { formatDate, formatDay, humanize, money, statusLabel, type AppStatus } f
 import { stageLabel, type CollectionStage } from "@/lib/billing";
 import { plans } from "@/lib/signup";
 import { DocumentList, UploadButton } from "@/components/files";
-import { guaranteeClaimable } from "@/lib/client";
+import { guaranteeCheck } from "@/lib/billing";
+import { departmentLabel } from "@/lib/support";
+import { Check, X as Cross } from "lucide-react";
 import { deliverableLabel, metricTone, type Metric } from "@/lib/work";
 
 const kinds: RecordKind[] = ["subscription", "project", "task", "invoice", "payment", "application", "ticket", "deliverable", "report"];
@@ -56,14 +58,26 @@ function Details() {
     const projects = data.projects.filter((p) => p.subscription_id === r.id);
     const pIds = new Set(projects.map((p) => p.id));
     const pending = plans.find((p) => p.id === r.pending_plan_id);
+    const guarantee = guaranteeCheck(r, data.invoices.filter((i) => i.subscription_id === r.id));
     return <>
-      {header(`${r.plan_name} plan`, <StatusBadge status={r.status} />, <><SubButtons s={r} a={a} />{guaranteeClaimable(r) && <ActBtn onClick={() => a.claim(r)}>Claim money-back guarantee</ActBtn>}<ActBtn onClick={() => a.newTicket(r.id)}>Get help</ActBtn></>)}
+      {header(`${r.plan_name} plan`, <StatusBadge status={r.status} />, <><SubButtons s={r} a={a} />{guarantee.eligible && <ActBtn dark onClick={() => a.claim(r)}>Request money-back refund</ActBtn>}<ActBtn onClick={() => a.newTicket(r.id)}>Get help</ActBtn></>)}
       {r.payment_warning && <p className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm">{r.payment_warning}</p>}
       <Section title="Plan">
         <FieldGrid items={[["Monthly fee", money(r.monthly_fee)], ["Hours this month", `${r.hours_used} of ${r.monthly_hours}`], ["Started", formatDay(r.started_at)],
           [r.cancel_at_period_end ? "Ends" : "Renews", formatDay(r.renews_at)], ["Scheduled change", pending ? `Moves to ${pending.name} at renewal` : "—"],
           ["Money-back guarantee", r.guarantee_status === "running" ? `Until ${formatDay(r.guarantee_ends_at)}` : r.guarantee_status === "void" ? `Ended: ${r.guarantee_void_reason ?? "conditions not met"}` : r.guarantee_status === "claimed" ? "Claim under review" : humanize(r.guarantee_status)]]} />
       </Section>
+      {(["running", "claimed", "refunded"].includes(r.guarantee_status) || r.started_at) && <Section title="90-day money-back guarantee">
+        <div className="p-5 text-sm">
+          {r.guarantee_status === "claimed" ? <p>Your refund request was sent on {formatDate(r.guarantee_claimed_at)}. We'll reply in your support tickets.</p>
+            : r.guarantee_status === "refunded" ? <p>Your service fees were refunded under the guarantee.</p>
+            : <p className="text-muted-foreground">If you receive no sales, you can request a refund of your service fees after your plan has run for 90 days, as long as every invoice was paid on time. Advertising budgets aren't covered.</p>}
+          {r.guarantee_status === "running" && <ul className="mt-3 space-y-2">{guarantee.checks.map((c) => <li key={c.label} className="flex items-start gap-2">
+            <span className={`mt-0.5 grid size-5 shrink-0 place-items-center rounded-full ${c.ok ? "bg-foreground text-background" : "border"}`}>{c.ok ? <Check className="size-3" /> : <Cross className="size-3 text-muted-foreground" />}</span>
+            <span><span className="font-medium">{c.label}</span><span className="block text-xs text-muted-foreground">{c.detail}</span></span></li>)}</ul>}
+          {guarantee.eligible && <div className="mt-4"><ActBtn dark onClick={() => a.claim(r)}>Request money-back refund</ActBtn></div>}
+        </div>
+      </Section>}
       {miniTable("Projects", projects, "project", [["Project", (x) => x.name], ["Status", (x) => <StatusBadge status={x.status} />], ["Hours", (x) => x.hours]])}
       {tasksTable(data.tasks.filter((t) => t.subscription_id === r.id || pIds.has(t.project_id)))}
       {hoursList(data.hours.filter((h) => pIds.has(h.project_id)))}
@@ -156,7 +170,7 @@ function Details() {
     <Section title="Files" actions={r.status !== "closed" ? <UploadButton relatedTable="support_tickets" relatedId={r.id} onDone={a.refresh} label="Attach a file" /> : undefined}>
       <DocumentList docs={docsFor("support_tickets", r.id)} empty="No files attached." />
     </Section>
-    <Section title="Ticket"><FieldGrid items={[["Topic", humanize(r.category)], ["Priority", humanize(r.priority)], ["Plan", subLink(r.subscription_id)], ["Opened", formatDate(r.created_at)], ["Closed", formatDate(r.closed_at)]]} /></Section>
+    <Section title="Ticket"><FieldGrid items={[["Department", departmentLabel(r.department ?? r.category)], ["Reply by", humanize(r.contact_preference ?? "dashboard")], ["Priority", humanize(r.priority)], ["Plan", subLink(r.subscription_id)], ["Opened", formatDate(r.created_at)], ["Closed", formatDate(r.closed_at)]]} /></Section>
     {a.modalEl}
   </>;
 }

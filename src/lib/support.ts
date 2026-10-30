@@ -32,3 +32,24 @@ export function slaState(t: TicketLike, now = new Date()): SlaState {
   return left <= hours * 36e5 * DUE_SOON ? "due_soon" : "on_track";
 }
 export const slaLabel: Record<SlaState, string> = { met: "Answered", on_track: "On track", due_soon: "Reply due soon", breached: "Overdue reply", none: "—" };
+
+/** Departments clients choose when they open a ticket. Each maps to the older category field for existing views. */
+export const departments = [
+  { id: "account", label: "Account management", help: "Your plan, onboarding, strategy and general questions.", category: "general" },
+  { id: "billing", label: "Billing and payments", help: "Invoices, payments, refunds and the money-back guarantee.", category: "billing" },
+  { id: "technical", label: "Technical support", help: "Websites, hosting, email, tracking and anything not working.", category: "technical" },
+  { id: "projects", label: "Projects and design", help: "Work in progress, deliverables, changes and deadlines.", category: "project" },
+  { id: "marketing", label: "Marketing and ads", help: "Campaigns, social media, ads and results.", category: "general" },
+  { id: "complaints", label: "Complaints", help: "Something went wrong and you'd like it reviewed.", category: "complaint" },
+] as const;
+export type DepartmentId = (typeof departments)[number]["id"];
+export const departmentLabel = (id: string) => departments.find((d) => d.id === id)?.label ?? id;
+export const clientPriorities = [
+  { id: "low", label: "Low", help: "A question or idea, no rush." },
+  { id: "normal", label: "Normal", help: "Needs an answer within a day." },
+  { id: "high", label: "High", help: "Affecting your work or customers." },
+  { id: "urgent", label: "Urgent", help: "Your site or campaigns are down." },
+] as const;
+export const contactPreferences = [
+  { id: "dashboard", label: "Reply in my dashboard" }, { id: "email", label: "Email me" }, { id: "phone", label: "Call me" },
+] as const;

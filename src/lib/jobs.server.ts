@@ -3,6 +3,7 @@ import { must } from "@/lib/billing.server";
 import { emailConfigured, sendEmail } from "@/lib/email.server";
 import { EMAIL_BATCH, EMAIL_MAX_ATTEMPTS, emailDecision, renderEmail } from "@/lib/notifications";
 import { slaState } from "@/lib/support";
+import { GUARANTEE_CLAIM_DAYS, GUARANTEE_DAYS } from "@/lib/admin";
 
 type Admin = any;
 const day = (d: Date) => d.toISOString().slice(0, 10);
@@ -68,5 +69,12 @@ export async function runDailyReminders(admin: Admin, now = new Date()) {
   }
   const reviews = must(await admin.from("deliverables").select("id, user_id, title, review_round").eq("status", "in_review").lte("submitted_at", addDays(now, -5).toISOString())) ?? [];
   for (const d of reviews) { await notify(admin, d.user_id, "deliverable", `Reminder: ${d.title} is waiting for your review`, null, `/dashboard/deliverable/${d.id}`, `review-reminder:${d.id}:${d.review_round}`); sent++; }
+  // Money-back guarantee: tell clients when their refund window opens, and close it when it ends.
+  const running = must(await admin.from("subscriptions").select("id, user_id, plan_name, started_at").eq("guarantee_status", "running").not("started_at", "is", null)) ?? [];
+  for (const g of running) {
+    const opens = new Date(new Date(g.started_at).getTime() + GUARANTEE_DAYS * 864e5), closes = new Date(opens.getTime() + GUARANTEE_CLAIM_DAYS * 864e5);
+    if (now > closes) must(await admin.from("subscriptions").update({ guarantee_status: "expired" }).eq("id", g.id).eq("guarantee_status", "running"));
+    else if (now >= opens) { await notify(admin, g.user_id, "subscription", `Your ${g.plan_name} plan has reached 90 days`, `If you received no sales and every invoice was paid on time, you can request your money-back refund until ${day(closes)}.`, `/dashboard/subscription/${g.id}`, `guarantee-open:${g.id}`); sent++; }
+  }
   return { ran: true, sent };
 }

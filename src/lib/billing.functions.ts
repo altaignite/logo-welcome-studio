@@ -258,12 +258,13 @@ export const guaranteeRefund = createServerFn({ method: "POST" })
     await requireAdmin(context);
     const { getAdmin } = await import("@/lib/billing.server");
     const { stripe, cents, audit } = await import("@/lib/stripe.server");
-    const { guaranteeEligible } = await import("@/lib/admin");
+    const { guaranteeCheck } = await import("@/lib/billing");
     const { planRefund } = await import("@/lib/billing");
     const admin = await getAdmin();
     const { data: sub } = await admin.from("subscriptions").select("*").eq("id", data.subscriptionId).single();
-    // A claim made inside the window can still be refunded after the window ends.
-    if (!sub || sub.sales_received || !(sub.guarantee_status === "claimed" || (sub.guarantee_status === "running" && guaranteeEligible(sub)))) throw new Error("This subscription isn't eligible for a guarantee refund.");
+    const { data: subInvoices } = await admin.from("invoices").select("status, collection_stage, failed_payment_at").eq("subscription_id", data.subscriptionId);
+    // A claim made while every rule passed can be refunded later; otherwise the rules must pass now.
+    if (!sub || sub.sales_received || !(sub.guarantee_status === "claimed" || guaranteeCheck(sub, subInvoices ?? []).eligible)) throw new Error("This subscription isn't eligible for a guarantee refund.");
     const { data: paid } = await admin.from("invoices").select("stripe_invoice_id").eq("subscription_id", sub.id).eq("status", "paid").not("stripe_invoice_id", "is", null).in("kind", ["first", "renewal", "service"]);
     // What's still refundable comes from Stripe, so refunds made earlier (or by a retry after a partial failure) are never repeated.
     const sources: { pi: string; refundable: number; refunded: number }[] = [];

@@ -7,6 +7,7 @@ import { setAccountStatus } from "@/lib/crm.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { DataTable, StatusBadge } from "@/components/admin/data-table";
 import { useEmailClients } from "@/components/admin/email-clients";
+import { usePopup } from "@/components/popup";
 import { accountStatusLabel, accountStatuses, formatAccount, formatDate, statusLabel, type AccountStatus } from "@/lib/admin";
 
 export const Route = createFileRoute("/admin/accounts/")({ component: Accounts });
@@ -15,6 +16,7 @@ function Accounts() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const change = useServerFn(setAccountStatus);
+  const popup = usePopup();
   const [modal, setModal] = useState<{ ids: string[] } | null>(null);
   const mail = useEmailClients(() => qc.invalidateQueries({ queryKey: ["admin"] }));
   const fields: FieldDef[] = [{ name: "status", label: "New status", type: "select", options: [...accountStatuses] }, { name: "reason", label: "Reason (saved in the audit log)", type: "textarea", required: true }];
@@ -47,7 +49,9 @@ function Accounts() {
           { key: "created", label: "Joined", value: (r) => r.created_at, render: (r) => formatDate(r.created_at) },
         ]} />}
       {modal && <FormModal title={`Change status for ${modal.ids.length} account${modal.ids.length === 1 ? "" : "s"}`} description="Staff accounts and your own account are skipped." fields={fields} submitLabel="Save status" onClose={() => setModal(null)}
-        onSubmit={async (v) => { if (v.reason!.length < 3) return "Add a short reason."; try { await change({ data: { userIds: modal.ids, status: v.status as AccountStatus, reason: v.reason! } }); await qc.invalidateQueries({ queryKey: ["admin"] }); return null; } catch (e) { return (e as Error).message; } }} />}
+        onSubmit={async (v) => { if (v.reason!.length < 3) return "Add a short reason."; try { const r = await change({ data: { userIds: modal.ids, status: v.status as AccountStatus, reason: v.reason! } }); await qc.invalidateQueries({ queryKey: ["admin"] });
+          popup({ type: "success", title: `${r.accounts} account${r.accounts === 1 ? "" : "s"} updated`, description: `${r.sessionsEnded} sessions ended, ${r.plansPaused} plans paused, ${r.plansCancelled} cancelled, ${r.plansResumed} resumed.${r.skipped ? ` ${r.skipped} staff or own accounts skipped.` : ""}`, primaryLabel: "Done", secondaryLabel: null });
+          return null; } catch (e) { return (e as Error).message; } }} />}
       {mail.el}
     </div>
   );

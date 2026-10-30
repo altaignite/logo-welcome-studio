@@ -32,3 +32,10 @@
 - Signed agreements are rendered server-side from agreementDocuments in src/lib/signup.ts and stored once, immutably, in signed_agreements; bump AGREEMENT_VERSION when the wording changes.
 - Only the client decides on a deliverable (reviewDeliverable); staff send for review, withdraw or archive.
 - Privacy requests are fulfilled with fulfilAccessRequest (export to the client's Documents) and fulfilDeletionRequest (anonymise and block sign-in, keeping financial and legal records).
+- Account status changes go only through setAccountStatus: suspended/closed ban sign-in and end every session (revoke_user_sessions), on hold/suspended pause plans in Stripe (marked paused_by_account_status so reactivation resumes them), cancelled/closed cancel them; the restrictive "active account" policy and requireSession lock suspended and closed accounts out immediately (a test checks new tables).
+- Clients never write tables directly: tickets, replies, uploads, reviews and requests go through server functions with validation and rate limits.
+- Disposable email domains live in src/lib/disposable-domains.ts and are seeded into blocked_email_domains; handle_new_user and sync_profile_email refuse them on the server.
+- Sign-ins are recorded once per session by requireSession (sign_in_events, Cloudflare location headers); a new location notifies the account's staff and the user.
+- Subscriptions and invoices follow Stripe's live status through syncSubscriptionFromStripe (webhook and the daily reconcileStripe in /api/public/cron/collections); a paid invoice is only ever marked paid by the signed webhook.
+- Money-back guarantee rules are guaranteeCheck in src/lib/billing.ts: request after 90 days, within the next 30, no failed or late invoices, not voided, no sales.
+- The client-files bucket is created on first use by ensureBucket (Lovable Cloud migrations can't create storage buckets).

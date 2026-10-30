@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { accountStatuses, canDelete, guaranteeEligible, guaranteeEnd, signInBlocked, subscriptionEffect } from "@/lib/admin";
+import { accountStatuses, canDelete, guaranteeEnd, signInBlocked, subscriptionEffect } from "@/lib/admin";
+import { guaranteeCheck } from "@/lib/billing";
 import { toPatch } from "@/lib/records";
 
 describe("account statuses", () => {
@@ -18,11 +19,22 @@ describe("account statuses", () => {
 
 describe("90-day money-back guarantee", () => {
   it("ends 90 days after the start", () => expect(guaranteeEnd(new Date("2026-01-01T00:00:00Z")).toISOString().slice(0, 10)).toBe("2026-04-01"));
-  it("is refundable only inside the window without sales", () => {
-    const now = new Date("2026-02-01");
-    expect(guaranteeEligible({ guarantee_ends_at: "2026-04-01", sales_received: false }, now)).toBe(true);
-    expect(guaranteeEligible({ guarantee_ends_at: "2026-04-01", sales_received: true }, now)).toBe(false);
-    expect(guaranteeEligible({ guarantee_ends_at: "2026-01-15", sales_received: false }, now)).toBe(false);
+  it("opens after 90 days for 30 days, with every invoice paid on time and no sales", () => {
+    const sub = { status: "active", started_at: "2026-01-01T00:00:00Z", guarantee_status: "running", sales_received: false };
+    const paid = [{ status: "paid", collection_stage: "none", failed_payment_at: null }];
+    expect(guaranteeCheck(sub, paid, new Date("2026-02-01")).eligible).toBe(false);
+    expect(guaranteeCheck(sub, paid, new Date("2026-04-02")).eligible).toBe(true);
+    expect(guaranteeCheck(sub, paid, new Date("2026-05-02")).eligible).toBe(false);
+    expect(guaranteeCheck({ ...sub, sales_received: true }, paid, new Date("2026-04-02")).eligible).toBe(false);
+    expect(guaranteeCheck({ ...sub, guarantee_status: "void" }, paid, new Date("2026-04-02")).eligible).toBe(false);
+    expect(guaranteeCheck({ ...sub, status: "cancelled" }, paid, new Date("2026-04-02")).eligible).toBe(false);
+  });
+  it("is lost by any failed or late invoice, even one paid later", () => {
+    const sub = { status: "active", started_at: "2026-01-01T00:00:00Z", guarantee_status: "running", sales_received: false };
+    const at = new Date("2026-04-02");
+    expect(guaranteeCheck(sub, [{ status: "paid", collection_stage: "settled" }], at).eligible).toBe(false);
+    expect(guaranteeCheck(sub, [{ status: "paid", failed_payment_at: "2026-02-01" }], at).eligible).toBe(false);
+    expect(guaranteeCheck(sub, [{ status: "overdue" }], at).checks.find((c) => c.label.startsWith("No failed"))?.ok).toBe(false);
   });
 });
 

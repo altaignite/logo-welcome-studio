@@ -4,7 +4,7 @@ import { useState } from "react";
 import { DataTable, StatusBadge } from "@/components/admin/data-table";
 import { db } from "@/components/admin/record-bits";
 import { formatDate } from "@/lib/admin";
-import { slaLabel, slaState, ticketStatusLabel, ticketStatuses, type TicketStatus } from "@/lib/support";
+import { departmentLabel, slaLabel, slaState, ticketStatusLabel, ticketStatuses, type TicketStatus } from "@/lib/support";
 import { FormModal } from "@/components/admin/form-modal";
 import { useStaff } from "@/components/admin/staff";
 
@@ -62,7 +62,7 @@ function Support() {
             { key: "status", label: "Status", value: (r) => r.status, render: (r) => <StatusBadge status={r.status} /> },
             { key: "priority", label: "Priority", value: (r) => r.priority },
             { key: "sla", label: "Reply", value: (r) => slaLabel[slaState(r)], render: (r) => { const st = slaState(r); return st === "none" ? "—" : <StatusBadge status={st} label={slaLabel[st]} />; } },
-            { key: "category", label: "Category", value: (r) => r.category },
+            { key: "department", label: "Department", value: (r) => departmentLabel((r as unknown as { department: string }).department ?? r.category) },
             { key: "who", label: "Assigned", value: (r) => r.assigned_to ?? "" },
             { key: "last", label: "Last reply by", value: (r) => r.last },
             { key: "updated", label: "Updated", value: (r) => r.updated_at, render: (r) => formatDate(r.updated_at) },

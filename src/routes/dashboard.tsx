@@ -6,6 +6,7 @@ import logo from "@/assets/logo.png.asset.json";
 import { supabase } from "@/integrations/supabase/client";
 import { NotificationBell } from "@/components/notifications";
 import { mfaNeeded } from "@/components/mfa";
+import { touchSession } from "@/lib/account-security.functions";
 
 export const Route = createFileRoute("/dashboard")({
   ssr: false,
@@ -25,6 +26,10 @@ export const Route = createFileRoute("/dashboard")({
     if (!data.user) throw redirect({ to: "/" });
     // Accounts with two-factor sign-in finish the code step on the login page first.
     if (await mfaNeeded()) throw redirect({ to: "/" });
+    // Records the sign-in location and refuses suspended or closed accounts on the server; sign them out here too.
+    try { await touchSession(); } catch (e) {
+      if (/suspended|closed/i.test((e as Error).message)) { await supabase.auth.signOut(); throw redirect({ to: "/" }); }
+    }
     return { userId: data.user.id, email: data.user.email ?? "" };
   },
   component: Layout,

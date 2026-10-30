@@ -1,5 +1,5 @@
 /** Server-only document, agreement and privacy export workflows (service role). */
-import { FILE_BUCKET, storagePath, uploadIssue } from "@/lib/files";
+import { allowedMimeTypes, FILE_BUCKET, MAX_FILE_BYTES, storagePath, uploadIssue } from "@/lib/files";
 import { agreementDocuments, AGREEMENT_VERSION, plans, signedAgreementText } from "@/lib/signup";
 import { exportTables, omit, profileExportOmit } from "@/lib/privacy";
 import { must } from "@/lib/billing.server";
@@ -42,6 +42,21 @@ export async function assertRelated(admin: Admin, clientId: string, table: strin
   if (!row || row.user_id !== clientId) throw new Error("Record not found.");
 }
 
+let bucketReady = false;
+/** Creates the private client-files bucket if it doesn't exist yet (migrations can't create storage buckets on Lovable Cloud). */
+export async function ensureBucket(admin: Admin) {
+  if (bucketReady) return;
+  const found = await admin.storage.getBucket(FILE_BUCKET);
+  if (found.error) {
+    const made = await admin.storage.createBucket(FILE_BUCKET, { public: false, fileSizeLimit: MAX_FILE_BYTES, allowedMimeTypes: [...allowedMimeTypes] });
+    if (made.error && !/exists/i.test(made.error.message)) throw new Error("File storage isn't available right now.");
+  } else if (found.data?.public) {
+    // Never serve client files publicly.
+    await admin.storage.updateBucket(FILE_BUCKET, { public: false, fileSizeLimit: MAX_FILE_BYTES, allowedMimeTypes: [...allowedMimeTypes] });
+  }
+  bucketReady = true;
+}
+
 /** Creates a pending document row and a one-time signed upload URL under the client's folder. */
 export async function startUpload(admin: Admin, o: {
   clientId: string; uploaderId: string; uploaderLabel: string; title: string; file: { name: string; size: number; type: string };
@@ -50,6 +65,7 @@ export async function startUpload(admin: Admin, o: {
   const issue = uploadIssue(o.file);
   if (issue) throw new Error(issue);
   await assertRelated(admin, o.clientId, o.relatedTable, o.relatedId);
+  await ensureBucket(admin);
   const id = crypto.randomUUID();
   const path = storagePath(o.clientId, o.folder, id, o.file.name);
   must(await admin.from("documents").insert({

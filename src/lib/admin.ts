@@ -67,14 +67,13 @@ export function subscriptionEffect(s: string): "paused" | "cancelled" | null {
   return null;
 }
 
-/** 90-day money-back guarantee window, counted from the subscription start. */
+/** 90-day money-back guarantee: a refund can be requested once the plan has run for 90 days (see guaranteeCheck in src/lib/billing.ts). */
 export const GUARANTEE_DAYS = 90;
+/** Days after day 90 in which the refund can be requested. */
+export const GUARANTEE_CLAIM_DAYS = 30;
+/** Day the refund request opens, counted from the subscription start (stored as guarantee_ends_at). */
 export function guaranteeEnd(startedAt: Date) {
   const d = new Date(startedAt); d.setDate(d.getDate() + GUARANTEE_DAYS); return d;
-}
-/** Eligible for a service-fee refund only inside the window and when no sales were received. */
-export function guaranteeEligible(sub: { guarantee_ends_at: string | null; sales_received: boolean }, now = new Date()) {
-  return !!sub.guarantee_ends_at && now <= new Date(sub.guarantee_ends_at) && !sub.sales_received;
 }
 
 /** Financial and legal records are never deleted, only voided or archived. */

@@ -7,9 +7,12 @@ export const Route = createFileRoute("/api/public/cron/collections")({
       POST: async ({ request }) => {
         const denied = await authenticateCronRequest(request);
         if (denied) return denied;
-        const { getAdmin, runCollections } = await import("@/lib/billing.server");
-        const touched = await runCollections(await getAdmin());
-        return Response.json({ ok: true, touched });
+        const { getAdmin, reconcileStripe, runCollections } = await import("@/lib/billing.server");
+        const admin = await getAdmin();
+        // Bring local plans and invoices in line with Stripe first, so collections act on live status.
+        const stripe = await reconcileStripe(admin);
+        const touched = await runCollections(admin);
+        return Response.json({ ok: true, touched, stripe });
       },
     },
   },

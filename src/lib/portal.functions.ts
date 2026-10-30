@@ -38,12 +38,13 @@ export const claimGuarantee = createServerFn({ method: "POST" })
     const admin = await getAdmin();
     const sub = must(await admin.from("subscriptions").select("*").eq("id", data.subscriptionId).maybeSingle());
     if (!sub || sub.user_id !== context.userId) throw new Error("Subscription not found.");
-    if (!guaranteeClaimable(sub)) throw new Error("This plan isn't eligible for the money-back guarantee.");
-    const claimed = must(await admin.from("subscriptions").update({ guarantee_status: "claimed" }).eq("id", sub.id).eq("guarantee_status", "running").select("id"));
+    const invoices = must(await admin.from("invoices").select("status, collection_stage, failed_payment_at").eq("subscription_id", sub.id)) ?? [];
+    if (!guaranteeClaimable(sub, invoices)) throw new Error("This plan doesn't meet the money-back guarantee rules yet. See the checklist on the plan page.");
+    const claimed = must(await admin.from("subscriptions").update({ guarantee_status: "claimed", guarantee_claimed_at: new Date().toISOString() }).eq("id", sub.id).eq("guarantee_status", "running").select("id"));
     if (!claimed?.length) throw new Error("This guarantee was already claimed.");
-    const t = must(await admin.from("support_tickets").insert({ user_id: sub.user_id, subscription_id: sub.id, subject: `Money-back guarantee claim, ${sub.plan_name} plan`, category: "billing", priority: "high" }).select("id").single());
+    const t = must(await admin.from("support_tickets").insert({ user_id: sub.user_id, subscription_id: sub.id, subject: `Money-back guarantee refund request, ${sub.plan_name} plan`, category: "billing", department: "billing", priority: "high" }).select("id").single());
     must(await admin.from("ticket_messages").insert({ ticket_id: t.id, user_id: sub.user_id, actor_id: context.userId, actor_label: label(context), internal: false,
-      body: `I'm claiming the 90-day money-back guarantee and confirm I received no sales.\n\n${data.statement}` }));
+      body: `I'm requesting a refund under the 90-day money-back guarantee. My plan has run for 90 days, every invoice was paid on time and I confirm I received no sales.\n\n${data.statement}` }));
     await audit(admin, sub.user_id, "subscriptions", sub.id, "guarantee_claimed", { guarantee: { from: "running", to: "claimed" }, statement: data.statement }, context.userId, label(context));
     return { ticketId: t.id as string };
   });
@@ -159,4 +160,51 @@ export const fileLink = createServerFn({ method: "POST" })
     const allowed = doc && doc.status === "ready" && ((await isStaff(context)) || (doc.user_id === context.userId && doc.visible_to_client && !doc.archived_at));
     if (!allowed) throw new Error("File not found.");
     return { url: await signedDownload(admin, doc) };
+  });
+
+const ticketInput = z.object({
+  department: z.enum(["account", "billing", "technical", "projects", "marketing", "complaints"]),
+  priority: z.enum(["low", "normal", "high", "urgent"]),
+  subject: z.string().trim().min(3, "Add a short subject.").max(200),
+  message: z.string().trim().min(10, "Tell us a little more so we can help.").max(5000),
+  subscriptionId: uuid.optional(), projectId: uuid.optional(),
+  contactPreference: z.enum(["dashboard", "email", "phone"]),
+  contactPhone: z.string().trim().max(40).optional(),
+}).refine((v) => v.contactPreference !== "phone" || (v.contactPhone?.replace(/\D/g, "").length ?? 0) >= 7, { message: "Add a phone number so we can call you.", path: ["contactPhone"] });
+
+/** Client opens a support ticket. Every field is checked here; clients can't write tickets directly. */
+export const createSupportTicket = createServerFn({ method: "POST" })
+  .middleware([requireSession])
+  .inputValidator((d: unknown) => ticketInput.parse(d))
+  .handler(async ({ data, context }) => {
+    const { getAdmin, must } = await import("@/lib/billing.server");
+    const { departments } = await import("@/lib/support");
+    const admin = await getAdmin();
+    if (data.subscriptionId) { const s = must(await admin.from("subscriptions").select("user_id").eq("id", data.subscriptionId).maybeSingle()); if (s?.user_id !== context.userId) throw new Error("Plan not found."); }
+    if (data.projectId) { const p = must(await admin.from("projects").select("user_id").eq("id", data.projectId).maybeSingle()); if (p?.user_id !== context.userId) throw new Error("Project not found."); }
+    const { count } = await admin.from("support_tickets").select("id", { count: "exact", head: true }).eq("user_id", context.userId).gte("created_at", new Date(Date.now() - 864e5).toISOString());
+    if ((count ?? 0) >= 10) throw new Error("You've opened a lot of requests today. Please reply on an existing ticket or try again tomorrow.");
+    const t = must(await admin.from("support_tickets").insert({
+      user_id: context.userId, subject: data.subject, department: data.department, category: departments.find((d) => d.id === data.department)!.category,
+      priority: data.priority, subscription_id: data.subscriptionId ?? null, project_id: data.projectId ?? null, status: "open",
+      contact_preference: data.contactPreference, contact_phone: data.contactPreference === "phone" ? data.contactPhone : null,
+    }).select("id").single());
+    must(await admin.from("ticket_messages").insert({ ticket_id: t.id, user_id: context.userId, body: data.message, internal: false, actor_id: context.userId, actor_label: label(context) }));
+    return { ticketId: t.id as string };
+  });
+
+/** Client replies on their own open ticket. */
+export const replyToTicket = createServerFn({ method: "POST" })
+  .middleware([requireSession])
+  .inputValidator((d: unknown) => z.object({ ticketId: uuid, body: z.string().trim().min(1).max(5000) }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { getAdmin, must } = await import("@/lib/billing.server");
+    const admin = await getAdmin();
+    const t = must(await admin.from("support_tickets").select("user_id, status").eq("id", data.ticketId).maybeSingle());
+    if (!t || t.user_id !== context.userId) throw new Error("Ticket not found.");
+    if (t.status === "closed") throw new Error("This ticket is closed. Open a new request if you need more help.");
+    const { count } = await admin.from("ticket_messages").select("id", { count: "exact", head: true }).eq("user_id", context.userId).eq("actor_id", context.userId).gte("created_at", new Date(Date.now() - 36e5).toISOString());
+    if ((count ?? 0) >= 30) throw new Error("Too many messages in the last hour. Please wait a little.");
+    must(await admin.from("ticket_messages").insert({ ticket_id: data.ticketId, user_id: context.userId, body: data.body, internal: false, actor_id: context.userId, actor_label: label(context) }));
+    return { ok: true };
   });

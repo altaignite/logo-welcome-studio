@@ -9,7 +9,8 @@ import { DataTable } from "@/components/admin/data-table";
 import { FormModal, type FieldDef } from "@/components/admin/form-modal";
 import { usePopup } from "@/components/popup";
 import { AuditList, Btn, ClientBar, FieldGrid, FieldValue, Section, db, fmtText } from "@/components/admin/record-bits";
-import { canDelete, guaranteeEligible, money } from "@/lib/admin";
+import { canDelete, money } from "@/lib/admin";
+import { guaranteeCheck } from "@/lib/billing";
 import { DocumentList, UploadButton } from "@/components/files";
 import { useStaff, withStaffPicker } from "@/components/admin/staff";
 import { fulfilAccessRequest, fulfilDeletionRequest } from "@/lib/staff.functions";
@@ -205,7 +206,7 @@ function RecordPage() {
           {kind === "subscriptions" && row.status !== "cancelled" && <Btn icon={Ban} danger onClick={() => subAct("cancel_now")}>Cancel now</Btn>}
           {kind === "subscriptions" && unbilledOverage(Number(row.hours_used), Number(row.monthly_hours), Number(row.overage_billed_hours ?? 0)) > 0 && <Btn icon={Clock} onClick={overage}>Bill extra hours</Btn>}
           {kind === "subscriptions" && subProjects.length > 0 && <Btn icon={Clock} onClick={() => logHours()}>Log hours</Btn>}
-          {kind === "subscriptions" && !row.sales_received && (row.guarantee_status === "claimed" || (row.guarantee_status === "running" && guaranteeEligible({ guarantee_ends_at: (row.guarantee_ends_at as string) ?? null, sales_received: !!row.sales_received }))) && <Btn icon={RotateCcw} onClick={refund}>Guarantee refund</Btn>}
+          {kind === "subscriptions" && !row.sales_received && (row.guarantee_status === "claimed" || guaranteeCheck(row, data.children.find((c) => c.kind === "invoices")?.rows ?? []).eligible) && <Btn icon={RotateCcw} onClick={refund}>Guarantee refund</Btn>}
           {kind === "deliverables" && ["draft", "changes_requested"].includes(String(row.status)) && <Btn icon={Send} onClick={() => setFields({ status: "in_review" }, "Sent for review", "The client was notified and can approve or request changes.")}>Send for review</Btn>}
           {kind === "deliverables" && row.status === "in_review" && <Btn icon={Undo2} onClick={() => setFields({ status: "draft" }, "Withdrawn", "The client no longer sees this deliverable.")}>Withdraw</Btn>}
           {kind === "client_reports" && !row.published_at && <Btn icon={Eye} onClick={() => setFields({ published_at: new Date().toISOString() }, "Report published", "The client was notified and can see it in Reports.")}>Publish</Btn>}

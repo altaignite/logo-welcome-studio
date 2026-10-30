@@ -2,6 +2,7 @@ import { z } from "zod";
 import { AsYouType, getCountries, getCountryCallingCode, getExampleNumber, type CountryCode } from "libphonenumber-js";
 import { parsePhoneNumberFromString as parseMobile } from "libphonenumber-js/mobile";
 import examples from "libphonenumber-js/mobile/examples";
+import { isBlockedDomain } from "@/lib/disposable-domains";
 
 export const subscription = {
   name: "Marketing Accelerator",
@@ -19,18 +20,18 @@ export const plans = [
 export type Plan = (typeof plans)[number];
 
 export function planTerms(plan: Plan) {
-  return `${plan.name} — $${plan.monthlyFee} / month\n${plan.monthlyHours} assigned service hours per month, shared across marketing, design and development. Services are not unlimited. Advertising budgets are separate and excluded.\n90-day money-back guarantee if no sales are received, on service fees only.`;
+  return `${plan.name} — $${plan.monthlyFee} / month\n${plan.monthlyHours} assigned service hours per month, shared across marketing, design and development. Services are not unlimited. Advertising budgets are separate and excluded.\n90-day money-back guarantee on service fees if no sales are received, requested after day 90 with every invoice paid on time.`;
 }
 
 /** Bump when agreement wording changes; signed copies record the version they were rendered from. */
-export const AGREEMENT_VERSION = "2026-10-29";
+export const AGREEMENT_VERSION = "2026-10-30";
 
 /** The agreements a client signs for a plan. Shown at signup and stored server-side as the signed copy. */
 export function agreementDocuments(plan: Plan): { title: string; body: string }[] {
   return [
     { title: "Client Agreement", body: "FP Marketing Accelerator\n\nYour monthly subscription covers marketing, design and development services within your assigned monthly service hours. Services are not unlimited. Advertising budgets are excluded and are separate from service fees." },
     { title: "Subscription Agreement", body: `FP Subscription Agreement\n\n${planTerms(plan)}` },
-    { title: "90-day Money-back Guarantee", body: "90-day money-back guarantee\n\nIf no sales are received within 90 days, the money-back guarantee applies to service fees only. Advertising budgets are not covered." },
+    { title: "90-day Money-back Guarantee", body: "90-day money-back guarantee\n\nIf you receive no sales in your first 90 days, you can request a refund of your service fees once those 90 days have passed, within the following 30 days. Every invoice on the plan must have been paid on time, with no failed or late payments, and the plan must not have been paused in its first 90 days. Advertising budgets are not covered." },
     { title: "Privacy Information", body: "Privacy\n\nWe use your personal and business details to provide your services, bill you and contact you about your account. Billing records are kept for as long as the law requires. You can ask for a copy of your data or for your account to be closed from your dashboard at any time." },
   ];
 }
@@ -92,7 +93,7 @@ export const personalSchema = z.object({
   phone: z.string().max(30).refine((v) => parseMobile(v)?.isValid() === true, "Enter a valid mobile number for the selected country."),
 });
 export const accountSchema = z.object({
-  email: z.string().trim().email("Enter a valid email address.").max(254),
+  email: z.string().trim().email("Enter a valid email address.").max(254).refine((v) => !isBlockedDomain(v), "Disposable email addresses can't be used. Please use your business or personal email."),
   password: z.string().min(10, "Use at least 10 characters for your password.").max(128).regex(/[a-z]/, "Add a lower case letter.").regex(/[A-Z]/, "Add an upper case letter.").regex(/\d/, "Add a number."),
   confirmPassword: z.string(),
 }).refine((v) => v.password === v.confirmPassword, { message: "Your passwords don't match.", path: ["confirmPassword"] });

@@ -128,6 +128,8 @@ export const fulfilAccessRequest = createServerFn({ method: "POST" })
     const json = JSON.stringify(await buildExport(admin, req.user_id), null, 2);
     const id = crypto.randomUUID();
     const path = storagePath(req.user_id, "exports", id, `data-export-${new Date().toISOString().slice(0, 10)}.json`);
+    const { ensureBucket } = await import("@/lib/documents.server");
+    await ensureBucket(admin);
     const up = await admin.storage.from(FILE_BUCKET).upload(path, new Blob([json], { type: "application/json" }), { contentType: "application/json", upsert: false });
     if (up.error) throw new Error("Couldn't save the export.");
     must(await admin.from("documents").insert({ id, user_id: req.user_id, kind: "export", title: "Your data export", storage_path: path, size_bytes: json.length, mime_type: "application/json",

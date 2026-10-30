@@ -7,6 +7,7 @@ import { FormModal, type FieldDef } from "@/components/admin/form-modal";
 import { Section } from "@/components/admin/record-bits";
 import { useStaff, type StaffRow } from "@/components/admin/staff";
 import { MfaSettings } from "@/components/mfa";
+import { BlockedDomains } from "@/components/admin/blocked-domains";
 import { usePopup } from "@/components/popup";
 import { formatDate } from "@/lib/admin";
 import type { Vals } from "@/lib/records";
@@ -17,7 +18,7 @@ export const Route = createFileRoute("/admin/staff")({ component: Staff });
 const adminRoute = getRouteApi("/admin");
 
 function Staff() {
-  const { adminId } = adminRoute.useRouteContext();
+  const { adminId, adminEmail } = adminRoute.useRouteContext();
   const qc = useQueryClient();
   const popup = usePopup();
   const s = useStaff();
@@ -66,6 +67,7 @@ function Staff() {
           </div>
         </Section>
       </div>
+      <BlockedDomains canEdit={s.can("accounts")} adminEmail={adminEmail} />
       {modal && <FormModal {...modal} onClose={() => setModal(null)} />}
     </div>
   );

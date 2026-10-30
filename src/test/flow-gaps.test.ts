@@ -47,8 +47,9 @@ describe("two-factor sessions", () => {
     const rls = new Set([...all.matchAll(/ALTER TABLE public\.(\w+) ENABLE ROW LEVEL SECURITY/gi)].map((m) => m[1]!));
     // Service-role only tables: no grants to signed-in users.
     for (const t of ["stripe_events", "job_runs"]) rls.delete(t);
-    const block = sql.slice(sql.indexOf("GRANT EXECUTE ON FUNCTION public.mfa_session_ok()"), sql.indexOf("CREATE POLICY \"two-factor session\""));
-    const covered = new Set([...block.matchAll(/'(\w+)'/g)].map((m) => m[1]!));
+    // Tables named in every restrictive "two-factor session" loop across the migrations.
+    const covered = new Set<string>();
+    for (const m of all.matchAll(/FOREACH t IN ARRAY ARRAY\[([^\]]*)\] LOOP\s*EXECUTE format\('CREATE POLICY "two-factor session"/g)) for (const t of m[1]!.matchAll(/'(\w+)'/g)) covered.add(t[1]!);
     expect(covered.size).toBeGreaterThan(20);
     expect([...rls].filter((t) => !covered.has(t))).toEqual([]);
   });
@@ -179,10 +180,11 @@ describe("admin overview", () => {
 });
 
 describe("files", () => {
-  it("match the bucket's size and type limits", () => {
-    const bucket = /VALUES \('client-files', 'client-files', false, (\d+), ARRAY\[([\s\S]*?)\]\)/.exec(sql);
-    expect(Number(bucket?.[1])).toBe(MAX_FILE_BYTES);
-    expect([...(bucket?.[2] ?? "").matchAll(/'([^']+)'/g)].map((m) => m[1]).sort()).toEqual([...allowedMimeTypes].sort());
+  it("keep the bucket limits Lovable can't set in a migration", () => {
+    // The bucket is created on first upload by ensureBucket in documents.server.ts with these limits.
+    expect(MAX_FILE_BYTES).toBe(25 * 1024 * 1024);
+    expect(allowedMimeTypes).not.toContain("text/html");
+    expect(allowedMimeTypes).not.toContain("image/svg+xml");
   });
   it("reject unsafe uploads and keep objects in the client's folder", () => {
     expect(uploadIssue({ name: "a.pdf", size: 10, type: "application/pdf" })).toBeNull();
@@ -231,13 +233,14 @@ describe("deliverables, reports and hours", () => {
 });
 
 describe("client actions", () => {
-  const sub = { status: "active", guarantee_status: "running", guarantee_ends_at: "2026-12-01T00:00:00Z", sales_received: false };
-  it("allow a guarantee claim only while it is running and no sales were made", () => {
-    const now = new Date("2026-10-29T00:00:00Z");
-    expect(guaranteeClaimable(sub, now)).toBe(true);
-    expect(guaranteeClaimable({ ...sub, sales_received: true }, now)).toBe(false);
-    expect(guaranteeClaimable({ ...sub, guarantee_status: "claimed" }, now)).toBe(false);
-    expect(guaranteeClaimable(sub, new Date("2026-12-02T00:00:00Z"))).toBe(false);
+  const sub = { status: "active", started_at: "2026-07-01T00:00:00Z", guarantee_status: "running", sales_received: false };
+  it("allow a guarantee refund request only when every rule passes", () => {
+    const now = new Date("2026-10-01T00:00:00Z");
+    expect(guaranteeClaimable(sub, [], now)).toBe(true);
+    expect(guaranteeClaimable({ ...sub, sales_received: true }, [], now)).toBe(false);
+    expect(guaranteeClaimable({ ...sub, guarantee_status: "claimed" }, [], now)).toBe(false);
+    expect(guaranteeClaimable(sub, [{ status: "overdue" }], now)).toBe(false);
+    expect(guaranteeClaimable(sub, [], new Date("2026-09-01T00:00:00Z"))).toBe(false);
     expect(guaranteeClaimSchema.safeParse({ subscriptionId: "00000000-0000-4000-8000-000000000000", statement: "short", confirmNoSales: true }).success).toBe(false);
   });
   it("let clients turn email notifications off", () => {

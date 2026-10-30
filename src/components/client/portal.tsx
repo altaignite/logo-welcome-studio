@@ -9,7 +9,9 @@ import { usePopup } from "@/components/popup";
 import { pauseVoidsGuarantee } from "@/lib/billing";
 import { approveOverage, billingPortal, subscriptionAction } from "@/lib/billing.functions";
 import { changePlan, orderAdditionalPlan, undoCancel } from "@/lib/client.functions";
-import { claimGuarantee, respondToInfoRequest, reviewDeliverable } from "@/lib/portal.functions";
+import { claimGuarantee, replyToTicket, respondToInfoRequest, reviewDeliverable } from "@/lib/portal.functions";
+import { TicketDialog } from "@/components/client/ticket-dialog";
+import type { DepartmentId } from "@/lib/support";
 import { plans } from "@/lib/signup";
 import { money } from "@/lib/admin";
 
@@ -57,12 +59,14 @@ type Modal = { title: string; description?: string; fields: FieldDef[]; submitLa
 
 /** Shared client actions (subscriptions, tickets, extra hours, billing) with their modal. */
 export function useClientActions() {
-  const { userId, email } = useClient();
+  const { userId, data } = useClient();
   const qc = useQueryClient();
+  const [ticket, setTicket] = useState<{ subscriptionId?: string; department?: DepartmentId; subject?: string } | null>(null);
   const popup = usePopup();
   const [modal, setModal] = useState<Modal | null>(null);
   const fnSub = useServerFn(subscriptionAction), fnPortal = useServerFn(billingPortal), fnApprove = useServerFn(approveOverage);
   const fnChange = useServerFn(changePlan), fnOrder = useServerFn(orderAdditionalPlan), fnUndo = useServerFn(undoCancel);
+  const fnReply = useServerFn(replyToTicket);
   const fnRespond = useServerFn(respondToInfoRequest), fnClaim = useServerFn(claimGuarantee), fnReview = useServerFn(reviewDeliverable);
   const refresh = () => qc.invalidateQueries({ queryKey: ["client"] });
   const fail = (e: unknown) => popup({ type: "error", title: "Something went wrong", description: (e as Error).message, primaryLabel: "Close", secondaryLabel: null });
@@ -96,23 +100,10 @@ export function useClientActions() {
   const approve = (t: R) => popup({ type: "info", title: "Approve extra hours?", description: "This task needs more hours than your plan has left this month. Extra hours are billed at your plan's hourly rate.", primaryLabel: "Approve", secondaryLabel: "Not now",
     onPrimary: async () => { try { await fnApprove({ data: { taskId: t.id } }); await refresh(); } catch (e) { fail(e); } } });
   const portal = async () => { try { const r = await fnPortal(); window.location.href = r.url; } catch (e) { fail(e); } };
-  const newTicket = (subscriptionId?: string) => setModal({
-    title: "New support request", submitLabel: "Send",
-    fields: [{ name: "subject", label: "Subject", required: true, max: 200 }, { name: "category", label: "Topic", type: "select", options: ["general", "billing", "project", "technical"] }, { name: "body", label: "Message", type: "textarea", required: true, max: 5000 }],
-    onSubmit: async (v) => {
-      const t = await db.from("support_tickets").insert({ user_id: userId, subject: v.subject.slice(0, 200), category: v.category, subscription_id: subscriptionId ?? null }).select("id").single();
-      if (t.error) return t.error.message;
-      const m = await db.from("ticket_messages").insert({ ticket_id: t.data.id, user_id: userId, body: v.body.slice(0, 5000), internal: false, actor_id: userId, actor_label: email });
-      if (m.error) return m.error.message;
-      await refresh(); return null;
-    },
-  });
+  const newTicket = (subscriptionId?: string, department?: DepartmentId, subject?: string) => setTicket({ ...(subscriptionId ? { subscriptionId } : {}), ...(department ? { department } : {}), ...(subject ? { subject } : {}) });
   const reply = (t: R) => setModal({
     title: "Reply", submitLabel: "Send", fields: [{ name: "body", label: "Message", type: "textarea", required: true, max: 5000 }],
-    onSubmit: async (v) => {
-      const m = await db.from("ticket_messages").insert({ ticket_id: t.id, user_id: userId, body: v.body.slice(0, 5000), internal: false, actor_id: userId, actor_label: email });
-      if (m.error) return m.error.message; await refresh(); return null;
-    },
+    onSubmit: async (v) => { try { await fnReply({ data: { ticketId: t.id, body: v.body } }); await refresh(); return null; } catch (e) { return err(e); } },
   });
   const respond = (app: R) => setModal({
     title: "Send the information we asked for", submitLabel: "Send to the FP team",
@@ -121,14 +112,14 @@ export function useClientActions() {
     onSubmit: async (v) => { try { await fnRespond({ data: { applicationId: app.id, message: v.message } }); await refresh(); return null; } catch (e) { return err(e); } },
   });
   const claim = (s: R) => setModal({
-    title: "Claim your money-back guarantee", submitLabel: "Send claim",
-    description: "If you received no sales in your first 90 days, we refund your service fees. Advertising budgets aren't covered. We'll review your claim and reply in a support ticket.",
+    title: "Request your money-back refund", submitLabel: "Send request",
+    description: "Your plan has run for 90 days and every invoice was paid on time. If you received no sales, we refund your service fees (advertising budgets aren't covered). We'll review your request and reply in a support ticket.",
     fields: [{ name: "statement", label: "What happened in your first 90 days?", type: "textarea", required: true, max: 4000 },
       { name: "confirm", label: "I confirm I received no sales in this period", type: "select", options: ["no", "yes"] }],
     onSubmit: async (v) => {
       if (v.confirm !== "yes") return "Confirm that you received no sales.";
       try { await fnClaim({ data: { subscriptionId: s.id, statement: v.statement, confirmNoSales: true } }); await refresh();
-        popup({ type: "success", title: "Claim sent", description: "We've opened a support ticket for your claim and will reply there.", primaryLabel: "Got it", secondaryLabel: null }); return null; }
+        popup({ type: "success", title: "Request sent", description: "We've opened a billing ticket for your refund request and will reply there.", primaryLabel: "Got it", secondaryLabel: null }); return null; }
       catch (e) { return err(e); }
     },
   });
@@ -137,7 +128,12 @@ export function useClientActions() {
       onSubmit: async (v) => { try { await fnReview({ data: { deliverableId: d.id, decision, ...(v.feedback ? { feedback: v.feedback } : {}) } }); await refresh(); return null; } catch (e) { return err(e); } } }
     : { title: "Request changes", submitLabel: "Send feedback", description: "Tell us what to change. The team will update it and send it back for review.", fields: [{ name: "feedback", label: "What should change?", type: "textarea", required: true, max: 4000 }],
       onSubmit: async (v) => { try { await fnReview({ data: { deliverableId: d.id, decision, feedback: v.feedback } }); await refresh(); return null; } catch (e) { return err(e); } } });
-  const modalEl = modal && <FormModal title={modal.title} description={modal.description} fields={modal.fields} submitLabel={modal.submitLabel} onClose={() => setModal(null)} onSubmit={modal.onSubmit} />;
+  const modalEl = <>
+    {modal && <FormModal title={modal.title} description={modal.description} fields={modal.fields} submitLabel={modal.submitLabel} onClose={() => setModal(null)} onSubmit={modal.onSubmit} />}
+    {ticket && <TicketDialog defaults={ticket} onClose={() => setTicket(null)} onCreated={refresh}
+      plans={(data?.subs ?? []).filter((x: R) => x.status !== "cancelled").map((x: R) => ({ id: x.id, name: `${x.plan_name} plan` }))}
+      projects={(data?.projects ?? []).filter((x: R) => x.status !== "cancelled").map((x: R) => ({ id: x.id, name: x.name }))} />}
+  </>;
   return { subAct, undo, change, order, approve, portal, newTicket, reply, respond, claim, review, refresh, fail, modalEl, setModal };
 }
 
