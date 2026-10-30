@@ -9,6 +9,7 @@ import { usePopup } from "@/components/popup";
 import { supabase } from "@/integrations/supabase/client";
 import { agreementDocuments, createAccountNumber, accountSchema, countries, createSignatureCode, isSignatureMatch, personalSchema, plans, type Plan, type CountryCode, type PersonalDetails, formatPhoneInput, switchPhoneCountry, phonePlaceholder } from "@/lib/signup";
 import logo from "@/assets/logo.png.asset.json";
+import hero from "@/assets/login-hero.jpg";
 
 export const Route = createFileRoute("/signup")({
   head: () => ({ meta: [
@@ -130,15 +131,15 @@ function Signup() {
   };
   const selectedDoc = documentIndex === null ? null : documents[documentIndex];
 
-  return <main className="min-h-dvh bg-background text-foreground">
-    <div className="relative w-full">
+  return <main className="min-h-dvh bg-background text-foreground md:grid md:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)] lg:grid-cols-[minmax(0,1fr)_minmax(0,0.75fr)]">
+    <div className="relative w-full min-w-0">
       <section className="min-w-0">
     <header className="border-b bg-background">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5 sm:h-20 sm:px-8">
+      <div className="mx-auto flex h-16 max-w-3xl items-center justify-between px-5 sm:h-20 sm:px-8">
         <div className="flex items-center gap-4">
           <Link to="/" aria-label="FP home"><img src={logo.url} alt="FP" className="size-9 object-contain sm:size-11" /></Link>
-          <span aria-hidden className="hidden h-8 w-px bg-border sm:block" />
-          <span className="hidden text-sm font-semibold tracking-tight sm:block">New Service Application</span>
+          <span aria-hidden className="hidden h-8 w-px bg-border lg:block" />
+          <span className="hidden text-sm font-semibold tracking-tight lg:block">New Service Application</span>
         </div>
         <span className="text-sm font-semibold sm:hidden">{step < 5 ? steps[step] : step === 5 ? "Almost there…" : "Application complete"}</span>
         <div className="flex items-center gap-3">
@@ -153,7 +154,7 @@ function Signup() {
         <ol className="flex gap-2 sm:gap-4">{steps.map((name, index) => <li key={name} className="min-w-0 flex-1"><div className={`h-1 rounded-full ${index <= step ? "bg-primary" : "bg-secondary"}`} /><span className={`mt-2 hidden text-xs xl:block ${index === step ? "font-semibold text-foreground" : "text-muted-foreground"}`}>{index + 1}. {name}</span></li>)}</ol>
         <p className="mt-2 text-xs text-muted-foreground xl:hidden">Step {step + 1} of 5</p>
       </nav>
-      <div className="mx-auto max-w-lg px-5 pb-8 pt-6 md:px-2 md:pt-8">
+      <div className="mx-auto max-w-lg px-5 pb-8 pt-6 md:px-6 md:pt-8">
         <div className="mb-6 text-center"><h1 className="text-2xl font-extrabold leading-tight lg:text-3xl">{titles[step]}</h1><p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">{subtitles[step]}</p></div>
         {step === 0 && <div>
           <div className="grid gap-4 pt-2" role="group" aria-label="Subscription plans">{plans.map((plan) => <div key={plan.id} className={`rounded-3xl border bg-card p-5 sm:p-6 ${selectedPlan.id === plan.id ? "border-foreground/40" : "border-border"}`}>
@@ -195,7 +196,7 @@ function Signup() {
         {step === 3 && <div>
           <ReviewSection title="Your application" onEdit={() => setStep(0)}><ReviewRow label="Plan" value={selectedPlan.name} /><ReviewRow label="Service fee" value={`$${selectedPlan.monthlyFee} / month`} /><ReviewRow label="Assigned monthly hours" value={`${selectedPlan.monthlyHours} hours shared across all services; not unlimited`} /><ReviewRow label="Included services" value="Marketing, design & development" /><ReviewRow label="Money-back guarantee" value="90 days if no sales are received. Service fees only; advertising budgets excluded." /></ReviewSection>
           <ReviewSection title="Personal information" onEdit={() => setStep(1)}><ReviewRow label="Full name" value={`${personal.firstName} ${personal.lastName}`} /><ReviewRow label="Business" value={personal.company} /><ReviewRow label="Country" value={countries.find((c) => c.code === personal.country)?.name ?? ""} country={personal.country} /><ReviewRow label="Mobile number" value={personal.phone} /></ReviewSection>
-          <ReviewSection title="Account details" onEdit={() => setStep(2)}><ReviewRow label="Account number" value={accountNumber.replace(/(\d{4})(\d{3})(\d{3})/, "$1 $2 $3")} /><ReviewRow label="Email Address" value={account.email} /></ReviewSection>
+          <ReviewSection title="Account details" onEdit={() => setStep(2)}><ReviewRow label="Account number" value={formatAccountNumber(accountNumber)} /><ReviewRow label="Email Address" value={account.email} /></ReviewSection>
           <Button className="signup-primary mt-6" onClick={() => setStep(4)}>To your agreements <ArrowRight /></Button>
         </div>}
         {step === 4 && <div>
@@ -207,10 +208,21 @@ function Signup() {
           <div className="mt-6 flex gap-3"><Button variant="secondary" aria-label="Back to review" className="size-11 shrink-0 rounded-full" onClick={() => setStep(3)}><ArrowLeft /></Button><Button className="signup-primary flex-1" onClick={openConfirmation}>Accept & continue <PenLine /></Button></div>
         </div>}
       </div>
-    </> : step === 5 ? <ProcessingScreen hours={selectedPlan.monthlyHours} onDone={() => { setAccount((a) => ({ ...a, password: "", confirmPassword: "" })); setStep(6); }} /> : <SuccessScreen name={personal.firstName} plan={selectedPlan} signedAt={signature?.at ?? new Date().toISOString()} email={account.email} />}
+    </> : step === 5 ? <ProcessingScreen hours={selectedPlan.monthlyHours} accountNumber={accountNumber} onDone={() => { setAccount((a) => ({ ...a, password: "", confirmPassword: "" })); setStep(6); }} /> : <SuccessScreen name={personal.firstName} accountNumber={accountNumber} plan={selectedPlan} signedAt={signature?.at ?? new Date().toISOString()} email={account.email} />}
 
       </section>
     </div>
+    {/* The same photo as the login page keeps every signup stage visually continuous on tablet and desktop. */}
+    <aside className="relative hidden md:block"><div className="sticky top-0 h-dvh overflow-hidden p-4 pl-0">
+      <div className="relative h-full overflow-hidden rounded-3xl">
+        <img src={hero} alt="" className="absolute inset-0 h-full w-full object-cover object-[60%_30%]" />
+        <div className="absolute inset-0 bg-gradient-to-t from-foreground/80 via-foreground/10 to-transparent" />
+        <div className="absolute inset-x-0 bottom-10 px-10">
+          <p className="text-sm font-medium uppercase tracking-[0.25em] text-background/70">Marketing Accelerator</p>
+          <p className="mt-3 max-w-sm text-3xl font-bold leading-tight text-background">{step >= 6 ? "Welcome aboard." : "Grow faster. Market smarter."}</p>
+        </div>
+      </div>
+    </div></aside>
     <Dialog.Root open={confirmOpen} onOpenChange={setConfirmOpen}>
       <Dialog.Portal><Dialog.Overlay className="fixed inset-0 z-40 bg-foreground/40 backdrop-blur-sm" /><Dialog.Content className="app-modal">
                 <Dialog.Close asChild><Button variant="ghost" size="icon" aria-label="Close confirmation" className="absolute right-4 top-4"><X /></Button></Dialog.Close>
@@ -237,14 +249,14 @@ function DocumentRow({ title, onRead, onDownload }: { title: string; onRead: () 
   return <div className="flex items-center justify-between gap-3 border-b py-5 sm:px-6"><Button variant="link" className="h-auto whitespace-normal p-0 text-left text-base font-semibold" onClick={onRead}>{title}</Button><Button variant="ghost" size="icon" aria-label={`Download ${title}`} title={`Download ${title}`} className="shrink-0 text-primary" onClick={onDownload}><Download /></Button></div>;
 }
 const processingStages = (hours: number) => [
-  { label: "Verifying your details", ms: 3600 },
-  { label: "Securing your digital signature", ms: 3200 },
-  { label: `Reserving your ${hours} monthly service hours`, ms: 4400 },
-  { label: "Preparing your agreements", ms: 3800 },
-  { label: "Finalising your application", ms: 2600 },
+  { label: "Verifying your details", ms: 1400 },
+  { label: "Securing your digital signature", ms: 1200 },
+  { label: `Reserving your ${hours} monthly service hours`, ms: 1600 },
+  { label: "Preparing your agreements", ms: 1400 },
+  { label: "Finalising your application", ms: 1000 },
 ];
 
-function ProcessingScreen({ hours, onDone }: { hours: number; onDone: () => void }) {
+function ProcessingScreen({ hours, accountNumber, onDone }: { hours: number; accountNumber: string; onDone: () => void }) {
   const stages = processingStages(hours);
   const total = stages.reduce((sum, s) => sum + s.ms, 0);
   const [elapsed, setElapsed] = useState(0);
@@ -254,7 +266,7 @@ function ProcessingScreen({ hours, onDone }: { hours: number; onDone: () => void
     const timer = window.setInterval(() => {
       const t = performance.now() - start;
       setElapsed(t);
-      if (t >= total + 500) { window.clearInterval(timer); done.current(); }
+      if (t >= total + 400) { window.clearInterval(timer); done.current(); }
     }, 100);
     return () => window.clearInterval(timer);
   }, [total]);
@@ -269,8 +281,9 @@ function ProcessingScreen({ hours, onDone }: { hours: number; onDone: () => void
     }
     acc += stage.ms;
   }
-  return <section className="mx-auto max-w-lg px-5 pb-16 pt-10 md:px-2 md:pt-14" aria-live="polite">
-    <div className="text-center"><h1 className="text-2xl font-bold sm:text-3xl">Processing your application</h1><p className="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-muted-foreground">Please keep this page open. This can take up to a minute.</p></div>
+  return <section className="mx-auto max-w-lg px-5 pb-16 pt-10 md:px-6 md:pt-14" aria-live="polite">
+    <div className="text-center"><h1 className="text-2xl font-bold sm:text-3xl">Processing your application</h1><p className="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-muted-foreground">Please keep this page open. This only takes a few seconds.</p></div>
+    <div className="mt-8 rounded-2xl border p-4 text-center"><p className="text-xs text-muted-foreground">Your account number</p><p className="mt-1 font-mono text-xl font-semibold tracking-wider tabular-nums">{formatAccountNumber(accountNumber)}</p></div>
     <div className="mt-8"><div className="flex justify-between text-xs text-muted-foreground"><span>{stages[current]?.label ?? "Complete"}…</span><span className="tabular-nums">{Math.floor(progress)}%</span></div>
       <div role="progressbar" aria-label="Processing application" aria-valuenow={Math.floor(progress)} aria-valuemin={0} aria-valuemax={100} className="relative mt-2 h-1.5 overflow-hidden rounded-full bg-secondary"><div className="h-full rounded-full bg-foreground transition-[width] duration-300 ease-out" style={{ width: `${progress}%` }} /><div className="signup-shimmer pointer-events-none absolute inset-0 bg-gradient-to-r from-transparent via-background/40 to-transparent" /></div></div>
     <ol className="mt-8 space-y-1 rounded-2xl border p-2">{stages.map((stage, i) => {
@@ -281,25 +294,31 @@ function ProcessingScreen({ hours, onDone }: { hours: number; onDone: () => void
   </section>;
 }
 
-function SuccessScreen({ name, plan, signedAt, email }: { name: string; plan: Plan; signedAt: string; email: string }) {
+const formatAccountNumber = (n: string) => n.replace(/(\d{4})(\d{3})(\d{3})/, "$1 $2 $3");
+
+function SuccessScreen({ name, accountNumber, plan, signedAt, email }: { name: string; accountNumber: string; plan: Plan; signedAt: string; email: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = () => { void navigator.clipboard?.writeText(accountNumber).then(() => { setCopied(true); window.setTimeout(() => setCopied(false), 1800); }).catch(() => {}); };
   const time = new Date(signedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
   const timeline = [
     { title: "Application submitted", text: time, state: "done" },
     { title: "Agreement signed digitally", text: "Your confirmation code was accepted.", state: "done" },
-    { title: "Account review", text: "We're checking your details, usually within 1 business day. We'll email you with any update, and you can follow it from your dashboard after confirming your email.", state: "current" },
+    { title: "Confirm your email", text: `We sent a link to ${email}. Open it to activate your dashboard login.`, state: "current" },
+    { title: "Account review", text: "We're checking your details, usually within 1 business day. We'll email you with any update.", state: "todo" },
     { title: "Onboarding call", text: `We'll contact you at ${email} to plan your first month.`, state: "todo" },
     { title: "Your accelerator starts", text: `${plan.monthlyHours} service hours assigned every month.`, state: "todo" },
   ] as const;
-  return <section className="mx-auto max-w-lg px-5 pb-12 pt-8 md:px-2 md:pt-12">
+  return <section className="mx-auto max-w-lg px-5 pb-12 pt-8 md:px-6 md:pt-12">
     <div className="text-center"><span className="mx-auto grid size-16 place-items-center rounded-full bg-foreground text-background"><Check className="size-8" /></span><h1 className="mt-6 text-2xl font-bold leading-tight sm:text-3xl">Your application was successful, {name}!</h1><p className="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-muted-foreground">Here's where things stand and what happens next.</p></div>
-    <div className="mt-8 flex items-center justify-between gap-3 rounded-2xl border p-4"><div className="min-w-0"><p className="text-xs text-muted-foreground">Current status</p><p className="mt-0.5 font-semibold">In review</p></div><span className="flex shrink-0 items-center gap-2 rounded-full bg-secondary px-3 py-1.5 text-xs font-medium"><span className="size-2 animate-pulse rounded-full bg-primary" />Step 3 of 5</span></div>
+    <div className="mt-8 flex items-center justify-between gap-3 rounded-2xl border p-4"><div className="min-w-0"><p className="text-xs text-muted-foreground">Current status</p><p className="mt-0.5 font-semibold">Confirm your email</p></div><span className="flex shrink-0 items-center gap-2 rounded-full bg-secondary px-3 py-1.5 text-xs font-medium"><span className="size-2 animate-pulse rounded-full bg-primary" />Step 3 of 6</span></div>
+    <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl border p-4"><div className="min-w-0"><p className="text-xs text-muted-foreground">Account number</p><p className="mt-0.5 font-mono text-lg font-semibold tracking-wider tabular-nums">{formatAccountNumber(accountNumber)}</p><p className="text-xs text-muted-foreground">Keep it for support and billing questions.</p></div><Button type="button" variant="secondary" className="shrink-0 rounded-full" onClick={copy}>{copied ? <><Check /> Copied</> : "Copy"}</Button></div>
     <ol className="mt-4 rounded-2xl border p-5">{timeline.map((item, i) => <li key={item.title} className="relative flex gap-4 pb-6 last:pb-0">
       {i < timeline.length - 1 && <span className={`absolute left-[11px] top-7 h-[calc(100%-1.5rem)] w-px ${item.state === "done" ? "bg-foreground" : "bg-border"}`} />}
       <span className={`relative grid size-6 shrink-0 place-items-center rounded-full ${item.state === "done" ? "bg-foreground text-background" : item.state === "current" ? "border-2 border-primary bg-background" : "border bg-background"}`}>{item.state === "done" ? <Check className="size-3.5" /> : item.state === "current" ? <span className="size-2 rounded-full bg-primary" /> : null}</span>
       <div className="min-w-0"><p className={`text-sm font-semibold ${item.state === "todo" ? "text-muted-foreground" : ""}`}>{item.title}{item.state === "current" && <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">Now</span>}</p><p className="mt-1 text-sm leading-relaxed text-muted-foreground">{item.text}</p></div>
     </li>)}</ol>
     <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl border p-4 text-sm"><span className="min-w-0"><span className="block font-semibold">{plan.name} Plan</span><span className="text-muted-foreground">{plan.monthlyHours} hours / month</span></span><span className="shrink-0 font-semibold">${plan.monthlyFee}<span className="font-normal text-muted-foreground">/month</span></span></div>
-    <Button asChild className="signup-primary mt-8"><Link to="/">Close</Link></Button>
+    <Button asChild className="signup-primary mt-8"><Link to="/">Go to sign in</Link></Button>
   </section>;
 }
 
