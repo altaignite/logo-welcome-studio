@@ -176,6 +176,13 @@
       "when": 1793326365660,
       "tag": "0024_ny_interest_cap",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1793326366660,
+      "tag": "0025_security_review_flags",
+      "breakpoints": true
     }
   ]
 }

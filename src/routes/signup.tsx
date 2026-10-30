@@ -284,7 +284,7 @@ function Signup() {
         </div>}
         {step === 4 && <div>
           <AgreementsList documents={documents} />
-          <p className="mt-4 text-xs leading-relaxed text-muted-foreground">Please read each document. By accepting, you agree to each of them and sign digitally with a confirmation code. You can save a PDF copy of each now, and the signed copies stay in your dashboard.</p>
+          <p className="mt-4 text-xs leading-relaxed text-muted-foreground">Please read the Service Agreement. By accepting, you agree to it and to the policies it refers to, and sign digitally with a confirmation code. You can save a PDF copy now, and the signed copy stays in your dashboard.</p>
           <div className="mt-5 flex gap-3"><Button variant="secondary" aria-label="Back to review" className="size-11 shrink-0 rounded-full" onClick={() => setStep(3)}><ArrowLeft /></Button><Button className="signup-primary flex-1" onClick={openConfirmation}>Accept & continue <PenLine /></Button></div>
         </div>}
       </div>
@@ -361,7 +361,7 @@ function SuccessScreen({ name, accountNumber, plan, signedAt, email }: { name: s
     { title: "Application submitted", text: time, state: "done" },
     { title: "Agreement signed digitally", text: "Your confirmation code was accepted.", state: "done" },
     { title: "Confirm your email", text: `We sent a link to ${email}. Open it to activate your dashboard login.`, state: "current" },
-    { title: "Account review", text: "We're checking your details, usually within 1 business day. We'll email you with any update.", state: "todo" },
+    { title: "Approval and first invoice", text: "When you first sign in we check your details, usually instantly. Once approved, your first invoice appears in your dashboard and inbox; your plan starts as soon as it's paid.", state: "todo" },
     { title: "Onboarding call", text: `We'll contact you at ${email} to plan your first month.`, state: "todo" },
     { title: "Your accelerator starts", text: `${plan.monthlyHours} service hours assigned every month.`, state: "todo" },
   ] as const;

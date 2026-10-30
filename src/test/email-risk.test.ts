@@ -4,12 +4,12 @@ import { passwordIssue } from "@/lib/passwords";
 
 describe("email risk", () => {
   const ok = { acceptsMail: true, ageDays: 4000, blockedInDb: false };
-  it("blocks invalid, disposable, undeliverable and brand-new domains", () => {
+  it("blocks invalid, disposable and undeliverable addresses, and only flags brand-new domains", () => {
     expect(emailSyntaxOk("jane@example.com")).toBe(true);
     expect(localSignals("jane@@example").verdict).toBe("block");
     expect(localSignals("x@mailinator.com").verdict).toBe("block");
     expect(combineRisk(localSignals("jane@acme.com"), { ...ok, acceptsMail: false }).verdict).toBe("block");
-    expect(combineRisk(localSignals("jane@acme.com"), { ...ok, ageDays: 2 }).verdict).toBe("block");
+    expect(combineRisk(localSignals("jane@acme.com"), { ...ok, ageDays: 2 }).verdict).toBe("review");
     expect(combineRisk(localSignals("jane@acme.com"), { ...ok, blockedInDb: true }).verdict).toBe("block");
   });
   it("flags risky signs for review and suggests typo fixes", () => {
@@ -26,14 +26,12 @@ describe("email risk", () => {
 });
 
 describe("password rules", () => {
-  it("require length, mixed characters, no patterns and nothing from the email", () => {
-    expect(passwordIssue("Short1!")).toMatch(/12 characters/);
-    expect(passwordIssue("alllowercase12!")).toMatch(/upper and lower/);
-    expect(passwordIssue("NoNumbersHere!!")).toMatch(/number/);
-    expect(passwordIssue("NoSymbols12345x")).toMatch(/symbol/);
-    expect(passwordIssue("Aaa111!!!bbbX")).toMatch(/repeating/);
-    expect(passwordIssue("Xy!9Password77")).toMatch(/common words/);
-    expect(passwordIssue("Janedoe!2026Zq", "janedoe@acme.com")).toMatch(/email/);
-    expect(passwordIssue("Tr0ub4dor&Horse")).toBeNull();
+  it("need length, letters and numbers, and nothing from the email; no symbol or case rules", () => {
+    expect(passwordIssue("Short1")).toMatch(/12 characters/);
+    expect(passwordIssue("onlyletterslong")).toMatch(/letters and numbers/);
+    expect(passwordIssue("aaaaaaaaaaaa")).toMatch(/letters and numbers/);
+    expect(passwordIssue("janedoe2026garden", "janedoe@acme.com")).toMatch(/email/);
+    expect(passwordIssue("correct horse 42 battery")).toBeNull();
+    expect(passwordIssue("bluegarden2026")).toBeNull();
   });
 });

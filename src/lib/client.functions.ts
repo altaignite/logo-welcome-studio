@@ -51,7 +51,7 @@ export const orderAdditionalPlan = createServerFn({ method: "POST" })
     if ((count ?? 0) >= 2) throw new Error("Please pay your open plan invoices before ordering another plan.");
     // Security: the mobile number on the order must not belong to another account.
     const { checkDuplicatePhone } = await import("@/lib/kyc.server");
-    if (await checkDuplicatePhone(admin, context.userId)) throw new Error(KYC_ERROR);
+    await checkDuplicatePhone(admin, context.userId);
     // Make sure Stripe is reachable and the client has a Stripe customer before anything is created locally.
     const { ensureCustomer } = await import("@/lib/stripe.server");
     await ensureCustomer(admin, context.userId);

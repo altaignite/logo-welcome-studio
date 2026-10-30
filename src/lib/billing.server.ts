@@ -324,3 +324,40 @@ export async function resyncAllStanding(admin: Admin) {
   }
   return { checked: subs.length };
 }
+
+/** Sends the first Stripe invoice for a pending subscription (staff approval and automatic approval). Activation happens on payment. */
+export async function sendFirstInvoiceFor(admin: Admin, subscriptionId: string) {
+  const { data: sub } = await admin.from("subscriptions").select("*").eq("id", subscriptionId).single();
+  if (!sub || sub.status !== "pending") throw new Error("Only pending subscriptions can be invoiced.");
+  const { data: owner } = await admin.from("profiles").select("status").eq("id", sub.user_id).maybeSingle();
+  if (owner?.status === "fraud_kyc") throw new Error("This account is restricted for KYC review. Reinstate it before sending invoices.");
+  const { data: existing } = await admin.from("invoices").select("id").eq("subscription_id", sub.id).eq("kind", "first").neq("status", "void").maybeSingle();
+  if (existing) throw new Error("A first invoice was already sent.");
+  const inv = await issueStripeInvoice(admin, {
+    userId: sub.user_id, subscriptionId: sub.id, kind: "first", description: `${sub.plan_name} plan, first month`,
+    lines: [{ description: `${sub.plan_name} plan, ${sub.monthly_hours} service hours per month`, amount: Number(sub.monthly_fee) }], idem: `first-${sub.id}`,
+  });
+  return { invoiceId: inv.id as string };
+}
+
+/** Approves a new signup automatically when nothing flagged it: no restriction, no open Security ticket, an email that passed the
+ * risk check and an application still waiting. Sends the first invoice so the client can start without waiting for staff. */
+export async function autoApproveSignup(admin: Admin, userId: string, emailClean: boolean) {
+  if (!emailClean) return false;
+  const { data: prof } = await admin.from("profiles").select("status").eq("id", userId).maybeSingle();
+  if (!prof || !["onboarding", "prospect", "active"].includes(prof.status)) return false;
+  const { count: flags } = await admin.from("support_tickets").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("department", "security").neq("status", "closed");
+  if ((flags ?? 0) > 0) return false;
+  const apps = (await admin.from("applications").select("id, status").eq("user_id", userId).eq("status", "submitted")).data ?? [];
+  if (!apps.length) return false;
+  const now = new Date().toISOString();
+  for (const app of apps) {
+    const up = await admin.from("applications").update({ status: "approved", decided_at: now, updated_at: now }).eq("id", app.id).eq("status", "submitted").select("id");
+    if (!up.data?.length) continue;
+    await admin.from("application_events").insert({ application_id: app.id, actor_label: "Automatic", action: "Approved automatically: no risk signals", from_status: "submitted", to_status: "approved", note: "Your first invoice has been sent. Your plan starts as soon as it's paid.", visible_to_client: true });
+    const subs = (await admin.from("subscriptions").select("id").eq("application_id", app.id).eq("status", "pending")).data ?? [];
+    for (const s of subs) { try { await sendFirstInvoiceFor(admin, s.id); } catch (e) { console.error("Automatic first invoice failed", e); } }
+  }
+  if (prof.status !== "active") await admin.from("profiles").update({ status: "active", status_changed_at: now }).eq("id", userId);
+  return true;
+}

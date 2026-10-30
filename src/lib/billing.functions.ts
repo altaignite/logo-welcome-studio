@@ -64,19 +64,8 @@ export const sendFirstInvoice = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => z.object({ subscriptionId: uuid }).parse(d))
   .handler(async ({ data, context }) => {
     await requireAdmin(context);
-    const { getAdmin, issueStripeInvoice } = await import("@/lib/billing.server");
-    const admin = await getAdmin();
-    const { data: sub } = await admin.from("subscriptions").select("*").eq("id", data.subscriptionId).single();
-    if (!sub || sub.status !== "pending") throw new Error("Only pending subscriptions can be invoiced.");
-    const { data: owner } = await admin.from("profiles").select("status").eq("id", sub.user_id).maybeSingle();
-    if (owner?.status === "fraud_kyc") throw new Error("This account is restricted for KYC review. Reinstate it before sending invoices.");
-    const { data: existing } = await admin.from("invoices").select("id").eq("subscription_id", sub.id).eq("kind", "first").neq("status", "void").maybeSingle();
-    if (existing) throw new Error("A first invoice was already sent.");
-    const inv = await issueStripeInvoice(admin, {
-      userId: sub.user_id, subscriptionId: sub.id, kind: "first", description: `${sub.plan_name} plan, first month`,
-      lines: [{ description: `${sub.plan_name} plan, ${sub.monthly_hours} service hours per month`, amount: Number(sub.monthly_fee) }], idem: `first-${sub.id}`,
-    });
-    return { invoiceId: inv.id as string };
+    const { getAdmin, sendFirstInvoiceFor } = await import("@/lib/billing.server");
+    return sendFirstInvoiceFor(await getAdmin(), data.subscriptionId);
   });
 
 /** Pause, resume or cancel a subscription. Clients may act on their own; staff on any. */

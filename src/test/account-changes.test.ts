@@ -26,3 +26,16 @@ describe("plan changes, cancellations and closures", () => {
     expect(recordKinds.account_change_requests.readonly).toBe(true);
   });
 });
+
+describe("automatic approval", () => {
+  it("only approves clean signups and never restricted or flagged ones", () => {
+    const srv = readFileSync("src/lib/billing.server.ts", "utf8");
+    const fn = srv.slice(srv.indexOf("export async function autoApproveSignup"));
+    expect(fn).toMatch(/if \(!emailClean\) return false/);
+    expect(fn).toMatch(/eq\("department", "security"\)\.neq\("status", "closed"\)/);
+    expect(fn).toMatch(/\["onboarding", "prospect", "active"\]\.includes\(prof\.status\)/);
+    expect(fn).toMatch(/eq\("status", "submitted"\)/);
+    const signin = readFileSync("src/lib/signin.server.ts", "utf8");
+    expect(signin.indexOf("checkSharedIp(admin")).toBeLessThan(signin.indexOf("autoApproveSignup(admin"));
+  });
+});

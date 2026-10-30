@@ -7,7 +7,7 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp
 import { usePopup } from "@/components/popup";
 import { downloadAgreementPdf } from "@/lib/agreement-pdf";
 import { createSignatureCode, isSignatureMatch, plans, type Plan } from "@/lib/signup";
-import { agreementDocuments, parseAgreement } from "@/lib/agreements";
+import { LEGAL_URL, agreementDocuments, parseAgreement } from "@/lib/agreements";
 import { money } from "@/lib/admin";
 
 /** Shared steps of every order: plan cards, review rows, agreements and the digital signature. Used by signup,
@@ -24,12 +24,14 @@ export function PlanCards({ onChoose, current }: { onChoose: (plan: Plan) => voi
             </div>
             <p className="mt-1 flex items-baseline gap-1"><span className="text-2xl font-bold tracking-tight">${plan.monthlyFee}</span><span className="text-xs text-muted-foreground">/month</span></p>
             <p className="mt-1 text-xs text-muted-foreground">{plan.description}</p>
-            <ul className="mt-3 space-y-2.5 border-t pt-3 sm:mb-4">{[
+            <ul className="mt-3 space-y-2.5 border-t pt-3">{[
               { icon: Clock, title: `${plan.monthlyHours} Service Hours`, text: "Assigned every month." },
               { icon: Megaphone, title: "Marketing", text: "Campaigns, content and strategy." },
               { icon: Palette, title: "Design", text: "Brand, social and web visuals." },
               { icon: Code2, title: "Development", text: "Websites, landing pages and fixes." },
             ].map(({ icon: Icon, title, text }) => <li key={title} className="flex items-start gap-2.5"><span className="grid size-7 shrink-0 place-items-center rounded-lg bg-secondary"><Icon className="size-3.5" strokeWidth={1.75} /></span><span className="min-w-0 leading-tight"><span className="block text-[13px] font-medium">{title}</span><span className="block text-xs text-muted-foreground">{text}</span></span></li>)}</ul>
+            <div className="mt-3 border-t pt-3 sm:mb-4"><p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">A typical month</p>
+              <ul className="mt-1.5 space-y-1 text-xs">{plan.typicalMonth.map((t) => <li key={t} className="flex gap-1.5"><Check className="mt-0.5 size-3 shrink-0" />{t}</li>)}</ul></div>
             <Button disabled={current === plan.id} className="mt-4 h-10 w-full rounded-xl bg-foreground text-sm font-semibold text-background hover:bg-foreground/90 sm:mt-auto" onClick={() => onChoose(plan)}>{current === plan.id ? "Current plan" : `Choose ${plan.name}`}</Button>
             <p className="mt-2 flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground"><Check className="size-3.5" />90-day money-back guarantee</p>
           </div>)}</div>
@@ -68,6 +70,7 @@ export function AgreementsList({ documents }: { documents: { title: string; body
   const doc = open === null ? null : documents[open];
   return <>
     <ul className="divide-y rounded-xl border">{documents.map((d, i) => <DocumentRow key={d.title} title={d.title} onRead={() => setOpen(i)} onDownload={() => save(i)} />)}</ul>
+    <p className="mt-2 text-xs text-muted-foreground">Full terms and policies: <a href={LEGAL_URL} target="_blank" rel="noopener noreferrer" className="font-medium text-foreground underline underline-offset-4">{LEGAL_URL.replace("https://", "")}</a></p>
     <Dialog.Root open={doc !== null} onOpenChange={(v) => { if (!v) setOpen(null); }}><Dialog.Portal><Dialog.Overlay className="fixed inset-0 z-40 bg-foreground/40 backdrop-blur-sm" /><Dialog.Content className="app-modal max-h-[85dvh] overflow-y-auto sm:max-w-2xl"><Dialog.Title className="pr-8 text-lg font-bold">{doc?.title}</Dialog.Title><Dialog.Description className="sr-only">The full text of {doc?.title}.</Dialog.Description>{doc && <AgreementText body={doc.body} />}<div className="mt-6 space-y-2"><Button className="signup-primary text-sm" onClick={() => { if (open !== null) save(open); }}><Download /> Save as PDF</Button><Dialog.Close asChild><Button variant="secondary" className="app-modal-secondary">Close</Button></Dialog.Close></div></Dialog.Content></Dialog.Portal></Dialog.Root>
   </>;
 }
@@ -173,7 +176,7 @@ export function OrderWizard({ client, mode, onPlace, onDone, doneLabel, initialP
     </div>}
     {step === 2 && <div>
       <AgreementsList documents={documents} />
-      <p className="mt-4 text-xs leading-relaxed text-muted-foreground">{mode === "client" ? "By accepting, you agree to these documents for this plan and sign them digitally with a confirmation code. Signed copies are kept in your Documents." : "The client receives these documents with the order and accepts them by paying the first invoice."}</p>
+      <p className="mt-4 text-xs leading-relaxed text-muted-foreground">{mode === "client" ? "By accepting, you agree to the Service Agreement and the policies it refers to, and sign digitally with a confirmation code. Your signed copy is kept in your Documents." : "The client receives the Service Agreement with the order and accepts it by paying the first invoice."}</p>
       <div className="mt-5 flex gap-3"><Button variant="secondary" aria-label="Back" className="size-11 shrink-0 rounded-full" onClick={() => setStep(1)}><ArrowLeft /></Button>
         {mode === "client" ? <Button className="signup-primary flex-1" onClick={() => setSigning(true)}>Accept & sign <PenLine /></Button> : <Button className="signup-primary flex-1" onClick={confirmStaff}>Place order</Button>}</div>
       <SignDialog open={signing} onOpenChange={setSigning} title="Confirm your order" onSign={place} />

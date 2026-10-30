@@ -14,9 +14,13 @@ export const subscription = {
 };
 
 export const plans = [
-  { id: "starter", name: "Starter", monthlyFee: 199, monthlyHours: 5, description: "A focused start for your brand." },
-  { id: "growth", name: "Growth", monthlyFee: 499, monthlyHours: 15, description: "More room for your next move." },
-  { id: "scale", name: "Scale", monthlyFee: 999, monthlyHours: 35, description: "Build momentum across channels." },
+  // `typicalMonth` shows what the hours usually buy, so plans read as results rather than hours. Examples, not commitments.
+  { id: "starter", name: "Starter", monthlyFee: 199, monthlyHours: 5, description: "A focused start for your brand.",
+    typicalMonth: ["8 branded social posts", "Website updates and fixes", "Monthly performance check-in"] },
+  { id: "growth", name: "Growth", monthlyFee: 499, monthlyHours: 15, description: "More room for your next move.",
+    typicalMonth: ["16 social posts and 2 short videos", "A new landing page or campaign", "Ad campaign set-up and tuning", "Monthly results report"] },
+  { id: "scale", name: "Scale", monthlyFee: 999, monthlyHours: 35, description: "Build momentum across channels.",
+    typicalMonth: ["Content across all your channels", "Multi-channel ad campaigns", "Website builds and conversion work", "Email marketing", "Strategy call and detailed reporting"] },
 ] as const;
 export type Plan = (typeof plans)[number];
 export type PlanId = Plan["id"];

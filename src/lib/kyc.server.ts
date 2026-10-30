@@ -1,4 +1,4 @@
-/** Automatic security flags. Every pattern calls flagForKyc: the database sets the account to "Fraud - KYC" with the reason,
+/** Automatic security flags. Strong signals (card fraud warnings, chargebacks, disposable or undeliverable email) call flagForKyc: the database sets the account to "Fraud - KYC" with the reason,
  * opens an urgent Security ticket with an internal note and alerts staff (public.flag_for_kyc); then the account's plans
  * are paused in Stripe like any hold. The client can only see the /kyc page until staff reinstate the account. Server only. */
 import { KYC_ERROR } from "@/lib/admin";
@@ -22,12 +22,21 @@ export async function flagForKyc(admin: Admin, userId: string, reason: string, s
   return data === true;
 }
 
-/** Duplicate mobile number on this account (checked when ordering; signup and phone changes are checked by a database trigger). */
+/** Softer signals open a Security review ticket and alert staff without restricting the account (public.flag_for_review). */
+export async function flagForReview(admin: Admin, userId: string, reason: string, source: string): Promise<boolean> {
+  const { data, error } = await admin.rpc("flag_for_review", { _user: userId, _reason: reason, _source: source });
+  if (error) { console.error("Review flag failed", error.message); return false; }
+  return data === true;
+}
+
+/** Mobile number shared with another account (checked when ordering; signup and phone changes are checked by a database
+ * trigger). Opens a review; owners with two businesses or a shared office phone are common, so it never restricts. */
 export async function checkDuplicatePhone(admin: Admin, userId: string) {
   const { data: other } = await admin.rpc("duplicate_phone_owner", { _user: userId });
   if (!other) return false;
   const { data: o } = await admin.from("profiles").select("account_number").eq("id", other).maybeSingle();
-  return flagForKyc(admin, userId, `This account was flagged due to duplication of phone number: the mobile number is already used by account ${o?.account_number ?? other}.`, "duplicate phone number");
+  await flagForReview(admin, userId, `The mobile number on this account is also used by account ${o?.account_number ?? other}. This can be an owner with two businesses or a shared office phone; check that the details add up.`, "shared mobile number");
+  return false;
 }
 
 /** Throws the KYC error for the client when the account is (now) restricted. */
@@ -50,5 +59,6 @@ export async function checkSharedIp(admin: Admin, userId: string, ip: string | n
   const fresh = new Set(((await admin.from("profiles").select("id").in("id", users).gte("created_at", recent)).data ?? []).map((r: { id: string }) => r.id));
   const clients = users.filter((u) => !staff.has(u) && fresh.has(u));
   if (clients.length < SHARED_IP_ACCOUNTS || !clients.includes(userId)) return false;
-  return flagForKyc(admin, userId, `${clients.length} new accounts (created in the last ${NEW_ACCOUNT_DAYS} days) signed in from the same IP address (${ip}) within 24 hours.`, "shared IP address");
+  // Coworking spaces and offices share addresses, so this opens a review rather than restricting anyone.
+  return flagForReview(admin, userId, `${clients.length} new accounts (created in the last ${NEW_ACCOUNT_DAYS} days) signed in from the same IP address (${ip}) within 24 hours.`, "shared IP address");
 }

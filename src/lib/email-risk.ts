@@ -4,8 +4,7 @@ import { isBlockedDomain } from "@/lib/disposable-domains";
 export type EmailVerdict = "ok" | "review" | "block";
 export type EmailRisk = { verdict: EmailVerdict; reasons: string[]; suggestion?: string; domainAgeDays?: number | null };
 
-/** Domains younger than this are blocked; younger than REVIEW are allowed but flagged. */
-export const NEW_DOMAIN_BLOCK_DAYS = 7;
+/** Domains younger than this are allowed but flagged for review. */
 export const NEW_DOMAIN_REVIEW_DAYS = 30;
 
 const providers = ["gmail.com", "googlemail.com", "outlook.com", "hotmail.com", "live.com", "yahoo.com", "icloud.com", "me.com", "aol.com", "proton.me", "protonmail.com", "gmx.com", "zoho.com"];
@@ -51,7 +50,7 @@ export function combineRisk(local: EmailRisk, facts: { acceptsMail: boolean | nu
   if (facts.acceptsMail === false) return { verdict: "block", reasons: ["This email domain can't receive email. Check the address for typos."], ...(local.suggestion ? { suggestion: local.suggestion } : {}) };
   const reasons = [...local.reasons];
   let verdict = local.verdict;
-  if (facts.ageDays !== null && facts.ageDays < NEW_DOMAIN_BLOCK_DAYS) return { verdict: "block", reasons: ["This email domain was registered in the last few days. Please use an established business or personal email."], domainAgeDays: facts.ageDays };
+  // New businesses often have brand-new domains, so a young domain is flagged for review, never blocked.
   if (facts.ageDays !== null && facts.ageDays < NEW_DOMAIN_REVIEW_DAYS) { verdict = "review"; reasons.push(`The email domain was registered ${facts.ageDays} days ago.`); }
   return { verdict, reasons, ...(local.suggestion ? { suggestion: local.suggestion } : {}), domainAgeDays: facts.ageDays };
 }

@@ -15,6 +15,7 @@ export async function recordSignIn(admin: Admin, userId: string, sessionId: stri
     user_id: userId, session_id: sessionId, ...place, user_agent: (req.headers.get("user-agent") ?? "").slice(0, 300) || null,
     new_location: isNewLocation(place, prev),
   }, { onConflict: "session_id", ignoreDuplicates: true });
+  let cleanEmail = false;
   // First sign-in: re-check the email, since the signup API can be called without the signup page's check.
   if (!prev.length) {
     const { data: u } = await admin.auth.admin.getUserById(userId);
@@ -23,6 +24,7 @@ export async function recordSignIn(admin: Admin, userId: string, sessionId: stri
     if (email && !staffRole) {
       const { emailRisk } = await import("@/lib/email-risk.server");
       const risk = await emailRisk(email);
+      cleanEmail = risk.verdict === "ok";
       if (risk.verdict === "block") {
         const { flagForKyc } = await import("@/lib/kyc.server");
         await flagForKyc(admin, userId, `The account's email failed the email risk check: ${risk.reasons.join(" ")}`, "email risk check");
@@ -35,4 +37,9 @@ export async function recordSignIn(admin: Admin, userId: string, sessionId: stri
   // Security pattern: many accounts from one network in a day.
   const { checkSharedIp } = await import("@/lib/kyc.server");
   await checkSharedIp(admin, userId, place.ip);
+  // Clean new signups are approved straight away and get their first invoice; anything flagged (review ticket, restriction) waits.
+  if (cleanEmail) {
+    const { autoApproveSignup } = await import("@/lib/billing.server");
+    try { await autoApproveSignup(admin, userId, true); } catch (e) { console.error("Automatic approval failed", e); }
+  }
 }
