@@ -1,0 +1,1 @@
+COMMENT ON TABLE public.subscriptions IS 'Stripe-linked service plans; payment standing controls linked work.';

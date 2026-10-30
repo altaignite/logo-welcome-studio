@@ -15,16 +15,17 @@ export const Route = createFileRoute("/api/public/stripe/webhook")({
         if (!(await verifyStripeSignature(body, request.headers.get("stripe-signature"), secret))) return new Response("Invalid signature", { status: 400 });
         const event = JSON.parse(body);
         const B = await import("@/lib/billing.server");
-        const { invoiceKind, nextRenewalAt, refundDelta } = await import("@/lib/billing");
+        const { refundDelta } = await import("@/lib/billing");
         const { must } = B;
         const admin = await B.getAdmin();
-        const seen = await admin.from("stripe_events").insert({ id: event.id, type: event.type });
+        const seen = await admin.from("stripe_events").select("id").eq("id", event.id).maybeSingle();
         if (seen.error) {
-          if (seen.error.code === "23505") return new Response("duplicate");
+          
           console.error("Stripe webhook couldn't record event", event.id, seen.error.message);
           return new Response("error", { status: 500 });
         }
-        const o = event.data?.object ?? {};
+        if (seen.data) return new Response("duplicate");
+        let o = event.data?.object ?? {};
         try {
           const localSub = async () => {
             const meta = o.metadata?.subscription_id ?? o.subscription_details?.metadata?.subscription_id ?? o.parent?.subscription_details?.metadata?.subscription_id;
@@ -35,73 +36,25 @@ export const Route = createFileRoute("/api/public/stripe/webhook")({
             return data?.id ?? null;
           };
           const findInvoice = async () => must(await admin.from("invoices").select("*").eq("stripe_invoice_id", o.id).maybeSingle());
-          const upsertInvoice = async (status: string) => {
-            const ex = await findInvoice();
-            if (ex) return ex;
-            const userId = o.metadata?.user_id ?? must(await admin.from("profiles").select("id").eq("stripe_customer_id", o.customer).maybeSingle())?.id;
-            if (!userId || !(o.total ?? o.amount_due)) return null;
-            const subId = await localSub();
-            const ins = await admin.from("invoices").insert({
-              user_id: userId, subscription_id: subId, number: o.number ?? o.id, amount: (o.total ?? o.amount_due) / 100, description: o.description ?? "Monthly service fee",
-              due_at: o.due_date ? new Date(o.due_date * 1000).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
-              status, kind: invoiceKind(o), stripe_invoice_id: o.id, hosted_url: o.hosted_invoice_url, pdf_url: o.invoice_pdf,
-            }).select("*").single();
-            // Another delivery for the same invoice may have created it first.
-            if (ins.error?.code === "23505") return await findInvoice();
-            return must(ins);
-          };
-          const paymentIntentOf = async (): Promise<string | null> => {
-            const direct = idOf(o.payment_intent) ?? idOf(o.payments?.data?.[0]?.payment?.payment_intent);
-            if (direct) return direct;
-            const full = await stripe("GET", `invoices/${o.id}`, { "expand[]": "payments" }).catch(() => null);
-            return idOf(full?.payment_intent) ?? idOf(full?.payments?.data?.[0]?.payment?.payment_intent);
-          };
-
-          // Every invoice event records Stripe's live invoice status on the local copy.
+          // Fetch authoritative state so delayed events cannot regress a paid or void invoice.
           if (event.type.startsWith("invoice.") && o.id) {
-            must(await admin.from("invoices").update({ stripe_status: o.status ?? null, stripe_synced_at: new Date().toISOString(),
-              ...(event.type === "invoice.payment_failed" ? { failed_payment_at: new Date().toISOString() } : {}) }).eq("stripe_invoice_id", o.id));
+            o = await stripe("GET", `invoices/${o.id}`, { "expand[]": "payments" });
+            const userId = must(await admin.from("profiles").select("id").eq("stripe_customer_id", idOf(o.customer)).maybeSingle())?.id;
+            if (userId) {
+              const { importInvoice } = await import("@/lib/stripe-import.server");
+              await importInvoice(admin, userId, o);
+              if (event.type === "invoice.payment_failed" && o.status === "open") {
+                must(await admin.from("invoices").update({ failed_payment_at: new Date().toISOString() }).eq("stripe_invoice_id", o.id));
+                const inv = await findInvoice();
+                if (inv?.subscription_id) { await B.markPastDue(admin, inv.subscription_id, "Invoice payment failed"); await B.applySubscriptionStanding(admin, inv.subscription_id, "Invoice payment failed", "Stripe"); }
+              }
+            }
+          } else if (event.type.startsWith("customer.subscription.") && o.id) {
+            o = await stripe("GET", `subscriptions/${o.id}`);
+            const subId = await localSub();
+            if (subId) await B.syncSubscriptionFromStripe(admin, subId, o);
           }
           switch (event.type) {
-            case "invoice.finalized": await upsertInvoice("open"); break;
-            case "invoice.paid": {
-              const inv = await upsertInvoice("open");
-              if (inv) await B.recordInvoicePaid(admin, inv, o, await paymentIntentOf());
-              break;
-            }
-            case "invoice.payment_failed": {
-              const inv = await upsertInvoice("overdue");
-              const subId = inv?.subscription_id ?? (await localSub());
-              if (subId) {
-                await B.markPastDue(admin, subId, o.last_finalization_error?.message ?? "Card payment was declined");
-                if (!o.next_payment_attempt) await B.suspendForNonPayment(admin, subId, `Invoice ${o.number ?? o.id} unpaid after all retries`);
-              }
-              break;
-            }
-            case "invoice.marked_uncollectible": {
-              const subId = await localSub();
-              const local = await findInvoice();
-              // Staff writing an invoice off marks it uncollectible in Stripe; that echo must not suspend the plan.
-              if (subId && local?.collection_stage !== "written_off") await B.suspendForNonPayment(admin, subId, `Invoice ${o.number ?? o.id} marked uncollectible`);
-              break;
-            }
-            case "invoice.voided": {
-              must(await admin.from("invoices").update({ status: "void", void_reason: "Voided in Stripe", interest_paused: true }).eq("stripe_invoice_id", o.id).neq("status", "void"));
-              const v = await findInvoice();
-              if (v?.subscription_id) await B.applySubscriptionStanding(admin, v.subscription_id, `Invoice ${v.number} voided in Stripe`, "Stripe");
-              break;
-            }
-            case "customer.subscription.created":
-            case "customer.subscription.updated":
-            case "customer.subscription.paused":
-            case "customer.subscription.resumed":
-            case "customer.subscription.deleted": {
-              // The local plan follows Stripe's live status (shared with the daily reconciliation).
-              const subId = await localSub();
-              if (subId) await B.syncSubscriptionFromStripe(admin, subId, event.type === "customer.subscription.deleted" ? { ...o, status: "canceled" } : o);
-              break;
-            }
-            case "invoice.updated": case "invoice.created": case "invoice.sent": break;
             case "charge.refunded": {
               const pi = idOf(o.payment_intent);
               const stripeInv = idOf(o.invoice);
@@ -119,9 +72,11 @@ export const Route = createFileRoute("/api/public/stripe/webhook")({
           }
         } catch (e) {
           console.error("Stripe webhook failed", event.type, e);
-          await admin.from("stripe_events").delete().eq("id", event.id);
+
           return new Response("error", { status: 500 });
         }
+        const completed = await admin.from("stripe_events").upsert({ id: event.id, type: event.type }, { onConflict: "id", ignoreDuplicates: true });
+        if (completed.error) return new Response("error", { status: 500 });
         return new Response("ok");
       },
     },

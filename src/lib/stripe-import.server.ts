@@ -51,7 +51,7 @@ async function importSubscription(admin: Admin, userId: string, s: any, counts: 
   const periodEnd = s.current_period_end ?? item?.current_period_end;
   const row = must(await admin.from("subscriptions").insert({
     user_id: userId, plan_name: plan.plan_name, monthly_fee: plan.monthly_fee, monthly_hours: plan.monthly_hours, status, stripe_subscription_id: s.id, stripe_status: s.status,
-    started_at: started.toISOString(), first_paid_at: started.toISOString(), renews_at: periodEnd ? new Date(periodEnd * 1000).toISOString() : null,
+    started_at: started.toISOString(), first_paid_at: null, renews_at: periodEnd ? new Date(periodEnd * 1000).toISOString() : null,
     current_period_end: periodEnd ? new Date(periodEnd * 1000).toISOString() : null, cancel_at_period_end: !!s.cancel_at_period_end,
     cancelled_at: s.canceled_at ? new Date(s.canceled_at * 1000).toISOString() : null, stripe_synced_at: new Date().toISOString(),
     guarantee_ends_at: opens.toISOString(), guarantee_status: new Date() > closes ? "expired" : "running",
@@ -64,27 +64,29 @@ async function importSubscription(admin: Admin, userId: string, s: any, counts: 
 /** Creates or updates the local copy of a Stripe invoice and records its payment. Exported for the daily sync. */
 export async function importInvoice(admin: Admin, userId: string, o: any, counts?: ImportCounts) {
   const status = localInvoiceStatus(o);
-  if (!status || !(o.total ?? o.amount_due)) return;
+  if (!status) return;
   const subStripe = o.subscription ?? o.parent?.subscription_details?.subscription ?? null;
   const subId = subStripe ? must(await admin.from("subscriptions").select("id").eq("stripe_subscription_id", typeof subStripe === "string" ? subStripe : subStripe.id).maybeSingle())?.id ?? null : (o.metadata?.subscription_id ?? null);
   const fields = {
     number: o.number ?? o.id, amount: (o.total ?? o.amount_due) / 100, description: o.description ?? o.lines?.data?.[0]?.description ?? "Service fee",
     due_at: o.due_date ? new Date(o.due_date * 1000).toISOString().slice(0, 10) : new Date((o.created ?? Date.now() / 1000) * 1000).toISOString().slice(0, 10),
     hosted_url: o.hosted_invoice_url, pdf_url: o.invoice_pdf, stripe_status: o.status, stripe_synced_at: new Date().toISOString(),
-    ...(o.attempt_count > 0 && o.status !== "paid" ? { failed_payment_at: new Date().toISOString() } : {}),
+    ...(o.attempt_count > 0 && o.status === "open" ? { failed_payment_at: new Date().toISOString() } : {}),
   };
   let inv = must(await admin.from("invoices").select("*").eq("stripe_invoice_id", o.id).maybeSingle());
   if (!inv) {
     inv = must(await admin.from("invoices").insert({ user_id: userId, subscription_id: subId, kind: invoiceKind(o), stripe_invoice_id: o.id, ...fields,
       status: status === "paid" ? "open" : status, issued_at: new Date((o.created ?? Date.now() / 1000) * 1000).toISOString().slice(0, 10) }).select("*").single());
   } else {
-    must(await admin.from("invoices").update({ ...fields, ...(status !== "paid" && inv.status !== status && inv.status !== "paid" ? { status } : {}) }).eq("id", inv.id));
+    must(await admin.from("invoices").update({ ...fields, ...(subId ? { subscription_id: subId } : {}), ...(status !== "paid" && inv.status !== status && inv.status !== "paid" ? { status } : {}) }).eq("id", inv.id));
   }
   if (counts) counts.invoices++;
-  if (status === "paid" && inv.status !== "paid") {
+  if (status === "paid") {
     await recordInvoicePaid(admin, inv, o, typeof o.payment_intent === "string" ? o.payment_intent : o.payment_intent?.id ?? null);
     if (counts) counts.payments++;
   }
+  const linkedSub = inv.subscription_id ?? subId;
+  if (linkedSub) await applySubscriptionStanding(admin, linkedSub, `Invoice ${o.number ?? o.id}: ${status}`, "Stripe");
 }
 
 /** Imports one page of Stripe customers with all their subscriptions and invoices. */

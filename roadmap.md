@@ -17,6 +17,9 @@
 - [x] Client dashboard and Stripe payments.
 - [x] App emails (in-app inbox plus email outbox; sending needs a verified email domain and RESEND_API_KEY), staff permission levels, documents, global search.
 # Stripe billing
+- [ ] Verify every SQL migration against the live database and apply pending updates.
+- [ ] Unify Stripe invoice events, reconciliation and linked subscription/application/project/task standing.
+- [ ] Add secure live refresh, regression tests and a focused security review.
 - [x] Stripe invoices, orders activating on payment, pause/resume/cancel, guarantee refunds, failed-payment suspension.
 - [x] Overage billing, debt recovery stages, compound interest, legal and court fees, daily job.
 - [x] Taskforce, Support, Billing rules pages; client dashboard; closed tickets locked.

@@ -27,7 +27,8 @@ export const createOrder = createServerFn({ method: "POST" })
     await requireAdmin(context);
     const { getAdmin, issueStripeInvoice } = await import("@/lib/billing.server");
     const admin = await getAdmin();
-    const plan = plans.find((p) => p.id === data.planId)!;
+    const plan = plans.find((p) => p.id === data.planId);
+    if (!plan) throw new Error("Unknown plan.");
     const { data: prof } = await admin.from("profiles").select("account_number, company, first_name, last_name").eq("id", data.userId).single();
     if (!prof) throw new Error("Client not found.");
     // Make sure Stripe is reachable and the client has a Stripe customer before anything is created locally.
@@ -80,7 +81,7 @@ export const subscriptionAction = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => z.object({ subscriptionId: uuid, action: z.enum(["pause", "resume", "cancel_end", "cancel_now"]), reason: z.string().trim().min(3).max(1000) }).parse(d))
   .handler(async ({ data, context }) => {
     const staff = await staffActor(context);
-    const { getAdmin, applyStripeStatus, assertClientMayAct, voidOpenFirstInvoices } = await import("@/lib/billing.server");
+    const { getAdmin, applyStripeStatus, applySubscriptionStanding, assertClientMayAct, voidOpenFirstInvoices } = await import("@/lib/billing.server");
     const { stripe, audit } = await import("@/lib/stripe.server");
     const { pauseVoidsGuarantee } = await import("@/lib/billing");
     const admin = await getAdmin();
@@ -116,6 +117,7 @@ export const subscriptionAction = createServerFn({ method: "POST" })
     patch.notes = [patch.notes ?? sub.notes, note].filter(Boolean).join("\n");
     const up = await admin.from("subscriptions").update(patch).eq("id", sub.id);
     if (up.error) throw new Error("Couldn't update the subscription.");
+    await applySubscriptionStanding(admin, sub.id, `Subscription ${data.action}`, actorLabel(context));
     await audit(admin, sub.user_id, "subscriptions", sub.id, data.action, { reason: data.reason, ...(patch.status ? { status: { from: sub.status, to: patch.status } } : {}), ...(patch.guarantee_status ? { guarantee: { from: "running", to: "void" } } : {}) }, context.userId, actorLabel(context));
     return { ok: true, guaranteeVoided: patch.guarantee_status === "void" };
   });
@@ -212,8 +214,8 @@ export const collectionAction = createServerFn({ method: "POST" })
       }
       case "settle": setStage("settled"); patch.interest_paused = true; break;
       case "write_off":
-        setStage("written_off"); patch.interest_paused = true; patch.status = "void"; patch.void_reason = `Written off: ${data.note}`;
-        if (inv.stripe_invoice_id) await stripe("POST", `invoices/${inv.stripe_invoice_id}/mark_uncollectible`).catch(() => null);
+        setStage("written_off"); patch.interest_paused = true; patch.status = "uncollectible"; patch.void_reason = `Written off: ${data.note}`;
+        if (inv.stripe_invoice_id) await stripe("POST", `invoices/${inv.stripe_invoice_id}/mark_uncollectible`);
         break;
       case "pause_interest": patch.interest_paused = true; break;
       case "resume_interest": patch.interest_paused = false; break;
