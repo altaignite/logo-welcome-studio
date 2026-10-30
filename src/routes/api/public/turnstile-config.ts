@@ -8,7 +8,7 @@ export const Route = createFileRoute("/api/public/turnstile-config")({
         const { turnstileKeys } = await import("@/lib/turnstile.server");
         const k = await turnstileKeys();
         // The site key is public by design; it's only offered once the secret is also set, so the widget never runs half-configured.
-        return new Response(JSON.stringify({ siteKey: k.siteKey && k.secretKey ? k.siteKey : null }), { headers: { "content-type": "application/json", "cache-control": "public, max-age=60" } });
+        return new Response(JSON.stringify({ siteKey: k.siteKey, enabled: !!(k.siteKey && k.secretKey) }), { headers: { "content-type": "application/json", "cache-control": "no-store" } });
       },
     },
   },

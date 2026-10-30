@@ -29,6 +29,6 @@ describe("Turnstile", () => {
     expect(save).toMatch(/secretKeyValid/);
     expect(save).not.toMatch(/return \{[^}]*secret/i);
     const cfg = readFileSync("src/routes/api/public/turnstile-config.ts", "utf8");
-    expect(cfg).not.toMatch(/secretKey\b(?! \?)/);
+    expect(cfg).not.toMatch(/secretKey\s*[:,}]|secretKey: k|\.\.\.k\b/);
   });
 });

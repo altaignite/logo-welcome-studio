@@ -109,7 +109,12 @@ function Signup() {
     if (!valid.success) { popup({ type: "error", title: "Let's check your email", description: valid.error.issues[0]?.message ?? "Enter a valid email address.", primaryLabel: "Try again", secondaryLabel: null }); return; }
     setGateBusy(true);
     try {
-      const r = await fetch("/api/public/account-check", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email, turnstile: await bot.getToken() }) });
+      const captcha = await bot.getToken();
+      if (bot.enabled && !captcha) {
+        popup({ type: "error", title: "The security check didn't load", description: "Our bot protection (Cloudflare) couldn't run in this browser. Turn off content blockers or VPN for this site, or try another browser, then press Continue again.", primaryLabel: "Try again", secondaryLabel: null });
+        return;
+      }
+      const r = await fetch("/api/public/account-check", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email, turnstile: captcha }) });
       const body = (await r.json().catch(() => ({}))) as { exists?: boolean; error?: string; risk?: { suggestion?: string } };
       if (!r.ok) {
         const fix = body.risk?.suggestion;

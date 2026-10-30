@@ -19,7 +19,8 @@ export const Route = createFileRoute("/api/public/csp-report")({
         for (const r of reports.slice(0, 5)) {
           const directive = String(r["effectiveDirective"] ?? r["effective-directive"] ?? r["violated-directive"] ?? "unknown").slice(0, 60);
           const blocked = String(r["blockedURL"] ?? r["blocked-uri"] ?? "inline").slice(0, 200);
-          const enforced = String(r["disposition"] ?? "enforce") === "enforce";
+          // Older browsers omit the disposition; scripts and connections are only ever report-only here, so assume a report.
+          const enforced = String(r["disposition"] ?? "report") === "enforce";
           let host = blocked; try { host = new URL(blocked).host || blocked; } catch { /* inline or eval */ }
           await logSecurityEvent({ kind: enforced ? "csp_blocked" : "csp_report_only", severity: enforced ? "medium" : "low", request, group: `${directive}:${host}`,
             path: String(r["documentURL"] ?? r["document-uri"] ?? "").slice(0, 300) || null,
