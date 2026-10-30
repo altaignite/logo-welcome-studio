@@ -80,10 +80,17 @@ export const Route = createFileRoute("/api/public/stripe/webhook")({
             }
             case "invoice.marked_uncollectible": {
               const subId = await localSub();
-              if (subId) await B.suspendForNonPayment(admin, subId, `Invoice ${o.number ?? o.id} marked uncollectible`);
+              const local = await findInvoice();
+              // Staff writing an invoice off marks it uncollectible in Stripe; that echo must not suspend the plan.
+              if (subId && local?.collection_stage !== "written_off") await B.suspendForNonPayment(admin, subId, `Invoice ${o.number ?? o.id} marked uncollectible`);
               break;
             }
-            case "invoice.voided": must(await admin.from("invoices").update({ status: "void", void_reason: "Voided in Stripe" }).eq("stripe_invoice_id", o.id).neq("status", "void")); break;
+            case "invoice.voided": {
+              must(await admin.from("invoices").update({ status: "void", void_reason: "Voided in Stripe", interest_paused: true }).eq("stripe_invoice_id", o.id).neq("status", "void"));
+              const v = await findInvoice();
+              if (v?.subscription_id) await B.applySubscriptionStanding(admin, v.subscription_id, `Invoice ${v.number} voided in Stripe`, "Stripe");
+              break;
+            }
             case "customer.subscription.created":
             case "customer.subscription.updated":
             case "customer.subscription.paused":

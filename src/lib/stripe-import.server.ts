@@ -2,7 +2,7 @@
  * Runs a page of customers at a time so it fits in a request; the admin page calls it until there are no more pages. */
 import { stripe } from "@/lib/stripe.server";
 import { invoiceKind, localInvoiceStatus, localSubscriptionStatus, planFromStripe } from "@/lib/billing";
-import { must, recordInvoicePaid, syncSubscriptionFromStripe } from "@/lib/billing.server";
+import { applySubscriptionStanding, must, recordInvoicePaid, syncSubscriptionFromStripe } from "@/lib/billing.server";
 import { GUARANTEE_CLAIM_DAYS, GUARANTEE_DAYS } from "@/lib/admin";
 
 type Admin = any;
@@ -106,6 +106,8 @@ export async function importStripePage(admin: Admin, startingAfter?: string) {
         if (!invs.has_more) break;
         after = invs.data[invs.data.length - 1].id;
       }
+      // Each imported or updated plan ends up in line with its invoices.
+      for (const sub of must(await admin.from("subscriptions").select("id").eq("user_id", userId).neq("status", "cancelled")) ?? []) await applySubscriptionStanding(admin, sub.id, "Imported from Stripe", "Stripe import");
     } catch (e) { counts.skipped.push(`${c.email ?? c.id}: ${(e as Error).message}`); }
   }
   const last = page.data?.[page.data.length - 1]?.id as string | undefined;

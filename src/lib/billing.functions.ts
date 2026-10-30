@@ -189,7 +189,7 @@ export const collectionAction = createServerFn({ method: "POST" })
   }).parse(d))
   .handler(async ({ data, context }) => {
     await requireAdmin(context);
-    const { getAdmin, issueArrears } = await import("@/lib/billing.server");
+    const { applySubscriptionStanding, getAdmin, issueArrears } = await import("@/lib/billing.server");
     const { audit, stripe } = await import("@/lib/stripe.server");
     const { collectionActionAllowed } = await import("@/lib/billing");
     const admin = await getAdmin();
@@ -221,6 +221,14 @@ export const collectionAction = createServerFn({ method: "POST" })
     }
     const up = await admin.from("invoices").update(patch).eq("id", inv.id);
     if (up.error) throw new Error("Couldn't update the invoice.");
+    // Mirror the recovery stage on the Stripe invoice and customer, so Stripe shows the same picture.
+    if (inv.stripe_invoice_id && patch.collection_stage) {
+      await stripe("POST", `invoices/${inv.stripe_invoice_id}`, { "metadata[collection_stage]": patch.collection_stage, "metadata[collection_note]": data.note.slice(0, 450) }).catch((e: Error) => console.error("Stripe invoice metadata", e.message));
+      const { data: prof } = await admin.from("profiles").select("stripe_customer_id").eq("id", inv.user_id).maybeSingle();
+      if (prof?.stripe_customer_id) await stripe("POST", `customers/${prof.stripe_customer_id}`, { "metadata[collections]": ["debt_recovery", "legal", "court"].includes(patch.collection_stage) ? patch.collection_stage : "" }).catch(() => null);
+    }
+    // The subscription, its Stripe billing, projects and application follow the debt.
+    if (inv.subscription_id) await applySubscriptionStanding(admin, inv.subscription_id, `Invoice ${inv.number}: ${data.action.replace("_", " ")}`, actorLabel(context));
     await audit(admin, inv.user_id, "invoices", inv.id, `collections_${data.action}`, { note: data.note, ...(patch.collection_stage ? { collection_stage: { from: inv.collection_stage, to: patch.collection_stage } } : {}) }, context.userId, actorLabel(context));
     return { ok: true };
   });
@@ -307,7 +315,7 @@ export const voidInvoices = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => z.object({ invoiceIds: z.array(uuid).min(1).max(100), reason: z.string().trim().min(3).max(1000) }).parse(d))
   .handler(async ({ data, context }) => {
     await requireAdmin(context);
-    const { getAdmin, must, voidStripeInvoice } = await import("@/lib/billing.server");
+    const { applySubscriptionStanding, getAdmin, must, voidStripeInvoice } = await import("@/lib/billing.server");
     const { audit } = await import("@/lib/stripe.server");
     const admin = await getAdmin();
     const rows = must(await admin.from("invoices").select("*").in("id", data.invoiceIds)) ?? [];
@@ -317,6 +325,8 @@ export const voidInvoices = createServerFn({ method: "POST" })
       if (inv.stripe_invoice_id) await voidStripeInvoice(inv.stripe_invoice_id);
       must(await admin.from("invoices").update({ status: "void", void_reason: data.reason, interest_paused: true }).eq("id", inv.id));
       await audit(admin, inv.user_id, "invoices", inv.id, "void", { status: { from: inv.status, to: "void" }, reason: data.reason }, context.userId, actorLabel(context));
+      // The plan, Stripe, projects and application follow what's still owed.
+      if (inv.subscription_id) await applySubscriptionStanding(admin, inv.subscription_id, `Invoice ${inv.number} voided: ${data.reason}`, actorLabel(context));
       voided++;
     }
     return { voided, skipped };

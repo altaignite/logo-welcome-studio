@@ -162,3 +162,23 @@ export function planFromStripe(unitAmountCents: number | null | undefined, produ
   return match ? { plan_name: match.name, monthly_fee: match.monthlyFee, monthly_hours: match.monthlyHours, custom: false }
     : { plan_name: (productName?.trim() || "Custom plan").replace(/ plan$/i, "").slice(0, 80), monthly_fee: fee, monthly_hours: 0, custom: true };
 }
+
+export type Standing = "active" | "past_due" | "suspended" | "abandoned";
+type StandingInvoice = { status: string; kind?: string | null; due_at: string | null; collection_stage?: string | null };
+
+/** Where a subscription should stand given its invoices. Null means its status isn't decided by invoices (cancelled, paused by
+ * the client or a hold, or a new order still waiting for its first payment). "abandoned" is a new order whose first invoice was
+ * voided without ever being paid, so it will never start. */
+export function subscriptionStanding(sub: { status: string; started_at: string | null; stripe_status?: string | null }, invoices: StandingInvoice[], today = new Date().toISOString().slice(0, 10)): Standing | null {
+  if (sub.status === "cancelled" || sub.status === "paused") return null;
+  if (sub.status === "pending" || !sub.started_at) {
+    const firsts = invoices.filter((i) => i.kind === "first");
+    return firsts.length > 0 && firsts.every((i) => i.status === "void") ? "abandoned" : null;
+  }
+  const unpaid = invoices.filter((i) => i.status === "open" || i.status === "overdue");
+  // Stripe gave up collecting (retries exhausted) or the debt is in recovery.
+  if (unpaid.length && sub.stripe_status === "unpaid") return "suspended";
+  if (unpaid.some((i) => ["debt_recovery", "legal", "court"].includes(String(i.collection_stage)))) return "suspended";
+  if (unpaid.some((i) => i.status === "overdue" || (!!i.due_at && i.due_at < today))) return "past_due";
+  return "active";
+}

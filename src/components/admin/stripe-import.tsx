@@ -42,7 +42,7 @@ export function StripeImport() {
     setBusy("sync");
     try {
       const r = await runSync(); await qc.invalidateQueries({ queryKey: ["admin"] });
-      popup({ type: "success", title: "Synced with Stripe", description: `${r.subs} subscriptions and ${r.invoices} invoices checked against Stripe.`, primaryLabel: "Done", secondaryLabel: null });
+      popup({ type: "success", title: "Synced with Stripe", description: `${r.subs} subscriptions and ${r.invoices} invoices checked against Stripe, and every running plan, project and application re-checked against its invoices.`, primaryLabel: "Done", secondaryLabel: null });
     } catch (e) { popup({ type: "error", title: "Sync failed", description: (e as Error).message, primaryLabel: "Close", secondaryLabel: null }); }
     setBusy(null);
   };
