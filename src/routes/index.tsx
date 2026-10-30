@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
 import { Mail, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
 import { usePopup } from "@/components/popup";
+import { isUnconfirmedEmail, unconfirmedPopup } from "@/lib/email-confirmation";
 import { Spinner } from "@/components/loading";
 import { SwitchField } from "@/components/switch-field";
 import logo from "@/assets/logo.png.asset.json";
@@ -53,7 +54,8 @@ function Login() {
     const { error } = await supabase.auth.signInWithPassword({ email, password: pw });
     if (error) {
       setBusy(false);
-      if (/banned/i.test(error.message)) popup({ type: "error", title: "Your account is suspended", description: "Please contact our support team to restore access." });
+      if (isUnconfirmedEmail(error)) popup(unconfirmedPopup(email, popup));
+      else if (/banned/i.test(error.message)) popup({ type: "error", title: "Your account is suspended", description: "Please contact our support team to restore access." });
       else popup({ type: "error", title: "Something went wrong while trying to log you in", description: error.message });
       return;
     }

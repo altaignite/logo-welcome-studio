@@ -4,6 +4,7 @@ import { Lock, Mail, ShieldCheck } from "lucide-react";
 import logo from "@/assets/logo.png.asset.json";
 import { supabase } from "@/integrations/supabase/client";
 import { usePopup } from "@/components/popup";
+import { isUnconfirmedEmail, unconfirmedPopup } from "@/lib/email-confirmation";
 import { Spinner } from "@/components/loading";
 import { passwordIssue } from "@/lib/client";
 import { MfaChallenge, mfaNeeded } from "@/components/mfa";
@@ -54,6 +55,7 @@ function AdminLogin() {
       return popup({ type: "success", title: "Check your inbox", description: "Confirm your email address, then sign in here.", primaryLabel: "Got it", secondaryLabel: null });
     }
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (isUnconfirmedEmail(error)) { setBusy(false); return popup(unconfirmedPopup(email, popup, "/admin-login")); }
     if (error || !data.user) { setBusy(false); return popup({ type: "error", title: "Something went wrong while trying to log you in", description: error?.message ?? "Try again." }); }
     const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: data.user.id, _role: "admin" });
     setBusy(false);

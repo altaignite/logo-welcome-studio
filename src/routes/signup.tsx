@@ -8,6 +8,7 @@ import { Spinner } from "@/components/loading";
 import { useServerFn } from "@tanstack/react-start";
 import { orderAdditionalPlan } from "@/lib/client.functions";
 import { usePopup } from "@/components/popup";
+import { isUnconfirmedEmail, unconfirmedPopup } from "@/lib/email-confirmation";
 import { supabase } from "@/integrations/supabase/client";
 import { agreementDocuments } from "@/lib/agreements";
 import { createAccountNumber, accountSchema, countries, personalSchema, plans, type Plan, type CountryCode, type PersonalDetails, formatPhoneInput, switchPhoneCountry, phonePlaceholder, phoneNational } from "@/lib/signup";
@@ -118,6 +119,8 @@ function Signup() {
     const { error } = await supabase.auth.signInWithPassword({ email: account.email.trim(), password: loginPassword });
     if (error) {
       setGateBusy(false);
+      // The plan is kept: after confirming, the client comes back to this tab and signs in.
+      if (isUnconfirmedEmail(error)) { popup(unconfirmedPopup(account.email.trim(), popup, "/signup")); return; }
       popup({ type: "error", title: /banned/i.test(error.message) ? "Your account is suspended" : "That password didn't work", description: /banned/i.test(error.message) ? "Please contact our support team to restore access." : "Check your password and try again, or reset it below.", primaryLabel: "Try again", secondaryLabel: null });
       return;
     }
@@ -300,6 +303,16 @@ function ProcessingScreen({ hours, accountNumber, onDone }: { hours: number; acc
 
 
 function SuccessScreen({ name, accountNumber, plan, signedAt, email }: { name: string; accountNumber: string; plan: Plan; signedAt: string; email: string }) {
+  const popup = usePopup();
+  // Supabase allows one confirmation email a minute, so the link counts down instead of failing.
+  const [cooldown, setCooldown] = useState(60);
+  useEffect(() => { if (cooldown <= 0) return; const t = window.setTimeout(() => setCooldown((c) => c - 1), 1000); return () => window.clearTimeout(t); }, [cooldown]);
+  const resend = async () => {
+    const { error } = await supabase.auth.resend({ type: "signup", email, options: { emailRedirectTo: window.location.origin } });
+    if (error) { popup({ type: "error", title: "We couldn't resend the email", description: /seconds|rate|security purposes/i.test(error.message) ? "Please wait a minute and try again." : error.message, primaryLabel: "Close", secondaryLabel: null }); return; }
+    setCooldown(60);
+    popup({ type: "success", title: "Confirmation email sent", description: `We sent a new link to ${email}. Check your spam or promotions folder if you don't see it within a few minutes.`, primaryLabel: "Got it", secondaryLabel: null });
+  };
   const [copied, setCopied] = useState(false);
   const copy = () => { void navigator.clipboard?.writeText(accountNumber).then(() => { setCopied(true); window.setTimeout(() => setCopied(false), 1800); }).catch(() => {}); };
   const time = new Date(signedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
@@ -323,6 +336,8 @@ function SuccessScreen({ name, accountNumber, plan, signedAt, email }: { name: s
       <div className="min-w-0"><p className={`text-sm font-semibold ${item.state === "todo" ? "text-muted-foreground" : ""}`}>{item.title}{item.state === "current" && <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">Now</span>}</p><p className="mt-1 text-sm leading-relaxed text-muted-foreground">{item.text}</p></div>
     </li>)}</ol>
     <Button asChild className="signup-primary mt-8"><Link to="/">Go to sign in</Link></Button>
+    <p className="mt-4 text-center text-xs text-muted-foreground">Didn't get the email? Check your spam folder, or{" "}
+      <button type="button" disabled={cooldown > 0} onClick={resend} className="font-medium text-foreground underline underline-offset-4 disabled:no-underline disabled:opacity-60">{cooldown > 0 ? `resend in ${cooldown}s` : "resend it"}</button>.</p>
   </section>;
 }
 
