@@ -18,6 +18,9 @@ export const plans = [
   { id: "scale", name: "Scale", monthlyFee: 999, monthlyHours: 35, description: "Build momentum across channels." },
 ] as const;
 export type Plan = (typeof plans)[number];
+export type PlanId = Plan["id"];
+/** Reads a plan id from a URL search value, so links can carry a chosen plan between signup, sign-in and ordering. */
+export const planFromSearch = (v: unknown): PlanId | undefined => (plans.some((p) => p.id === v) ? (v as PlanId) : undefined);
 
 export function planTerms(plan: Plan) {
   return `${plan.name} — $${plan.monthlyFee} / month\n${plan.monthlyHours} assigned service hours per month, shared across marketing, design and development. Services are not unlimited. Advertising budgets are separate and excluded.\n90-day money-back guarantee on service fees if no sales are received, requested after day 90 with every invoice paid on time.`;

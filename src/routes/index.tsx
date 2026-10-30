@@ -9,8 +9,11 @@ import hero from "@/assets/login-hero.jpg";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { MfaChallenge, mfaNeeded } from "@/components/mfa";
+import { planFromSearch, type PlanId } from "@/lib/signup";
 
 export const Route = createFileRoute("/")({
+  // A plan chosen at signup by someone who already has an account carries through sign-in to ordering.
+  validateSearch: (s: Record<string, unknown>): { plan?: PlanId } => { const plan = planFromSearch(s["plan"]); return plan ? { plan } : {}; },
   head: () => ({
     meta: [
       { title: "FP Marketing Accelerator — Sign in" },
@@ -33,6 +36,8 @@ function Login() {
   const [busy, setBusy] = useState(false);
   const popup = usePopup();
   const navigate = useNavigate();
+  const { plan } = Route.useSearch();
+  const next = () => (plan ? navigate({ to: "/dashboard/order", search: { plan } }) : navigate({ to: "/dashboard" }));
   // A signed-in session that still needs its authenticator code continues here (the dashboard sends it back).
   useEffect(() => { void supabase.auth.getSession().then(async ({ data }) => { if (data.session && (await mfaNeeded())) setMfa(true); }); }, []);
   const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
@@ -54,7 +59,7 @@ function Login() {
     }
     if (await mfaNeeded()) { setBusy(false); setMfa(true); return; }
     // Keep the spinner until the dashboard has opened.
-    await navigate({ to: "/dashboard" });
+    await next();
     setBusy(false);
   };
   return (
@@ -83,7 +88,7 @@ function Login() {
             <p className="mt-1 text-sm text-muted-foreground sm:mt-2 sm:text-base">Access your personal account by logging in.</p>
           </div>
 
-          {mfa ? <div className="mt-5 flex w-full justify-center sm:mt-8"><MfaChallenge onDone={() => navigate({ to: "/dashboard" })} onCancel={async () => { await supabase.auth.signOut(); setMfa(false); }} /></div> :
+          {mfa ? <div className="mt-5 flex w-full justify-center sm:mt-8"><MfaChallenge onDone={() => void next()} onCancel={async () => { await supabase.auth.signOut(); setMfa(false); }} /></div> :
           <form className="mt-5 w-full max-w-md space-y-4 sm:mt-8 sm:space-y-5" onSubmit={onSubmit} noValidate>
             <div className="space-y-1.5">
               <label htmlFor="email" className="block text-[13px] font-medium text-foreground">Email Address<span className="text-primary">*</span></label>

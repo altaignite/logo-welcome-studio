@@ -94,7 +94,7 @@ function Signup() {
   };
   const openConfirmation = () => setConfirmOpen(true);
   const accept = async (): Promise<boolean> => {
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email: account.email.trim(), password: account.password,
       options: { emailRedirectTo: window.location.origin, data: {
         account_number: accountNumber, first_name: personal.firstName.trim(), last_name: personal.lastName.trim(), company: personal.company.trim(),
@@ -105,6 +105,12 @@ function Signup() {
     if (error) {
       setConfirmOpen(false);
       popup({ type: "error", title: "We couldn't submit your application", description: /database error/i.test(error.message) ? "This email address can't be used. Disposable email addresses aren't accepted; please use your business or personal email." : error.message, primaryLabel: "Try again", onPrimary: openConfirmation, secondaryLabel: "Cancel" });
+      return false;
+    }
+    // Supabase doesn't reveal existing emails: it returns a user with no identities and creates nothing. Send them to sign in instead.
+    if (data.user && (data.user.identities?.length ?? 0) === 0) {
+      setConfirmOpen(false);
+      popup({ type: "info", title: "You already have an account", description: `Sign in to add the ${selectedPlan.name} plan to your existing account. Your projects, plans and invoices stay together there.`, primaryLabel: "Sign in to continue", onPrimary: () => { void navigate({ to: "/", search: { plan: selectedPlan.id } }); }, secondaryLabel: "Cancel" });
       return false;
     }
     setSignature({ name: `${personal.firstName} ${personal.lastName}`, at: new Date().toISOString() });
@@ -135,8 +141,13 @@ function Signup() {
       <div className={`mx-auto px-5 pb-8 pt-6 md:px-6 md:pt-8 ${step === 0 ? "max-w-4xl" : "max-w-lg"}`}>
         <div className="mb-6 text-center"><h1 className="text-2xl font-extrabold leading-tight lg:text-3xl">{titles[step]}</h1><p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">{subtitles[step]}</p></div>
         {step === 0 && <div>
-          <PlanCards onChoose={(plan) => { setSelectedPlan(plan); setStep(1); }} />
-          <p className="mt-4 text-center text-sm text-muted-foreground">Already have an account? <Button asChild variant="link" className="h-auto p-0 font-semibold text-foreground"><Link to="/">Log in</Link></Button></p>
+          <PlanCards onChoose={async (plan) => {
+            // Someone already signed in adds the plan to their account instead of registering again.
+            const { data } = await supabase.auth.getSession();
+            if (data.session) { void navigate({ to: "/dashboard/order", search: { plan: plan.id } }); return; }
+            setSelectedPlan(plan); setStep(1);
+          }} />
+          <p className="mt-4 text-center text-sm text-muted-foreground">Already have an account? <Button asChild variant="link" className="h-auto p-0 font-semibold text-foreground"><Link to="/" search={{}}>Log in</Link></Button></p>
         </div>}
         {(step === 1 || step === 2) && <form onSubmit={advance} noValidate className="space-y-4">
           {step === 1 ? <>

@@ -139,12 +139,14 @@ export type OrderClient = { name: string; company?: string | null; email?: strin
 
 /** Plan, review, agreements and sign for an existing account. Clients sign the agreements themselves; staff place the
  * order for the client, who accepts the agreements by paying the first invoice. */
-export function OrderWizard({ client, mode, onPlace, onDone, doneLabel }: {
-  client: OrderClient; mode: "client" | "staff"; onPlace: (plan: Plan) => Promise<void>; onDone: () => void; doneLabel: string;
+export function OrderWizard({ client, mode, onPlace, onDone, doneLabel, initialPlan }: {
+  client: OrderClient; mode: "client" | "staff"; initialPlan?: Plan["id"]; onPlace: (plan: Plan) => Promise<void>; onDone: () => void; doneLabel: string;
 }) {
   const popup = usePopup();
-  const [step, setStep] = useState(0);
-  const [plan, setPlan] = useState<Plan>(plans[1]);
+  // A plan picked before signing in opens straight on the review.
+  const picked = plans.find((p) => p.id === initialPlan);
+  const [step, setStep] = useState(picked ? 1 : 0);
+  const [plan, setPlan] = useState<Plan>(picked ?? plans[1]);
   const [signing, setSigning] = useState(false);
   const [placedAt, setPlacedAt] = useState<string | null>(null);
   const documents = agreementDocuments(plan, client, placedAt ?? undefined);
