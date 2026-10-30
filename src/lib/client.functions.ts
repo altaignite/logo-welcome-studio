@@ -29,7 +29,8 @@ export const updateMyProfile = createServerFn({ method: "POST" })
 /** Client orders an additional plan: pending subscription, project and a Stripe invoice. Activation on payment. */
 export const orderAdditionalPlan = createServerFn({ method: "POST" })
   .middleware([limited("order")])
-  .inputValidator((d: unknown) => z.object({ planId: z.enum(["starter", "growth", "scale"]) }).parse(d))
+  // The client signs the plan's agreements in the order flow before ordering.
+  .inputValidator((d: unknown) => z.object({ planId: z.enum(["starter", "growth", "scale"]), signed: z.literal(true) }).parse(d))
   .handler(async ({ data, context }) => {
     const { getAdmin, issueStripeInvoice } = await import("@/lib/billing.server");
     const admin = await getAdmin();
@@ -41,9 +42,9 @@ export const orderAdditionalPlan = createServerFn({ method: "POST" })
     // Make sure Stripe is reachable and the client has a Stripe customer before anything is created locally.
     const { ensureCustomer } = await import("@/lib/stripe.server");
     await ensureCustomer(admin, context.userId);
-    const app = await admin.from("applications").insert({ user_id: context.userId, account_number: prof.account_number, plan_id: plan.id, plan_name: plan.name, monthly_fee: plan.monthlyFee, monthly_hours: plan.monthlyHours, status: "approved", decided_at: new Date().toISOString() }).select("id").single();
+    const app = await admin.from("applications").insert({ user_id: context.userId, account_number: prof.account_number, plan_id: plan.id, plan_name: plan.name, monthly_fee: plan.monthlyFee, monthly_hours: plan.monthlyHours, status: "approved", decided_at: new Date().toISOString(), signed_at: new Date().toISOString() }).select("id").single();
     if (app.error) throw new Error("Couldn't create the order.");
-    await admin.from("application_events").insert({ application_id: app.data.id, actor_id: context.userId, actor_label: label(context), action: "Additional plan ordered by client; invoice sent", to_status: "approved" });
+    await admin.from("application_events").insert({ application_id: app.data.id, actor_id: context.userId, actor_label: label(context), action: "Additional plan ordered and agreements signed digitally; invoice sent", to_status: "approved", note: `Plan: ${plan.name}` });
     const sub = await admin.from("subscriptions").insert({ user_id: context.userId, plan_name: plan.name, monthly_fee: plan.monthlyFee, monthly_hours: plan.monthlyHours, status: "pending", application_id: app.data.id, notes: "Awaiting payment of first invoice" }).select("id").single();
     if (sub.error) throw new Error("Couldn't create the subscription.");
     await admin.from("projects").insert({ user_id: context.userId, subscription_id: sub.data.id, name: `${prof.company || "Client"} ${plan.name}`, service: "Marketing", status: "planned", description: `${plan.name} plan` });

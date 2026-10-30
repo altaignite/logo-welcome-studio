@@ -1,4 +1,5 @@
 import { downloadAgreementPdf } from "@/lib/agreement-pdf";
+import { AgreementText } from "@/components/order-flow";
 import { useServerFn } from "@tanstack/react-start";
 import { useRef, useState } from "react";
 import { Download, FileText, Loader2, Upload } from "lucide-react";
@@ -88,7 +89,7 @@ export function AgreementList({ agreements, empty = "No signed agreements." }: {
               <button type="button" onClick={() => void downloadAgreementPdf(a)} className="inline-flex h-8 items-center gap-1 rounded-full border px-3 text-xs font-semibold hover:bg-secondary"><Download className="size-3.5" />Download</button>
             </span>
           </div>
-          {openId === a.id && <pre className="mt-3 max-h-80 overflow-auto whitespace-pre-wrap rounded-lg bg-secondary/60 p-3 font-sans text-sm">{a.body}</pre>}
+          {openId === a.id && <div className="mt-3 max-h-96 overflow-auto rounded-lg border p-4"><AgreementText body={a.body} /></div>}
         </li>
       ))}
       {agreements.length === 0 && <li className="px-5 py-6 text-muted-foreground">{empty}</li>}

@@ -1,15 +1,14 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
-import * as Dialog from "@radix-ui/react-dialog";
-import { ArrowLeft, ArrowRight, Check, ShieldCheck, Clock, Code2, FileText, Megaphone, Palette, ChevronDown, Download, Eye, EyeOff, LockKeyhole, Loader2, PenLine, RefreshCw, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Eye, EyeOff, LockKeyhole, Loader2, PenLine, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { CountryField, CountryFlag } from "@/components/country-field";
-import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
+import { CountryField } from "@/components/country-field";
 import { usePopup } from "@/components/popup";
 import { supabase } from "@/integrations/supabase/client";
-import { agreementDocuments, createAccountNumber, accountSchema, countries, createSignatureCode, isSignatureMatch, personalSchema, plans, type Plan, type CountryCode, type PersonalDetails, formatPhoneInput, switchPhoneCountry, phonePlaceholder } from "@/lib/signup";
+import { agreementDocuments } from "@/lib/agreements";
+import { createAccountNumber, accountSchema, countries, personalSchema, plans, type Plan, type CountryCode, type PersonalDetails, formatPhoneInput, switchPhoneCountry, phonePlaceholder } from "@/lib/signup";
 import logo from "@/assets/logo.png.asset.json";
-import { downloadAgreementPdf } from "@/lib/agreement-pdf";
+import { AgreementsList, PlanCards, ReviewRow, ReviewSection, SignDialog, formatAccountNumber } from "@/components/order-flow";
 
 export const Route = createFileRoute("/signup")({
   head: () => ({ meta: [
@@ -38,14 +37,9 @@ function Signup() {
   const [account, setAccount] = useState({ email: "", password: "", confirmPassword: "" });
   const [showPassword, setShowPassword] = useState(false);
   const [accountNumber, setAccountNumber] = useState("");
-  const [submitting, setSubmitting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [code, setCode] = useState("");
-  const [entered, setEntered] = useState("");
-  const [documentIndex, setDocumentIndex] = useState<number | null>(null);
-  const [signature, setSignature] = useState<{ name: string; at: string; code: string } | null>(null);
+  const [signature, setSignature] = useState<{ name: string; at: string } | null>(null);
   const documents = agreementDocuments(selectedPlan, { name: `${personal.firstName} ${personal.lastName}`.trim(), company: personal.company, email: account.email, phone: personal.phone, country: personal.country, accountNumber }, signature?.at);
-  const usedCodes = useRef(new Set<string>());
   const phoneTouched = useRef(false);
   const countryTouched = useRef(false);
   const popup = usePopup();
@@ -98,15 +92,8 @@ function Signup() {
     if (step === 2 && !accountNumber) setAccountNumber(createAccountNumber());
     setStep((s) => s + 1);
   };
-  const newCode = () => { const next = createSignatureCode(usedCodes.current); usedCodes.current.add(next); setCode(next); setEntered(""); };
-  const openConfirmation = () => { newCode(); setConfirmOpen(true); };
-  const accept = async () => {
-    if (!isSignatureMatch(code, entered)) {
-      setConfirmOpen(false);
-      popup({ type: "error", title: "The code doesn't match", description: "Please try again with a new confirmation code.", primaryLabel: "Try again", onPrimary: openConfirmation, secondaryLabel: "Cancel" });
-      return;
-    }
-    setSubmitting(true);
+  const openConfirmation = () => setConfirmOpen(true);
+  const accept = async (): Promise<boolean> => {
     const { error } = await supabase.auth.signUp({
       email: account.email.trim(), password: account.password,
       options: { emailRedirectTo: window.location.origin, data: {
@@ -115,18 +102,16 @@ function Signup() {
         monthly_fee: selectedPlan.monthlyFee, monthly_hours: selectedPlan.monthlyHours,
       } },
     });
-    setSubmitting(false);
     if (error) {
       setConfirmOpen(false);
       popup({ type: "error", title: "We couldn't submit your application", description: /database error/i.test(error.message) ? "This email address can't be used. Disposable email addresses aren't accepted; please use your business or personal email." : error.message, primaryLabel: "Try again", onPrimary: openConfirmation, secondaryLabel: "Cancel" });
-      return;
+      return false;
     }
-    setSignature({ name: `${personal.firstName} ${personal.lastName}`, at: new Date().toISOString(), code });
-    setConfirmOpen(false); setStep(5);
+    setSignature({ name: `${personal.firstName} ${personal.lastName}`, at: new Date().toISOString() });
+    setStep(5);
+    return true;
   };
-  const downloadDocument = (index: number) => { const doc = documents[index]; if (doc) void downloadAgreementPdf(doc).catch((e: Error) => popup({ type: "error", title: "Couldn't create the PDF", description: e.message, primaryLabel: "Close", secondaryLabel: null })); };
 
-  const selectedDoc = documentIndex === null ? null : documents[documentIndex];
 
   return <main className="min-h-dvh bg-background text-foreground">
     <div className="relative w-full">
@@ -140,36 +125,17 @@ function Signup() {
         </div>
         <span className="text-sm font-semibold sm:hidden">{step < 5 ? steps[step] : step === 5 ? "Almost there…" : "Application complete"}</span>
         <div className="flex items-center gap-3">
-          <span className="hidden text-sm text-muted-foreground sm:block">{step < 5 ? `${steps[step]}` : step === 5 ? "Almost there…" : "Application complete"}</span>
+          <span className="hidden text-sm text-muted-foreground sm:block">{step < 5 ? `${steps[step]} · ${step + 1} of 5` : step === 5 ? "Almost there…" : "Application complete"}</span>
           {step < 5 ? <Button variant="ghost" size="icon" aria-label="Close signup" onClick={() => popup({ type: "info", title: "Leave your application?", description: "Your details won't be saved.", primaryLabel: "Leave application", onPrimary: () => { navigate({ to: "/" }); }, secondaryLabel: "Keep going" })}><X /></Button> : <div className="size-9" />}
         </div>
       </div>
     </header>
 
     {step < 5 ? <>
-      <nav aria-label="Application progress" className="mx-auto max-w-2xl px-5 pt-6 sm:pt-8">
-        <ol className="flex gap-2 sm:gap-4">{steps.map((name, index) => <li key={name} className="min-w-0 flex-1"><div className={`h-1 rounded-full ${index <= step ? "bg-primary" : "bg-secondary"}`} /><span className={`mt-2 hidden text-xs xl:block ${index === step ? "font-semibold text-foreground" : "text-muted-foreground"}`}>{index + 1}. {name}</span></li>)}</ol>
-        <p className="mt-2 text-xs text-muted-foreground xl:hidden">Step {step + 1} of 5</p>
-      </nav>
       <div className={`mx-auto px-5 pb-8 pt-6 md:px-6 md:pt-8 ${step === 0 ? "max-w-4xl" : "max-w-lg"}`}>
         <div className="mb-6 text-center"><h1 className="text-2xl font-extrabold leading-tight lg:text-3xl">{titles[step]}</h1><p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">{subtitles[step]}</p></div>
         {step === 0 && <div>
-          <div className="grid gap-3 sm:grid-cols-3" role="group" aria-label="Subscription plans">{plans.map((plan) => <div key={plan.id} className={`flex flex-col rounded-2xl border p-4 sm:p-5 ${plan.id === "growth" ? "border-foreground/50" : ""}`}>
-            <div className="flex items-center justify-between gap-2">
-              <h2 className="text-base font-semibold">{plan.name}</h2>
-              {plan.id === "growth" && <span className="rounded-full bg-foreground px-2 py-0.5 text-[11px] font-medium text-background">Popular</span>}
-            </div>
-            <p className="mt-1 flex items-baseline gap-1"><span className="text-2xl font-bold tracking-tight">${plan.monthlyFee}</span><span className="text-xs text-muted-foreground">/month</span></p>
-            <p className="mt-1 text-xs text-muted-foreground">{plan.description}</p>
-            <ul className="mt-3 space-y-2.5 border-t pt-3 sm:mb-4">{[
-              { icon: Clock, title: `${plan.monthlyHours} Service Hours`, text: "Assigned every month." },
-              { icon: Megaphone, title: "Marketing", text: "Campaigns, content and strategy." },
-              { icon: Palette, title: "Design", text: "Brand, social and web visuals." },
-              { icon: Code2, title: "Development", text: "Websites, landing pages and fixes." },
-            ].map(({ icon: Icon, title, text }) => <li key={title} className="flex items-start gap-2.5"><span className="grid size-7 shrink-0 place-items-center rounded-lg bg-secondary"><Icon className="size-3.5" strokeWidth={1.75} /></span><span className="min-w-0 leading-tight"><span className="block text-[13px] font-medium">{title}</span><span className="block text-xs text-muted-foreground">{text}</span></span></li>)}</ul>
-            <Button className="mt-4 h-10 w-full rounded-xl bg-foreground text-sm font-semibold text-background hover:bg-foreground/90 sm:mt-auto" onClick={() => { setSelectedPlan(plan); setStep(1); }}>Choose {plan.name}</Button>
-            <p className="mt-2 flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground"><ShieldCheck className="size-3.5 text-primary" />90-day money-back guarantee</p>
-          </div>)}</div>
+          <PlanCards onChoose={(plan) => { setSelectedPlan(plan); setStep(1); }} />
           <p className="mt-4 text-center text-sm text-muted-foreground">Already have an account? <Button asChild variant="link" className="h-auto p-0 font-semibold text-foreground"><Link to="/">Log in</Link></Button></p>
         </div>}
         {(step === 1 || step === 2) && <form onSubmit={advance} noValidate className="space-y-4">
@@ -194,8 +160,8 @@ function Signup() {
           <Button className="signup-primary mt-6" onClick={() => setStep(4)}>To your agreements <ArrowRight /></Button>
         </div>}
         {step === 4 && <div>
-          <ul className="divide-y rounded-xl border">{documents.map((doc, index) => <DocumentRow key={doc.title} title={doc.title} onRead={() => setDocumentIndex(index)} onDownload={() => downloadDocument(index)} />)}</ul>
-          <p className="mt-4 text-xs leading-relaxed text-muted-foreground">Please read each document. By accepting, you agree to all four and sign them digitally with a confirmation code. You can save a PDF copy of each now, and the signed copies stay in your dashboard.</p>
+          <AgreementsList documents={documents} />
+          <p className="mt-4 text-xs leading-relaxed text-muted-foreground">Please read each document. By accepting, you agree to each of them and sign digitally with a confirmation code. You can save a PDF copy of each now, and the signed copies stay in your dashboard.</p>
           <div className="mt-5 flex gap-3"><Button variant="secondary" aria-label="Back to review" className="size-11 shrink-0 rounded-full" onClick={() => setStep(3)}><ArrowLeft /></Button><Button className="signup-primary flex-1" onClick={openConfirmation}>Accept & continue <PenLine /></Button></div>
         </div>}
       </div>
@@ -203,31 +169,10 @@ function Signup() {
 
       </section>
     </div>
-    <Dialog.Root open={confirmOpen} onOpenChange={setConfirmOpen}>
-      <Dialog.Portal><Dialog.Overlay className="fixed inset-0 z-40 bg-foreground/40 backdrop-blur-sm" /><Dialog.Content className="app-modal max-h-[85dvh] overflow-y-auto sm:max-w-2xl">
-                <Dialog.Close asChild><Button variant="ghost" size="icon" aria-label="Close confirmation" className="absolute right-4 top-4"><X /></Button></Dialog.Close>
-        <span className="mx-auto grid size-12 place-items-center rounded-full bg-secondary"><PenLine className="size-5" /></span>
-        <Dialog.Title className="mt-4 text-center text-xl font-bold leading-snug">Confirm your application</Dialog.Title>
-        <Dialog.Description className="mt-1.5 text-center text-sm text-muted-foreground">Enter the code shown below as your digital signature.</Dialog.Description>
-        <SignatureCode code={code} />
-        <InputOTP maxLength={6} value={entered} onChange={setEntered} aria-label="Enter six-digit confirmation code" inputMode="numeric" pattern="[0-9]*" autoComplete="off" containerClassName="mt-4 w-full justify-center"><InputOTPGroup className="grid w-full grid-cols-6 gap-2">{Array.from({ length: 6 }, (_, index) => <InputOTPSlot key={index} index={index} className="signup-input h-11 justify-center rounded-lg border p-0 text-base shadow-none first:rounded-lg first:border-l last:rounded-lg data-[active=true]:border-foreground data-[active=true]:ring-[3px] data-[active=true]:ring-foreground/10" />)}</InputOTPGroup></InputOTP>
-        <button type="button" onClick={newCode} className="relative z-10 mx-auto mt-3 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground"><RefreshCw className="size-3.5" /> Use a new code</button>
-        <div className="relative z-10 mt-6 space-y-2"><Button className="signup-primary text-sm" disabled={entered.length !== 6 || submitting} onClick={accept}>{submitting ? "Submitting…" : "Accept & sign"}</Button><button type="button" className="app-modal-secondary" onClick={() => setConfirmOpen(false)}>Cancel</button></div>
-      </Dialog.Content></Dialog.Portal>
-    </Dialog.Root>
-    <Dialog.Root open={selectedDoc !== null} onOpenChange={(open) => { if (!open) setDocumentIndex(null); }}><Dialog.Portal><Dialog.Overlay className="fixed inset-0 z-40 bg-foreground/40 backdrop-blur-sm" /><Dialog.Content className="app-modal"><Dialog.Title className="pr-8 text-xl font-bold">{selectedDoc?.title}</Dialog.Title><Dialog.Description className="mt-4 whitespace-pre-line text-sm leading-relaxed text-muted-foreground">{selectedDoc?.body}</Dialog.Description><div className="mt-6 space-y-2"><Button className="signup-primary text-sm" onClick={() => { if (documentIndex !== null) downloadDocument(documentIndex); }}><Download /> Save as PDF</Button><Dialog.Close asChild><Button variant="secondary" className="app-modal-secondary">Close</Button></Dialog.Close></div></Dialog.Content></Dialog.Portal></Dialog.Root>
+    <SignDialog open={confirmOpen} onOpenChange={setConfirmOpen} title="Confirm your application" onSign={accept} />
   </main>;
 }
 
-function ReviewSection({ title, children, onEdit }: { title: string; children: ReactNode; onEdit: () => void }) {
-  return <section className="mb-8"><div className="flex items-center justify-between border-b pb-2"><h2 className="text-lg font-semibold">{title}</h2><Button variant="link" className="h-auto p-0" onClick={onEdit}>Edit</Button></div><div className="divide-y">{children}</div></section>;
-}
-function ReviewRow({ label, value, country }: { label: string; value: string; country?: string }) {
-  return <div className="flex flex-col gap-0.5 py-3 sm:flex-row sm:justify-between sm:gap-6"><p className="shrink-0 text-sm text-muted-foreground">{label}</p><p className="flex items-center gap-2 break-words text-sm font-medium sm:text-right">{country && <CountryFlag code={country} />}{value}</p></div>;
-}
-function DocumentRow({ title, onRead, onDownload }: { title: string; onRead: () => void; onDownload: () => void }) {
-  return <li className="flex items-center gap-3 px-4 py-2.5 text-sm"><FileText className="size-4 shrink-0 text-muted-foreground" /><button type="button" className="min-w-0 flex-1 truncate text-left font-medium hover:underline" onClick={onRead}>{title}</button><button type="button" className="text-xs font-medium text-primary hover:underline" onClick={onRead}>Read</button><button type="button" aria-label={`Save ${title} as PDF`} title="Save as PDF" className="grid size-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground" onClick={onDownload}><Download className="size-4" /></button></li>;
-}
 const processingStages = (hours: number) => [
   { label: "Verifying your details", ms: 1400 },
   { label: "Securing your digital signature", ms: 1200 },
@@ -274,7 +219,6 @@ function ProcessingScreen({ hours, accountNumber, onDone }: { hours: number; acc
   </section>;
 }
 
-const formatAccountNumber = (n: string) => n.replace(/(\d{4})(\d{3})(\d{3})/, "$1 $2 $3");
 
 function SuccessScreen({ name, accountNumber, plan, signedAt, email }: { name: string; accountNumber: string; plan: Plan; signedAt: string; email: string }) {
   const [copied, setCopied] = useState(false);
@@ -303,32 +247,3 @@ function SuccessScreen({ name, accountNumber, plan, signedAt, email }: { name: s
   </section>;
 }
 
-/** Draws the signature code on a canvas after a short load, so the digits never appear as page text. */
-function SignatureCode({ code }: { code: string }) {
-  const canvas = useRef<HTMLCanvasElement>(null);
-  const [ready, setReady] = useState(false);
-  useEffect(() => {
-    setReady(false);
-    const timer = window.setTimeout(() => setReady(true), 1400 + Math.random() * 1200);
-    return () => window.clearTimeout(timer);
-  }, [code]);
-  useEffect(() => {
-    const el = canvas.current; if (!ready || !el) return;
-    const ctx = el.getContext("2d"); if (!ctx) return;
-    const dpr = window.devicePixelRatio || 1, w = el.clientWidth, h = el.clientHeight;
-    el.width = w * dpr; el.height = h * dpr; ctx.scale(dpr, dpr);
-    const css = getComputedStyle(el), fg = css.color, muted = css.getPropertyValue("--muted-foreground");
-    ctx.clearRect(0, 0, w, h);
-    ctx.strokeStyle = muted; ctx.globalAlpha = 0.35;
-    for (let i = 0; i < 5; i++) { ctx.beginPath(); ctx.moveTo(Math.random() * w, Math.random() * h); ctx.bezierCurveTo(Math.random() * w, Math.random() * h, Math.random() * w, Math.random() * h, Math.random() * w, Math.random() * h); ctx.stroke(); }
-    ctx.globalAlpha = 1; ctx.fillStyle = fg; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    const step = w / 7;
-    [...code].forEach((digit, i) => {
-      ctx.save(); ctx.translate(step * (i + 1) + (i > 2 ? step * 0.15 : -step * 0.15), h / 2 + (Math.random() - 0.5) * 6); ctx.rotate((Math.random() - 0.5) * 0.35);
-      ctx.font = `600 ${26 + Math.random() * 6}px ui-monospace, monospace`; ctx.fillText(digit, 0, 0); ctx.restore();
-    });
-  }, [ready, code]);
-  return <div className="mt-5 grid h-16 place-items-center overflow-hidden rounded-xl border bg-secondary/60" aria-live="polite">
-    {ready ? <canvas ref={canvas} role="img" aria-label="Signature code image" className="block h-16 w-full text-foreground" /> : <span className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="size-4 animate-spin" /> Generating secure code…</span>}
-  </div>;
-}

@@ -11,7 +11,7 @@ import { FormModal, type FieldDef } from "@/components/admin/form-modal";
 import { usePopup } from "@/components/popup";
 import { AuditList, Btn, FieldGrid, Section, db, fmtText } from "@/components/admin/record-bits";
 import { setAccountStatus } from "@/lib/crm.functions";
-import { createInvoice, createOrder, subscriptionAction, voidInvoices } from "@/lib/billing.functions";
+import { createInvoice, subscriptionAction, voidInvoices } from "@/lib/billing.functions";
 import { accountStatusLabel, accountStatuses, complianceKinds, formatAccount, formatDate, formatDay, humanize, lifecycleStages, money, statusLabel, type AccountStatus } from "@/lib/admin";
 import { plans } from "@/lib/signup";
 import { DocumentList, UploadButton } from "@/components/files";
@@ -36,7 +36,7 @@ function AccountDetail() {
   const qc = useQueryClient();
   const popup = usePopup();
   const changeStatus = useServerFn(setAccountStatus);
-  const fnOrder = useServerFn(createOrder), fnInvoice = useServerFn(createInvoice), fnSub = useServerFn(subscriptionAction), fnVoid = useServerFn(voidInvoices);
+  const fnInvoice = useServerFn(createInvoice), fnSub = useServerFn(subscriptionAction), fnVoid = useServerFn(voidInvoices);
   const [tab, setTab] = useState<(typeof tabs)[number]>(tabs[0]);
   const staff = useStaff();
   const mail = useEmailClients(() => qc.invalidateQueries({ queryKey: ["admin"] }));
@@ -172,14 +172,8 @@ function AccountDetail() {
     fields: [{ name: "kind", label: "Request type", type: "select", options: [...complianceKinds] }, { name: "details", label: "Details", type: "textarea" }],
     onSubmit: async (v) => done((await supabase.from("compliance_requests").insert({ user_id: id, kind: v.kind, details: v.details || null, actor_label: adminEmail })).error),
   });
-  const newOrder = () => setModal({
-    title: "New subscription order", submitLabel: "Create and send invoice", description: "Creates the application, subscription and project, and Stripe emails the first invoice to the client. Everything activates when the invoice is paid.",
-    fields: [{ name: "plan", label: "Plan", type: "select", options: plans.map((x) => x.name) }, { name: "notes", label: "Internal notes", type: "textarea" }],
-    onSubmit: async (v) => {
-      const plan = plans.find((x) => x.name === v.plan)!;
-      try { await fnOrder({ data: { userId: id, planId: plan.id, ...(v.notes ? { notes: v.notes } : {}) } }); await refresh(); return null; } catch (e) { return (e as Error).message; }
-    },
-  });
+  const newOrder = () => navigate({ to: "/admin/order/$userId", params: { userId: id } });
+
   const exportData = () => {
     const { audit: _a, ...rest } = data;
     const url = URL.createObjectURL(new Blob([JSON.stringify({ exported_at: new Date().toISOString(), exported_by: adminEmail, ...rest }, null, 2)], { type: "application/json" }));

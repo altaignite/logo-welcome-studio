@@ -16,7 +16,8 @@
 - Use libphonenumber-js metadata for countries and dial codes; optional browser IP preselection must not overwrite manual choices or block signup.
 - Treat displayed signature codes as local confirmation only, generated with Web Crypto and never reused within the current application, not as identity verification.
 - Signup is a single centred column on every screen size (no photo panel), with minimal boxes: plain headings and dividers, cards only for plan choice.
-- Agreement PDFs (signup "Save as PDF" and signed copies in the dashboard) are generated client-side by downloadAgreementPdf in src/lib/agreement-pdf.ts with the logo letterhead; agreement wording, the operator details (Lanex Group, LLC) and the client details block live in src/lib/signup.ts (agreementDocuments(plan, client, date)).
+- Agreement wording, operator details (Lanex Group, LLC), the client details table and the markup parser (headings, "|" tables, "!" notices) live in src/lib/agreements.ts (agreementDocuments(plan, client, date)); the on-screen reader (AgreementText) and the PDF (downloadAgreementPdf in src/lib/agreement-pdf.ts, logo letterhead) render the same blocks. Have agreement changes reviewed by counsel.
+- Every order uses the same flow components in src/components/order-flow.tsx (PlanCards, review, AgreementsList, SignDialog): signup, /dashboard/order (client signs; orderAdditionalPlan records signed_at) and /admin/order/$userId (staff place it; client accepts by paying). No stepper bars.
 - Render country flags from the free FlagCDN image API with empty alt text alongside country names and graceful image-failure fallback, so flags remain decorative rather than replacing accessible country labels.
 
 - After every code or database change, do a focused security-audit-skill review (guidance mode) of the changed trust boundaries before finishing; the owner requires security checks on every change.
@@ -30,7 +31,7 @@
 - Notifications are written by database triggers via public.notify / notify_staff (links are in-app paths only) and emailed by the /api/public/cron/notifications job (schedule every 10 minutes; needs RESEND_API_KEY and EMAIL_FROM, optional APP_URL). Don't send email from feature code.
 - Client files live in the private client-files bucket under the client's own folder; uploads and downloads go only through startFileUpload, finishFileUpload and fileLink (short-lived signed URLs), never direct storage access.
 - Application events moving into a client-facing status (clientVisibleStatuses in src/lib/admin.ts) are shared with the client, note included; staff can't share anything else on the timeline.
-- Signed agreements are rendered server-side from agreementDocuments in src/lib/signup.ts and stored once, immutably, in signed_agreements; bump AGREEMENT_VERSION when the wording changes.
+- Signed agreements are rendered server-side from agreementDocuments in src/lib/agreements.ts and stored once, immutably, in signed_agreements; bump AGREEMENT_VERSION when the wording changes.
 - Only the client decides on a deliverable (reviewDeliverable); staff send for review, withdraw or archive.
 - Privacy requests are fulfilled with fulfilAccessRequest (export to the client's Documents) and fulfilDeletionRequest (anonymise and block sign-in, keeping financial and legal records).
 - Account status changes go only through setAccountStatus: suspended/closed ban sign-in and end every session (revoke_user_sessions), on hold/suspended pause plans in Stripe (marked paused_by_account_status so reactivation resumes them), cancelled/closed cancel them; the restrictive "active account" policy and requireSession lock suspended and closed accounts out immediately (a test checks new tables).

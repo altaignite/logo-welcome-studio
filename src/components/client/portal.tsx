@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useRouteContext } from "@tanstack/react-router";
+import { Link, useNavigate, useRouteContext } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useState, type ReactNode } from "react";
 import { Eye } from "lucide-react";
@@ -8,7 +8,7 @@ import { FormModal, type FieldDef } from "@/components/admin/form-modal";
 import { usePopup } from "@/components/popup";
 import { pauseVoidsGuarantee } from "@/lib/billing";
 import { approveOverage, billingPortal, subscriptionAction } from "@/lib/billing.functions";
-import { changePlan, orderAdditionalPlan, undoCancel } from "@/lib/client.functions";
+import { changePlan, undoCancel } from "@/lib/client.functions";
 import { claimGuarantee, replyToTicket, respondToInfoRequest, reviewDeliverable } from "@/lib/portal.functions";
 import { TicketDialog } from "@/components/client/ticket-dialog";
 import type { DepartmentId } from "@/lib/support";
@@ -61,11 +61,12 @@ type Modal = { title: string; description?: string; fields: FieldDef[]; submitLa
 export function useClientActions() {
   const { userId, data } = useClient();
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const [ticket, setTicket] = useState<{ subscriptionId?: string; department?: DepartmentId; subject?: string } | null>(null);
   const popup = usePopup();
   const [modal, setModal] = useState<Modal | null>(null);
   const fnSub = useServerFn(subscriptionAction), fnPortal = useServerFn(billingPortal), fnApprove = useServerFn(approveOverage);
-  const fnChange = useServerFn(changePlan), fnOrder = useServerFn(orderAdditionalPlan), fnUndo = useServerFn(undoCancel);
+  const fnChange = useServerFn(changePlan), fnUndo = useServerFn(undoCancel);
   const fnReply = useServerFn(replyToTicket);
   const fnRespond = useServerFn(respondToInfoRequest), fnClaim = useServerFn(claimGuarantee), fnReview = useServerFn(reviewDeliverable);
   const refresh = () => qc.invalidateQueries({ queryKey: ["client"] });
@@ -90,13 +91,8 @@ export function useClientActions() {
       if (r.timing === "renewal") popup({ type: "success", title: "Change scheduled", description: "Your new plan starts at your next renewal.", primaryLabel: "Got it", secondaryLabel: null });
       return null; } catch (e) { return err(e); } },
   });
-  const order = () => setModal({
-    title: "Add another plan", submitLabel: "Send invoice",
-    description: `${plans.map((p) => `${p.name} ${money(p.monthlyFee)} for ${p.monthlyHours} hours`).join(", ")} per month. We email you an invoice and the plan starts once it's paid.`,
-    fields: [{ name: "plan", label: "Plan", type: "select", options: plans.map((p) => p.id) }],
-    onSubmit: async (v) => { try { await fnOrder({ data: { planId: v.plan } }); await refresh();
-      popup({ type: "success", title: "Invoice sent", description: "Pay it from Invoices or the email we sent to start your new plan.", primaryLabel: "Got it", secondaryLabel: null }); return null; } catch (e) { return err(e); } },
-  });
+  const order = () => navigate({ to: "/dashboard/order" });
+
   const approve = (t: R) => popup({ type: "info", title: "Approve extra hours?", description: "This task needs more hours than your plan has left this month. Extra hours are billed at your plan's hourly rate.", primaryLabel: "Approve", secondaryLabel: "Not now",
     onPrimary: async () => { try { await fnApprove({ data: { taskId: t.id } }); await refresh(); } catch (e) { fail(e); } } });
   const portal = async () => { try { const r = await fnPortal(); window.location.href = r.url; } catch (e) { fail(e); } };

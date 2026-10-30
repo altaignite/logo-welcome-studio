@@ -1,6 +1,7 @@
 /** Server-only document, agreement and privacy export workflows (service role). */
 import { allowedMimeTypes, FILE_BUCKET, MAX_FILE_BYTES, storagePath, uploadIssue } from "@/lib/files";
-import { agreementDocuments, AGREEMENT_VERSION, plans, signedAgreementText } from "@/lib/signup";
+import { plans } from "@/lib/signup";
+import { agreementDocuments, AGREEMENT_VERSION, signedAgreementText } from "@/lib/agreements";
 import { exportTables, omit, profileExportOmit } from "@/lib/privacy";
 import { must } from "@/lib/billing.server";
 

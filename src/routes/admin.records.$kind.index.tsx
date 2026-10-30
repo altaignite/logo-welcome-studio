@@ -7,7 +7,7 @@ import { DataTable, StatusBadge, type BulkAction, type Column } from "@/componen
 import { FormModal, type FieldDef } from "@/components/admin/form-modal";
 import { db, fmtText } from "@/components/admin/record-bits";
 import { usePopup } from "@/components/popup";
-import { createInvoice, createOrder, voidInvoices } from "@/lib/billing.functions";
+import { createInvoice, voidInvoices } from "@/lib/billing.functions";
 import { Plus } from "lucide-react";
 import { Btn } from "@/components/admin/record-bits";
 import { canDelete } from "@/lib/admin";
@@ -28,7 +28,7 @@ function RecordList() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const popup = usePopup();
-  const fnVoid = useServerFn(voidInvoices), fnInvoice = useServerFn(createInvoice), fnOrder = useServerFn(createOrder);
+  const fnVoid = useServerFn(voidInvoices), fnInvoice = useServerFn(createInvoice);
   const { adminEmail, adminId } = adminRoute.useRouteContext();
   const staff = useStaff();
   const cfg = isRecordKind(kind) ? recordKinds[kind] : null;
@@ -81,10 +81,7 @@ function RecordList() {
           onSubmit: async (v) => { const sub = subs.find((x) => v.sub.endsWith(String(x.id).slice(0, 8))); const amount = Number(v.amount); if (!sub || !(amount > 0)) return "Choose a plan and an amount above 0.";
             try { const r = await fnInvoice({ data: { subscriptionId: sub.id, description: v.description, amount } }); await refresh(); navigate({ to: "/admin/records/$kind/$id", params: { kind, id: r.invoiceId } }); return null; } catch (e) { return (e as Error).message; } } });
       }
-      return setModal({ title: "New subscription", submitLabel: "Create and send first invoice", fields: [
-        { name: "plan", label: "Plan", type: "select", options: plans.map((x) => x.name) }, { name: "notes", label: "Internal notes", type: "textarea" }],
-        onSubmit: async (v) => { const plan = plans.find((x) => x.name === v.plan)!;
-          try { const r = await fnOrder({ data: { userId: clientId, planId: plan.id, ...(v.notes ? { notes: v.notes } : {}) } }); await refresh(); navigate({ to: "/admin/records/$kind/$id", params: { kind, id: r.subscriptionId } }); return null; } catch (e) { return (e as Error).message; } } });
+      return navigate({ to: "/admin/order/$userId", params: { userId: clientId } });
     }
     const fields = withStaffPicker(cfg.edit.map((f) => f.name === "assigned_to" ? { ...f, defaultValue: adminEmail } : f.name === "period_start" ? { ...f, defaultValue: `${today.slice(0, 7)}-01` } : f), staff.emails);
     setModal({ title: `New ${cfg.singular.toLowerCase()}`, submitLabel: "Create", fields,

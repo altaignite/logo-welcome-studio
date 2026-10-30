@@ -24,10 +24,12 @@ import { Route as AdminTaskforceRouteImport } from './routes/admin.taskforce'
 import { Route as AdminTemplatesRouteImport } from './routes/admin.templates'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard.index'
 import { Route as DashboardSectionRouteImport } from './routes/dashboard.$section'
+import { Route as DashboardOrderRouteImport } from './routes/dashboard.order'
 import { Route as AdminAccountsIndexRouteImport } from './routes/admin.accounts.index'
 import { Route as AdminAccountsIdRouteImport } from './routes/admin.accounts.$id'
 import { Route as AdminApplicationsIndexRouteImport } from './routes/admin.applications.index'
 import { Route as AdminApplicationsIdRouteImport } from './routes/admin.applications.$id'
+import { Route as AdminOrderUserIdRouteImport } from './routes/admin.order.$userId'
 import { Route as DashboardKindIdRouteImport } from './routes/dashboard.$kind.$id'
 import { Route as AdminRecordsKindIndexRouteImport } from './routes/admin.records.$kind.index'
 import { Route as AdminRecordsKindIdRouteImport } from './routes/admin.records.$kind.$id'
@@ -110,6 +112,11 @@ const DashboardSectionRoute = DashboardSectionRouteImport.update({
   path: '/$section',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardOrderRoute = DashboardOrderRouteImport.update({
+  id: '/order',
+  path: '/order',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const AdminAccountsIndexRoute = AdminAccountsIndexRouteImport.update({
   id: '/accounts/',
   path: '/accounts/',
@@ -128,6 +135,11 @@ const AdminApplicationsIndexRoute = AdminApplicationsIndexRouteImport.update({
 const AdminApplicationsIdRoute = AdminApplicationsIdRouteImport.update({
   id: '/applications/$id',
   path: '/applications/$id',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminOrderUserIdRoute = AdminOrderUserIdRouteImport.update({
+  id: '/order/$userId',
+  path: '/order/$userId',
   getParentRoute: () => AdminRoute,
 } as any)
 const DashboardKindIdRoute = DashboardKindIdRouteImport.update({
@@ -177,10 +189,12 @@ export interface FileRoutesByFullPath {
   '/admin/taskforce': typeof AdminTaskforceRoute
   '/admin/templates': typeof AdminTemplatesRoute
   '/dashboard/$section': typeof DashboardSectionRoute
+  '/dashboard/order': typeof DashboardOrderRoute
   '/admin/': typeof AdminIndexRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/admin/accounts/$id': typeof AdminAccountsIdRoute
   '/admin/applications/$id': typeof AdminApplicationsIdRoute
+  '/admin/order/$userId': typeof AdminOrderUserIdRoute
   '/dashboard/$kind/$id': typeof DashboardKindIdRoute
   '/admin/accounts/': typeof AdminAccountsIndexRoute
   '/admin/applications/': typeof AdminApplicationsIndexRoute
@@ -202,10 +216,12 @@ export interface FileRoutesByTo {
   '/admin/taskforce': typeof AdminTaskforceRoute
   '/admin/templates': typeof AdminTemplatesRoute
   '/dashboard/$section': typeof DashboardSectionRoute
+  '/dashboard/order': typeof DashboardOrderRoute
   '/admin': typeof AdminIndexRoute
   '/dashboard': typeof DashboardIndexRoute
   '/admin/accounts/$id': typeof AdminAccountsIdRoute
   '/admin/applications/$id': typeof AdminApplicationsIdRoute
+  '/admin/order/$userId': typeof AdminOrderUserIdRoute
   '/dashboard/$kind/$id': typeof DashboardKindIdRoute
   '/admin/accounts': typeof AdminAccountsIndexRoute
   '/admin/applications': typeof AdminApplicationsIndexRoute
@@ -230,10 +246,12 @@ export interface FileRoutesById {
   '/admin/taskforce': typeof AdminTaskforceRoute
   '/admin/templates': typeof AdminTemplatesRoute
   '/dashboard/$section': typeof DashboardSectionRoute
+  '/dashboard/order': typeof DashboardOrderRoute
   '/admin/': typeof AdminIndexRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/admin/accounts/$id': typeof AdminAccountsIdRoute
   '/admin/applications/$id': typeof AdminApplicationsIdRoute
+  '/admin/order/$userId': typeof AdminOrderUserIdRoute
   '/dashboard/$kind/$id': typeof DashboardKindIdRoute
   '/admin/accounts/': typeof AdminAccountsIndexRoute
   '/admin/applications/': typeof AdminApplicationsIndexRoute
@@ -259,10 +277,12 @@ export interface FileRouteTypes {
     | '/admin/taskforce'
     | '/admin/templates'
     | '/dashboard/$section'
+    | '/dashboard/order'
     | '/admin/'
     | '/dashboard/'
     | '/admin/accounts/$id'
     | '/admin/applications/$id'
+    | '/admin/order/$userId'
     | '/dashboard/$kind/$id'
     | '/admin/accounts/'
     | '/admin/applications/'
@@ -284,10 +304,12 @@ export interface FileRouteTypes {
     | '/admin/taskforce'
     | '/admin/templates'
     | '/dashboard/$section'
+    | '/dashboard/order'
     | '/admin'
     | '/dashboard'
     | '/admin/accounts/$id'
     | '/admin/applications/$id'
+    | '/admin/order/$userId'
     | '/dashboard/$kind/$id'
     | '/admin/accounts'
     | '/admin/applications'
@@ -311,10 +333,12 @@ export interface FileRouteTypes {
     | '/admin/taskforce'
     | '/admin/templates'
     | '/dashboard/$section'
+    | '/dashboard/order'
     | '/admin/'
     | '/dashboard/'
     | '/admin/accounts/$id'
     | '/admin/applications/$id'
+    | '/admin/order/$userId'
     | '/dashboard/$kind/$id'
     | '/admin/accounts/'
     | '/admin/applications/'
@@ -445,6 +469,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardSectionRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/order': {
+      id: '/dashboard/order'
+      path: '/order'
+      fullPath: '/dashboard/order'
+      preLoaderRoute: typeof DashboardOrderRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/admin/accounts/': {
       id: '/admin/accounts/'
       path: '/accounts'
@@ -471,6 +502,13 @@ declare module '@tanstack/react-router' {
       path: '/applications/$id'
       fullPath: '/admin/applications/$id'
       preLoaderRoute: typeof AdminApplicationsIdRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/order/$userId': {
+      id: '/admin/order/$userId'
+      path: '/order/$userId'
+      fullPath: '/admin/order/$userId'
+      preLoaderRoute: typeof AdminOrderUserIdRouteImport
       parentRoute: typeof AdminRoute
     }
     '/dashboard/$kind/$id': {
@@ -527,6 +565,7 @@ interface AdminRouteChildren {
   AdminIndexRoute: typeof AdminIndexRoute
   AdminAccountsIdRoute: typeof AdminAccountsIdRoute
   AdminApplicationsIdRoute: typeof AdminApplicationsIdRoute
+  AdminOrderUserIdRoute: typeof AdminOrderUserIdRoute
   AdminAccountsIndexRoute: typeof AdminAccountsIndexRoute
   AdminApplicationsIndexRoute: typeof AdminApplicationsIndexRoute
   AdminRecordsKindIdRoute: typeof AdminRecordsKindIdRoute
@@ -542,6 +581,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminIndexRoute: AdminIndexRoute,
   AdminAccountsIdRoute: AdminAccountsIdRoute,
   AdminApplicationsIdRoute: AdminApplicationsIdRoute,
+  AdminOrderUserIdRoute: AdminOrderUserIdRoute,
   AdminAccountsIndexRoute: AdminAccountsIndexRoute,
   AdminApplicationsIndexRoute: AdminApplicationsIndexRoute,
   AdminRecordsKindIdRoute: AdminRecordsKindIdRoute,
@@ -552,12 +592,14 @@ const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
 interface DashboardRouteChildren {
   DashboardSectionRoute: typeof DashboardSectionRoute
+  DashboardOrderRoute: typeof DashboardOrderRoute
   DashboardIndexRoute: typeof DashboardIndexRoute
   DashboardKindIdRoute: typeof DashboardKindIdRoute
 }
 
 const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardSectionRoute: DashboardSectionRoute,
+  DashboardOrderRoute: DashboardOrderRoute,
   DashboardIndexRoute: DashboardIndexRoute,
   DashboardKindIdRoute: DashboardKindIdRoute,
 }

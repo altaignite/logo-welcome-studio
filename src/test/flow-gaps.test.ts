@@ -7,7 +7,8 @@ import { countSince, hoursUse, monthlyRecurring, receivables, renewingWithin, re
 import { emailDecision, escapeHtml, renderEmail, safeLink, undeliverable } from "@/lib/notifications";
 import { briefQuestions, briefSchema, missingAnswers, onboardingSteps } from "@/lib/onboarding";
 import { anonymisedProfile, deletionBlockers, omit } from "@/lib/privacy";
-import { agreementDocuments, plans, planTerms, signedAgreementText, AGREEMENT_VERSION } from "@/lib/signup";
+import { plans, planTerms } from "@/lib/signup";
+import { agreementDocuments, signedAgreementText, AGREEMENT_VERSION } from "@/lib/agreements";
 import { leavesAnOwner, levelGrants, staffLevelGrants, staffLevels, staffPerms } from "@/lib/staff";
 import { replyDueAt, slaState } from "@/lib/support";
 import { messageRecipient, renderTemplate, unknownPlaceholders } from "@/lib/templates";

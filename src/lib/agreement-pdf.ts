@@ -1,5 +1,5 @@
 import logo from "@/assets/logo.png.asset.json";
-import { AGREEMENT_VERSION, company } from "@/lib/signup";
+import { AGREEMENT_VERSION, company, parseAgreement } from "@/lib/agreements";
 
 type Signer = { name: string; accountNumber: string; signedAt: string };
 
@@ -47,41 +47,81 @@ export async function downloadAgreementPdf(doc: { title: string; body: string; v
   const newPage = () => { pdf.addPage(); header(); y = 138; };
   const need = (h: number) => { if (y + h > H - 64) newPage(); };
 
-  header(); y = 148;
-  pdf.setFont("helvetica", "bold").setFontSize(20).text(doc.title, M, y); y += 18;
-  pdf.setFont("helvetica", "normal").setFontSize(9).setTextColor(110).text(`Version ${version}${signer ? ` · Account ${signer.accountNumber}` : ""}`, M, y); y += 26;
-  pdf.setTextColor(20);
+  header(); y = 146;
+  pdf.setFont("helvetica", "bold").setFontSize(15).text(doc.title, M, y); y += 14;
+  pdf.setFont("helvetica", "normal").setFontSize(8).setTextColor(110).text(`Version ${version}${signer ? ` · Account ${signer.accountNumber}` : ""}`, M, y); y += 20;
+  pdf.setTextColor(30);
 
-  for (const para of text.split(/\n\s*\n/)) {
-    const lines = para.split("\n");
-    for (const [i, line] of lines.entries()) {
-      const heading = (/^\d+\.\s/.test(line) && line.length < 80) || /^(PARTIES|Provider:|Client:)$/.test(line);
-      pdf.setFont("helvetica", heading ? "bold" : "normal").setFontSize(heading ? 11.5 : 10.5);
-      const wrapped = pdf.splitTextToSize(line, maxW) as string[];
-      const lh = heading ? 16 : 15;
-      need(wrapped.length * lh + (heading ? 8 : 0));
-      if (heading && i === 0) y += 4;
-      pdf.text(wrapped, M, y); y += wrapped.length * lh + (heading ? 2 : 0);
+  const BODY = 8.75, LH = 12.2;
+  const table = (header: string[] | null, rows: string[][]) => {
+    const cols = Math.max(...[header, ...rows].filter(Boolean).map((r) => r!.length));
+    const first = cols === 2 ? 150 : 96;
+    const widths = [first, ...Array(cols - 1).fill((maxW - first) / (cols - 1))] as number[];
+    const pad = 5, lh = 10.8;
+    const draw = (cells: string[], head: boolean) => {
+      pdf.setFont("helvetica", head ? "bold" : "normal").setFontSize(8);
+      const wrapped = widths.map((w, c) => pdf.splitTextToSize(cells[c] ?? "", w - pad * 2) as string[]);
+      const h = Math.max(...wrapped.map((w) => w.length)) * lh + pad * 2 - 2;
+      need(h);
+      let x = M;
+      if (head) { pdf.setFillColor(243, 244, 246); pdf.rect(M, y, maxW, h, "F"); }
+      pdf.setDrawColor(225).setLineWidth(0.5);
+      widths.forEach((w, c) => {
+        pdf.rect(x, y, w, h);
+        if (!head && c === 0) pdf.setFont("helvetica", "bold");
+        pdf.setTextColor(head ? 60 : 30).text(wrapped[c]!, x + pad, y + pad + 6.5);
+        if (!head && c === 0) pdf.setFont("helvetica", "normal");
+        x += w;
+      });
+      y += h;
+    };
+    if (header) draw(header, true);
+    rows.forEach((r) => draw(r, false));
+    y += 16; pdf.setTextColor(30);
+  };
+
+  for (const b of parseAgreement(text)) {
+    if (b.kind === "table") { table(b.header, b.rows); continue; }
+    if (b.kind === "heading") {
+      need(30); y += 5;
+      pdf.setFont("helvetica", "bold").setFontSize(9.5).text(b.text, M, y); y += 13;
+      continue;
     }
-    y += 8;
+    pdf.setFont("helvetica", "normal").setFontSize(BODY);
+    if (b.kind === "notice") {
+      pdf.setFont("helvetica", "bold");
+      const wrapped = pdf.splitTextToSize(b.text, maxW - 20) as string[];
+      const h = wrapped.length * LH + 14;
+      need(h + 6);
+      pdf.setFillColor(243, 244, 246).setDrawColor(210).roundedRect(M, y, maxW, h, 4, 4, "FD");
+      pdf.text(wrapped, M + 10, y + 15);
+      y += h + 10;
+      continue;
+    }
+    for (const line of b.text.split("\n")) {
+      const sub = /^\d+\.\d+\s/.test(line);
+      const wrapped = pdf.splitTextToSize(line, maxW - (sub ? 14 : 0)) as string[];
+      for (const w of wrapped) { need(LH); pdf.text(w, M + (sub ? 14 : 0), y); y += LH; }
+      y += 2.5;
+    }
+    y += 4;
   }
 
   if (signer || footer) {
-    need(110); y += 10;
-    pdf.setDrawColor(200).roundedRect(M, y, maxW, 86, 6, 6);
-    pdf.setFont("helvetica", "bold").setFontSize(10).text("Signed digitally", M + 16, y + 22);
-    pdf.setFont("helvetica", "normal").setFontSize(10);
+    y += 6;
     const rows = signer
-      ? [`Name: ${signer.name}`, `Account number: ${signer.accountNumber}`, `Signed: ${new Date(signer.signedAt).toLocaleString("en-GB", { dateStyle: "long", timeStyle: "short" })}`]
-      : (footer ?? "").split("\n").filter(Boolean);
-    pdf.text(rows, M + 16, y + 40);
+      ? [["Signed by", signer.name], ["Account number", signer.accountNumber], ["Signed", new Date(signer.signedAt).toLocaleString("en-US", { dateStyle: "long", timeStyle: "short" })], ["Method", "Electronic signature with a one-time confirmation code"]]
+      : (footer ?? "").split("\n").filter(Boolean).map((l) => ["Signature", l]);
+    need(30 + rows.length * 18);
+    pdf.setFont("helvetica", "bold").setFontSize(9.5).text("Electronic signature", M, y); y += 8;
+    table(null, rows);
   }
 
   const pages = pdf.getNumberOfPages();
   for (let i = 1; i <= pages; i++) {
     pdf.setPage(i);
-    pdf.setFont("helvetica", "normal").setFontSize(8).setTextColor(130);
-    pdf.text(`${company.name} · ${doc.title} · Version ${version}`, M, H - 32);
+    pdf.setFont("helvetica", "normal").setFontSize(7).setTextColor(130);
+    pdf.text(`${company.legalName} d/b/a ${company.name} · ${doc.title} · Version ${version}`, M, H - 32);
     pdf.text(`Page ${i} of ${pages}`, W - M, H - 32, { align: "right" });
   }
   pdf.save(`${doc.title.toLowerCase().replaceAll(/[^a-z0-9]+/g, "-")}.pdf`);
