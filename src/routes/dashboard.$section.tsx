@@ -1,17 +1,24 @@
 import { createFileRoute, notFound, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { DataTable, StatusBadge, type Column } from "@/components/admin/data-table";
 import { Section } from "@/components/admin/record-bits";
 import { usePopup } from "@/components/popup";
+import { SwitchField } from "@/components/switch-field";
 import { ActBtn, Actions, SubButtons, invoiceTotal, useClient, useClientActions, type R, type RecordKind } from "@/components/client/portal";
 import { supabase } from "@/integrations/supabase/client";
-import { formatAccount, formatDate, formatDay, money, statusLabel, type AppStatus } from "@/lib/admin";
+import { formatAccount, formatDate, formatDay, humanize, money, statusLabel, type AppStatus } from "@/lib/admin";
 import { stageLabel, type CollectionStage } from "@/lib/billing";
 import { passwordIssue, profileUpdateSchema } from "@/lib/client";
 import { requestPrivacy, updateMyProfile } from "@/lib/client.functions";
+import { myAgreements, saveOnboardingBrief } from "@/lib/portal.functions";
+import { AgreementList, DocumentList, UploadButton } from "@/components/files";
+import { MfaSettings } from "@/components/mfa";
+import { briefQuestions, missingAnswers, type BriefAnswers } from "@/lib/onboarding";
+import { deliverableLabel, hoursByMonth } from "@/lib/work";
 
-const sections = ["subscriptions", "projects", "tasks", "invoices", "payments", "applications", "support", "profile", "security"] as const;
+const sections = ["subscriptions", "onboarding", "projects", "deliverables", "tasks", "reports", "documents", "invoices", "payments", "applications", "support", "profile", "security"] as const;
 type S = (typeof sections)[number];
 
 export const Route = createFileRoute("/dashboard/$section")({
@@ -41,6 +48,31 @@ function SectionPage() {
       { key: "r", label: "Renews", value: (r) => r.renews_at ?? "", render: (r) => r.cancel_at_period_end ? `Ends ${formatDay(r.renews_at)}` : formatDay(r.renews_at) },
       { key: "a", label: "Actions", value: () => "", render: (r) => <Actions kind="subscription" id={r.id}><SubButtons s={r} a={a} /></Actions> },
     ], <ActBtn dark onClick={a.order}>Add a plan</ActBtn>)}
+
+    {s === "onboarding" && <BriefForm brief={data.brief} refresh={a.refresh} />}
+
+    {s === "deliverables" && table("Deliverables", "deliverable", data.deliverables, [
+      { key: "t", label: "Deliverable", value: (r) => r.title },
+      { key: "p", label: "Project", value: (r) => data.projects.find((x) => x.id === r.project_id)?.name ?? "—" },
+      { key: "s", label: "Status", value: (r) => r.status, render: (r) => <StatusBadge status={r.status} label={deliverableLabel[r.status]} /> },
+      { key: "d", label: "Sent", value: (r) => r.submitted_at ?? "", render: (r) => formatDate(r.submitted_at) },
+      { key: "a", label: "Actions", value: () => "", render: (r) => <Actions kind="deliverable" id={r.id}>{r.status === "in_review" && <><ActBtn dark onClick={() => a.review(r, "approved")}>Approve</ActBtn><ActBtn onClick={() => a.review(r, "changes_requested")}>Request changes</ActBtn></>}</Actions> },
+    ])}
+
+    {s === "reports" && <>
+      {table("Reports", "report", data.reports, [
+        { key: "t", label: "Report", value: (r) => r.title },
+        { key: "p", label: "Period", value: (r) => r.period_start, render: (r) => new Date(`${r.period_start}T00:00:00Z`).toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" }) },
+        { key: "d", label: "Published", value: (r) => r.published_at ?? "", render: (r) => formatDate(r.published_at) },
+        { key: "a", label: "Actions", value: () => "", render: (r) => <Actions kind="report" id={r.id} /> },
+      ])}
+      <Section title="Hours by month">
+        <ul className="divide-y text-sm">{hoursByMonth(data.hours).map((h) => <li key={h.month} className="flex justify-between px-5 py-3"><span>{h.label}</span><span className="font-semibold">{h.hours} h</span></li>)}
+          {data.hours.length === 0 && <li className="px-5 py-6 text-muted-foreground">No hours logged yet.</li>}</ul>
+      </Section>
+    </>}
+
+    {s === "documents" && <DocumentsPanel docs={data.documents} refresh={a.refresh} />}
 
     {s === "projects" && table("Projects", "project", data.projects, [
       { key: "n", label: "Project", value: (r) => r.name },
@@ -97,7 +129,7 @@ function SectionPage() {
       { key: "x", label: "Actions", value: () => "", render: (r) => <Actions kind="ticket" id={r.id}>{r.status !== "closed" && <ActBtn onClick={() => a.reply(r)}>Reply</ActBtn>}</Actions> },
     ], <ActBtn dark onClick={() => a.newTicket()}>New request</ActBtn>)}
 
-    {s === "profile" && data.profile && <ProfileForm p={data.profile} refresh={a.refresh} />}
+    {s === "profile" && data.profile && <ProfileForm p={data.profile} privacyRows={data.privacy} refresh={a.refresh} />}
     {s === "security" && <SecurityPanel />}
     {a.modalEl}
   </>;
@@ -106,7 +138,7 @@ function SectionPage() {
 const fieldCls = "mt-1 h-10 w-full rounded-lg border bg-background px-2.5 text-sm outline-none focus:ring-2 focus:ring-ring";
 const profileFields: [string, string, number][] = [["first_name", "First name", 80], ["last_name", "Last name", 80], ["company", "Business name", 160], ["phone", "Phone", 40], ["website", "Website", 200], ["industry", "Industry", 100], ["company_size", "Company size", 40], ["address_line", "Address", 200], ["city", "City", 100], ["state", "State or region", 100], ["postal_code", "Postal code", 20], ["country", "Country", 80], ["timezone", "Time zone", 60]];
 
-function ProfileForm({ p, refresh }: { p: R; refresh: () => Promise<void> }) {
+function ProfileForm({ p, privacyRows, refresh }: { p: R; privacyRows: R[]; refresh: () => Promise<void> }) {
   const popup = usePopup();
   const save = useServerFn(updateMyProfile), privacy = useServerFn(requestPrivacy);
   const [busy, setBusy] = useState(false);
@@ -115,7 +147,7 @@ function ProfileForm({ p, refresh }: { p: R; refresh: () => Promise<void> }) {
     const f = new FormData(e.currentTarget);
     const v: Record<string, unknown> = Object.fromEntries(profileFields.map(([k]) => [k, String(f.get(k) ?? "").trim() || null]));
     v["first_name"] = v["first_name"] ?? undefined; v["last_name"] = v["last_name"] ?? undefined;
-    v["marketing_opt_in"] = f.get("marketing_opt_in") === "on"; v["sms_opt_in"] = f.get("sms_opt_in") === "on";
+    v["marketing_opt_in"] = f.get("marketing_opt_in") === "on"; v["sms_opt_in"] = f.get("sms_opt_in") === "on"; v["email_notifications"] = f.get("email_notifications") === "on";
     const parsed = profileUpdateSchema.safeParse(v);
     if (!parsed.success) { popup({ type: "error", title: "Please check your details", description: parsed.error.issues[0]?.message ?? "Some fields are too long." }); return; }
     setBusy(true);
@@ -137,15 +169,19 @@ function ProfileForm({ p, refresh }: { p: R; refresh: () => Promise<void> }) {
           {profileFields.map(([k, l, max]) => <label key={k} className="block"><span className="text-[13px] font-medium">{l}{(k === "first_name" || k === "last_name") && <span className="text-primary"> *</span>}</span>
             <input name={k} defaultValue={p[k] ?? ""} maxLength={max} className={fieldCls} /></label>)}
         </div>
-        <div className="mt-4 space-y-2 text-sm">
-          <label className="flex items-center gap-2"><input type="checkbox" name="marketing_opt_in" defaultChecked={!!p.marketing_opt_in} className="size-4 accent-primary" />Send me marketing emails</label>
-          <label className="flex items-center gap-2"><input type="checkbox" name="sms_opt_in" defaultChecked={!!p.sms_opt_in} className="size-4 accent-primary" />Send me text messages</label>
+        <div className="mt-4 max-w-md space-y-3">
+          <SwitchField name="marketing_opt_in" defaultChecked={!!p.marketing_opt_in} label="Send me marketing emails" />
+          <SwitchField name="sms_opt_in" defaultChecked={!!p.sms_opt_in} label="Send me text messages" />
+          <SwitchField name="email_notifications" defaultChecked={p.email_notifications !== false} label="Email me about replies, reviews, invoices and account updates" />
         </div>
         <button type="submit" disabled={busy} className="mt-5 h-10 rounded-full bg-foreground px-6 text-sm font-semibold text-background">{busy ? "Saving…" : "Save changes"}</button>
       </form>
     </Section>
     <Section title="Your privacy">
       <div className="flex flex-wrap gap-2 p-5"><ActBtn onClick={() => ask("access")}>Request my data</ActBtn><ActBtn danger onClick={() => ask("deletion")}>Close my account</ActBtn></div>
+      {privacyRows.length > 0 && <ul className="divide-y border-t text-sm">{privacyRows.map((r) => <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 px-5 py-3">
+        <span><span className="block font-medium capitalize">{humanize(r.kind)} request</span><span className="text-xs text-muted-foreground">Sent {formatDate(r.created_at)}{r.status === "open" ? `, due by ${formatDay(r.due_at)}` : ""}{r.outcome_note ? `. ${r.outcome_note}` : ""}</span></span>
+        <StatusBadge status={r.status} /></li>)}</ul>}
     </Section>
   </>;
 }
@@ -181,7 +217,7 @@ function SecurityPanel() {
   };
   const signOutAll = () => popup({ type: "info", title: "Sign out everywhere?", description: "You'll be signed out on all devices, including this one.", primaryLabel: "Sign out", secondaryLabel: "Cancel",
     onPrimary: async () => { await supabase.auth.signOut({ scope: "global" }); navigate({ to: "/", replace: true }); } });
-  return <div className="grid gap-6 xl:grid-cols-2">
+  return <div className="space-y-6">
     <Section title="Change password">
       <form onSubmit={changePw} className="space-y-3 p-5">
         {[["current", "Current password", "current-password"], ["password", "New password", "new-password"], ["confirm", "Confirm new password", "new-password"]].map(([n, l, ac]) =>
@@ -197,7 +233,57 @@ function SecurityPanel() {
           <button type="submit" disabled={busy === "email"} className="h-10 rounded-full bg-foreground px-6 text-sm font-semibold text-background">{busy === "email" ? "Sending…" : "Send confirmation"}</button>
         </form>
       </Section>
+      <Section title="Two-factor authentication"><MfaSettings /></Section>
       <Section title="Sessions"><div className="p-5"><ActBtn danger onClick={signOutAll}>Sign out of all devices</ActBtn></div></Section>
     </div>
   </div>;
+}
+
+function DocumentsPanel({ docs, refresh }: { docs: R[]; refresh: () => Promise<void> }) {
+  const load = useServerFn(myAgreements);
+  const agreements = useQuery({ queryKey: ["client", "agreements"], queryFn: () => load() });
+  const mine = docs.filter((d) => d.kind === "file" || d.kind === "export");
+  return <div className="space-y-6">
+    <Section title="Your files" actions={<UploadButton onDone={refresh} label="Upload a file" />}>
+      <p className="border-b px-5 py-3 text-xs text-muted-foreground">Share logos, brand guides, photos and documents with the FP team. Up to 25 MB per file. Never upload passwords.</p>
+      <DocumentList docs={mine} empty="No files yet. Upload your logo or brand guide to get started." />
+    </Section>
+    <Section title="Signed agreements">
+      {agreements.isLoading ? <p className="p-5 text-sm text-muted-foreground">Loading…</p> : <AgreementList agreements={agreements.data ?? []} empty="Agreements you sign appear here." />}
+    </Section>
+    {docs.some((d) => d.kind === "deliverable" || d.kind === "report") && <Section title="Files from deliverables and reports"><DocumentList docs={docs.filter((d) => d.kind === "deliverable" || d.kind === "report")} /></Section>}
+  </div>;
+}
+
+function BriefForm({ brief, refresh }: { brief: R | null; refresh: () => Promise<void> }) {
+  const popup = usePopup();
+  const save = useServerFn(saveOnboardingBrief);
+  const [answers, setAnswers] = useState<BriefAnswers>(() => (brief?.answers ?? {}) as BriefAnswers);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { if (brief?.answers) setAnswers(brief.answers as BriefAnswers); }, [brief?.updated_at]); // eslint-disable-line react-hooks/exhaustive-deps
+  const submit = async (send: boolean) => {
+    if (send) { const missing = missingAnswers(answers); if (missing.length) return popup({ type: "error", title: "A few answers are missing", description: missing.join("; "), primaryLabel: "Got it", secondaryLabel: null }); }
+    setBusy(true);
+    try {
+      await save({ data: { answers, submit: send } }); await refresh();
+      popup({ type: "success", title: send ? "Brief sent" : "Draft saved", description: send ? "Thank you. Your team will use this to plan your first month." : "You can come back and finish it any time.", primaryLabel: "Done", secondaryLabel: null });
+    } catch (e) { popup({ type: "error", title: "Couldn't save", description: (e as Error).message, primaryLabel: "Close", secondaryLabel: null }); }
+    setBusy(false);
+  };
+  return <Section title="Onboarding brief">
+    <div className="space-y-4 p-5">
+      <p className="text-sm text-muted-foreground">{brief?.submitted_at ? `Sent ${formatDate(brief.submitted_at)}. You can still update your answers.` : "Tell us about your business so we can plan your first month. Save a draft any time."}</p>
+      {briefQuestions.map((q) => <label key={q.id} className="block">
+        <span className="text-[13px] font-medium">{q.label}{q.required && <span className="text-primary"> *</span>}</span>
+        {q.help && <span className="block text-xs text-muted-foreground">{q.help}</span>}
+        {q.type === "textarea" ? <textarea value={answers[q.id] ?? ""} maxLength={q.max} rows={3} onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })} className="mt-1 w-full rounded-lg border bg-background p-2.5 text-sm outline-none focus:ring-2 focus:ring-ring" />
+          : q.type === "select" ? <select value={answers[q.id] ?? ""} onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })} className={fieldCls}><option value="">Choose…</option>{q.options!.map((o) => <option key={o}>{o}</option>)}</select>
+          : <input type={q.type === "url" ? "url" : "text"} value={answers[q.id] ?? ""} maxLength={q.max} placeholder={q.type === "url" ? "https://" : undefined} onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })} className={fieldCls} />}
+      </label>)}
+      <div className="flex flex-wrap gap-2">
+        <button type="button" disabled={busy} onClick={() => submit(true)} className="h-10 rounded-full bg-foreground px-6 text-sm font-semibold text-background">{brief?.submitted_at ? "Save changes" : "Send brief"}</button>
+        {!brief?.submitted_at && <button type="button" disabled={busy} onClick={() => submit(false)} className="h-10 rounded-full border px-6 text-sm font-semibold">Save draft</button>}
+      </div>
+    </div>
+  </Section>;
 }

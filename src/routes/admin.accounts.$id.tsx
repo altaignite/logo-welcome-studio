@@ -2,7 +2,7 @@ import { createFileRoute, Link, getRouteApi, useNavigate } from "@tanstack/react
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
-import { ArrowLeft, Download, FilePlus2, ListChecks, MessageSquare, Pencil, Phone, Plus, ShieldCheck, UserCog, UserPlus } from "lucide-react";
+import { ArrowLeft, Download, FilePlus2, ListChecks, Mail, MessageSquare, Pencil, Phone, Plus, ShieldCheck, UserCog, UserPlus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { DataTable, StatusBadge, type BulkAction, type Column } from "@/components/admin/data-table";
 import { FormModal, type FieldDef } from "@/components/admin/form-modal";
@@ -12,12 +12,16 @@ import { setAccountStatus } from "@/lib/crm.functions";
 import { createInvoice, createOrder, subscriptionAction, voidInvoices } from "@/lib/billing.functions";
 import { accountStatusLabel, accountStatuses, complianceKinds, formatAccount, formatDate, formatDay, humanize, lifecycleStages, money, statusLabel, type AccountStatus } from "@/lib/admin";
 import { plans } from "@/lib/signup";
+import { DocumentList, UploadButton } from "@/components/files";
+import { useStaff, withStaffPicker } from "@/components/admin/staff";
+import { useEmailClients } from "@/components/admin/email-clients";
+import { briefQuestions } from "@/lib/onboarding";
 import { recordKinds, toPatch, type RecordKind, type Row, type Vals } from "@/lib/records";
 
 export const Route = createFileRoute("/admin/accounts/$id")({ component: AccountDetail });
 const adminRoute = getRouteApi("/admin");
 
-const tabs = ["Overview", "Contacts", "Applications", "Subscriptions", "Projects", "Invoices", "Transactions", "Support tickets", "Activities", "Tasks", "Privacy", "Audit log"] as const;
+const tabs = ["Overview", "Onboarding", "Contacts", "Applications", "Subscriptions", "Projects", "Deliverables", "Reports", "Documents", "Invoices", "Transactions", "Support tickets", "Activities", "Tasks", "Privacy", "Audit log"] as const;
 type Modal = { title: string; description?: string | undefined; fields: FieldDef[]; submitLabel: string; onSubmit: (v: Vals) => Promise<string | null> };
 const today = () => new Date().toISOString().slice(0, 10);
 type R = Row;
@@ -31,18 +35,22 @@ function AccountDetail() {
   const changeStatus = useServerFn(setAccountStatus);
   const fnOrder = useServerFn(createOrder), fnInvoice = useServerFn(createInvoice), fnSub = useServerFn(subscriptionAction), fnVoid = useServerFn(voidInvoices);
   const [tab, setTab] = useState<(typeof tabs)[number]>(tabs[0]);
+  const staff = useStaff();
+  const mail = useEmailClients(() => qc.invalidateQueries({ queryKey: ["admin"] }));
   const [modal, setModal] = useState<Modal | null>(null);
   const { data, isLoading, error } = useQuery({
     queryKey: ["admin", "account", id],
     queryFn: async () => {
       const list = async (t: string, order = "created_at") => { const r = await db.from(t).select("*").eq("user_id", id).order(order, { ascending: false }); if (r.error) throw r.error; return (r.data ?? []) as R[]; };
-      const [profile, applications, subscriptions, projects, invoices, transactions, tickets, activities, tasks, contacts, compliance, audit] = await Promise.all([
+      const [profile, applications, subscriptions, projects, invoices, transactions, tickets, activities, tasks, contacts, compliance, audit, deliverables, reports, documents, brief] = await Promise.all([
         supabase.from("profiles").select("*").eq("id", id).maybeSingle().then((r) => { if (r.error) throw r.error; return r.data; }),
         list("applications"), list("subscriptions"), list("projects"), list("invoices", "issued_at"), list("transactions"), list("support_tickets"),
         list("crm_activities", "occurred_at"), list("tasks"), list("contacts"), list("compliance_requests"),
         supabase.from("audit_log").select("*").eq("account_id", id).order("created_at", { ascending: false }).limit(500).then((r) => r.data ?? []),
+        list("deliverables", "updated_at"), list("client_reports", "period_start"), list("documents"),
+        supabase.from("onboarding_briefs").select("*").eq("user_id", id).maybeSingle().then((r) => r.data),
       ]);
-      return { profile, applications, subscriptions, projects, invoices, transactions, tickets, activities, tasks, contacts, compliance, audit };
+      return { profile, applications, subscriptions, projects, invoices, transactions, tickets, activities, tasks, contacts, compliance, audit, deliverables, reports, documents, brief };
     },
   });
   const refresh = () => qc.invalidateQueries({ queryKey: ["admin"] });
@@ -118,7 +126,7 @@ function AccountDetail() {
   ];
   const editProfile = () => setModal({
     title: "Edit client profile", submitLabel: "Save changes",
-    fields: profileFields.map((f) => ({ ...f, defaultValue: String((p as Record<string, unknown>)[f.name] ?? (f.name === "account_manager" ? adminEmail : "")) })),
+    fields: withStaffPicker(profileFields.map((f) => ({ ...f, defaultValue: String((p as Record<string, unknown>)[f.name] ?? (f.name === "account_manager" ? adminEmail : "")) })), staff.emails),
     onSubmit: async (v) => done((await db.from("profiles").update({ ...toPatch(profileFields, v), lifecycle_stage: v.lifecycle_stage || p.lifecycle_stage, updated_at: new Date().toISOString() }).eq("id", id)).error),
   });
   const editConsent = () => setModal({
@@ -132,11 +140,11 @@ function AccountDetail() {
     onSubmit: async (v) => done((await supabase.from("profiles").update({ marketing_opt_in: v.marketing_opt_in === "yes", sms_opt_in: v.sms_opt_in === "yes", do_not_sell: v.do_not_sell === "yes", legal_hold: v.legal_hold === "yes" }).eq("id", id)).error),
   });
   const create = (kind: RecordKind, extra: Record<string, unknown> = {}) => {
-    const fields = recordKinds[kind].edit.map((f) => f.name === "assigned_to" ? { ...f, defaultValue: adminEmail } : f);
+    const fields = withStaffPicker(recordKinds[kind].edit.map((f) => f.name === "assigned_to" ? { ...f, defaultValue: adminEmail } : f.name === "period_start" ? { ...f, defaultValue: `${today().slice(0, 7)}-01` } : f), staff.emails);
     setModal({
       title: `New ${recordKinds[kind].singular.toLowerCase()}`, submitLabel: "Create", fields,
       onSubmit: async (v) => {
-        const r = await db.from(kind).insert({ user_id: id, ...toPatch(fields, v), ...extra }).select("id").single();
+        const r = await db.from(kind).insert({ user_id: id, ...toPatch(fields, v, recordKinds[kind].codec), ...extra }).select("id").single();
         if (r.error) return r.error.message;
         await refresh(); navigate({ to: "/admin/records/$kind/$id", params: { kind, id: r.data.id } }); return null;
       },
@@ -146,6 +154,8 @@ function AccountDetail() {
   const newTicket = () => create("support_tickets");
   const newTask = () => create("tasks", { actor_label: adminEmail });
   const newContact = () => create("contacts");
+  const newDeliverable = () => create("deliverables", { actor_label: adminEmail, project_id: live.length ? (data.projects.find((x) => x.subscription_id === live[0]!.id)?.id ?? null) : null, subscription_id: live[0]?.id ?? null });
+  const newReport = () => create("client_reports", { actor_label: adminEmail, subscription_id: live[0]?.id ?? null });
   const newPrivacy = () => setModal({
     title: "Privacy request", submitLabel: "Log request", description: "Many privacy laws require a response within 45 days.",
     fields: [{ name: "kind", label: "Request type", type: "select", options: [...complianceKinds] }, { name: "details", label: "Details", type: "textarea" }],
@@ -198,6 +208,7 @@ function AccountDetail() {
         <div className="flex flex-wrap gap-2">
           <Btn icon={Phone} onClick={logActivity}>Log call</Btn>
           <Btn icon={MessageSquare} onClick={newTicket}>New ticket</Btn>
+          <Btn icon={Mail} onClick={() => mail.open([id])}>Email client</Btn>
           <Btn icon={FilePlus2} onClick={newOrder}>New order</Btn>
           <Btn icon={Pencil} onClick={editProfile}>Edit</Btn>
           <Btn icon={UserCog} onClick={statusModal}>Change status</Btn>
@@ -221,6 +232,21 @@ function AccountDetail() {
         </Section>
         {p.internal_notes && <Section title="Internal notes"><p className="whitespace-pre-wrap px-5 py-4 text-sm">{p.internal_notes}</p></Section>}
       </div>}
+
+      {tab === "Onboarding" && <Section title={data.brief?.submitted_at ? `Onboarding brief, sent ${formatDate(data.brief.submitted_at)}` : data.brief ? "Onboarding brief (draft)" : "Onboarding brief"}>
+        {data.brief ? <FieldGrid items={briefQuestions.map((q) => [q.label, String((data.brief!.answers as Record<string, unknown>)?.[q.id] ?? "—")])} />
+          : <p className="px-5 py-6 text-sm text-muted-foreground">The client hasn't started their onboarding brief yet.</p>}
+      </Section>}
+
+      {tab === "Deliverables" && <DataTable<R> title="Deliverables" rows={data.deliverables} getId={(r) => r.id} onRowClick={open("deliverables")} empty="No deliverables yet." toolbar={<Btn icon={Plus} onClick={newDeliverable}>New deliverable</Btn>}
+        bulkActions={[archive("deliverables")]} columns={[col("title", "Deliverable"), col("status", "Status", "status"), col("assigned_to", "Assigned to"), col("submitted_at", "Sent", "date"), col("due_at", "Due", "day")]} />}
+
+      {tab === "Reports" && <DataTable<R> title="Reports" rows={data.reports} getId={(r) => r.id} onRowClick={open("client_reports")} empty="No reports yet." toolbar={<Btn icon={Plus} onClick={newReport}>New report</Btn>}
+        bulkActions={[archive("client_reports")]} columns={[col("title", "Report"), col("period_start", "Period starting", "day"), col("published_at", "Published", "date"), col("actor_label", "Prepared by")]} />}
+
+      {tab === "Documents" && <Section title="Documents" actions={<><UploadButton clientId={id} onDone={refresh} label="Share a file" /><UploadButton clientId={id} visibleToClient={false} onDone={refresh} label="Upload internal" /></>}>
+        <DocumentList docs={data.documents.filter((d) => d.status === "ready")} staff empty="No files for this client yet." />
+      </Section>}
 
       {tab === "Contacts" && <DataTable<R> title="Contacts" rows={data.contacts} getId={(r) => r.id} onRowClick={open("contacts")} empty="No extra contacts yet." toolbar={<Btn icon={UserPlus} onClick={newContact}>Add contact</Btn>}
         bulkActions={[bulkDelete("contacts")]} columns={[col("name", "Name"), col("role", "Role"), col("email", "Email"), col("phone", "Phone")]} />}
@@ -273,6 +299,7 @@ function AccountDetail() {
       {tab === "Audit log" && <Section title="Audit log"><AuditList rows={data.audit} showTable /></Section>}
 
       {modal && <FormModal {...modal} onClose={() => setModal(null)} />}
+      {mail.el}
     </div>
   );
 }

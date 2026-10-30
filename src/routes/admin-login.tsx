@@ -1,10 +1,11 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Lock, Mail, ShieldCheck } from "lucide-react";
 import logo from "@/assets/logo.png.asset.json";
 import { supabase } from "@/integrations/supabase/client";
 import { usePopup } from "@/components/popup";
 import { passwordIssue } from "@/lib/client";
+import { MfaChallenge, mfaNeeded } from "@/components/mfa";
 
 export const Route = createFileRoute("/admin-login")({
   head: () => ({
@@ -26,8 +27,10 @@ const DOMAIN = "@firstpersonmarketing.com";
 function AdminLogin() {
   const [mode, setMode] = useState<"in" | "up">("in");
   const [busy, setBusy] = useState(false);
+  const [mfa, setMfa] = useState(false);
   const popup = usePopup();
   const navigate = useNavigate();
+  useEffect(() => { void supabase.auth.getSession().then(async ({ data }) => { if (data.session && (await mfaNeeded())) setMfa(true); }); }, []);
   const submit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
@@ -57,7 +60,8 @@ function AdminLogin() {
       await supabase.auth.signOut();
       return popup({ type: "error", title: "No admin access", description: "Your account isn't approved for the admin dashboard yet." });
     }
-    navigate({ to: "/admin/accounts" });
+    if (await mfaNeeded()) { setMfa(true); return; }
+    navigate({ to: "/admin" });
   };
   return (
     <main className="flex min-h-dvh items-center justify-center bg-secondary px-4 py-10">
@@ -67,6 +71,7 @@ function AdminLogin() {
           <span className="h-6 w-px bg-border" />
           <span className="text-sm font-semibold">Admin</span>
         </div>
+        {mfa ? <div className="mt-6"><MfaChallenge onDone={() => navigate({ to: "/admin" })} onCancel={async () => { await supabase.auth.signOut(); setMfa(false); }} /></div> : <>
         <h1 className="mt-6 text-2xl font-extrabold">{mode === "in" ? "Staff sign in" : "Create staff account"}</h1>
         <p className="mt-1 text-sm text-muted-foreground">Only {DOMAIN} addresses have access.</p>
         <form onSubmit={submit} noValidate className="mt-6 space-y-4">
@@ -80,6 +85,7 @@ function AdminLogin() {
         <button type="button" onClick={() => setMode(mode === "in" ? "up" : "in")} className="mt-4 w-full text-center text-sm text-muted-foreground hover:text-foreground">
           {mode === "in" ? "New staff member? Create an account" : "Already have an account? Sign in"}
         </button>
+        </>}
       </div>
     </main>
   );

@@ -1,11 +1,13 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Mail, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
 import { usePopup } from "@/components/popup";
+import { SwitchField } from "@/components/switch-field";
 import logo from "@/assets/logo.png.asset.json";
 import hero from "@/assets/login-hero.jpg";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
+import { MfaChallenge, mfaNeeded } from "@/components/mfa";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -26,8 +28,11 @@ const input = "signup-input pl-10";
 function Login() {
   const [remember, setRemember] = useState(false);
   const [show, setShow] = useState(false);
+  const [mfa, setMfa] = useState(false);
   const popup = usePopup();
   const navigate = useNavigate();
+  // A signed-in session that still needs its authenticator code continues here (the dashboard sends it back).
+  useEffect(() => { void supabase.auth.getSession().then(async ({ data }) => { if (data.session && (await mfaNeeded())) setMfa(true); }); }, []);
   const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
@@ -43,6 +48,7 @@ function Login() {
       else popup({ type: "error", title: "Something went wrong while trying to log you in", description: error.message });
       return;
     }
+    if (await mfaNeeded()) { setMfa(true); return; }
     navigate({ to: "/dashboard" });
   };
   return (
@@ -71,6 +77,7 @@ function Login() {
             <p className="mt-1 text-sm text-muted-foreground sm:mt-2 sm:text-base">Access your personal account by logging in.</p>
           </div>
 
+          {mfa ? <div className="mt-5 flex w-full justify-center sm:mt-8"><MfaChallenge onDone={() => navigate({ to: "/dashboard" })} onCancel={async () => { await supabase.auth.signOut(); setMfa(false); }} /></div> :
           <form className="mt-5 w-full max-w-md space-y-4 sm:mt-8 sm:space-y-5" onSubmit={onSubmit} noValidate>
             <div className="space-y-1.5">
               <label htmlFor="email" className="block text-[13px] font-medium text-foreground">Email Address<span className="text-primary">*</span></label>
@@ -90,16 +97,13 @@ function Login() {
               </div>
             </div>
             <div className="flex items-center justify-between gap-3 text-sm">
-              <label className="flex cursor-pointer items-center gap-2 text-muted-foreground">
-                <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="h-4 w-4 accent-primary" />
-                Remember me
-              </label>
+              <SwitchField checked={remember} onCheckedChange={setRemember} label={<span className="text-muted-foreground">Remember me</span>} className="flex-row-reverse justify-end" />
               <Link to="/forgot-password" className="font-semibold text-foreground hover:text-primary">Forgot Password?</Link>
             </div>
             <button type="submit" className="signup-primary group flex items-center justify-center gap-2 text-sm">
               Log In <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
             </button>
-          </form>
+          </form>}
 
           <p className="mt-auto pt-5 text-sm text-muted-foreground sm:pt-10">
             Don't have an account? <Button asChild variant="link" className="ml-1 h-auto p-0 font-semibold text-foreground hover:text-primary"><Link to="/signup">Sign up</Link></Button>

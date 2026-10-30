@@ -1,9 +1,11 @@
 import { createFileRoute, Link, Outlet, redirect, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { CreditCard, FileText, FolderKanban, Headphones, Home, KeyRound, ListChecks, Menu, Receipt, Repeat, LogOut, User, X } from "lucide-react";
+import { BarChart3, ClipboardList, CreditCard, FileCheck2, FileText, FolderKanban, FolderOpen, Headphones, Home, KeyRound, ListChecks, Menu, Receipt, Repeat, LogOut, User, X } from "lucide-react";
 import logo from "@/assets/logo.png.asset.json";
 import { supabase } from "@/integrations/supabase/client";
+import { NotificationBell } from "@/components/notifications";
+import { mfaNeeded } from "@/components/mfa";
 
 export const Route = createFileRoute("/dashboard")({
   ssr: false,
@@ -21,6 +23,8 @@ export const Route = createFileRoute("/dashboard")({
   beforeLoad: async () => {
     const { data } = await supabase.auth.getUser();
     if (!data.user) throw redirect({ to: "/" });
+    // Accounts with two-factor sign-in finish the code step on the login page first.
+    if (await mfaNeeded()) throw redirect({ to: "/" });
     return { userId: data.user.id, email: data.user.email ?? "" };
   },
   component: Layout,
@@ -29,8 +33,12 @@ export const Route = createFileRoute("/dashboard")({
 export const portalNav = [
   { section: "", label: "Overview", icon: Home },
   { section: "subscriptions", label: "Subscriptions", icon: Repeat },
+  { section: "onboarding", label: "Onboarding brief", icon: ClipboardList },
   { section: "projects", label: "Projects", icon: FolderKanban },
+  { section: "deliverables", label: "Deliverables", icon: FileCheck2 },
   { section: "tasks", label: "Tasks", icon: ListChecks },
+  { section: "reports", label: "Reports", icon: BarChart3 },
+  { section: "documents", label: "Documents", icon: FolderOpen },
   { section: "invoices", label: "Invoices", icon: Receipt },
   { section: "payments", label: "Payments", icon: CreditCard },
   { section: "applications", label: "Applications", icon: FileText },
@@ -52,7 +60,7 @@ function Nav({ onPick }: { onPick?: () => void }) {
 }
 
 function Layout() {
-  const { email } = Route.useRouteContext();
+  const { email, userId } = Route.useRouteContext();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -66,6 +74,7 @@ function Layout() {
           <span className="hidden h-5 w-px bg-border sm:block" />
           <span className="hidden text-sm font-semibold sm:block">Client dashboard</span>
           <span className="ml-auto truncate text-sm text-muted-foreground">{email}</span>
+          <NotificationBell userId={userId} />
           <button type="button" onClick={signOut} aria-label="Sign out" className="rounded-lg p-2 hover:bg-secondary"><LogOut className="size-4" /></button>
         </div>
       </header>

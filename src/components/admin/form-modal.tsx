@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import { Switch } from "@/components/ui/switch";
 
 export type FieldDef = {
   name: string; label: string; type?: "text" | "textarea" | "number" | "date" | "select" | "email" | "url"; options?: string[];
@@ -29,7 +30,12 @@ export function FormModal({ title, description, fields, submitLabel, onSubmit, o
         <h2 className="text-lg font-bold">{title}</h2>
         {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
         <div className="mt-4 space-y-3">
-          {fields.map((f) => (
+          {fields.map((f) => f.type === "select" && f.options?.join() === "no,yes" ? (
+            <label key={f.name} className="flex cursor-pointer items-center justify-between gap-3 py-1">
+              <span className="text-[13px] font-medium">{f.label}</span>
+              <Switch checked={values[f.name] === "yes"} onCheckedChange={(v) => setValues({ ...values, [f.name]: v ? "yes" : "no" })} />
+            </label>
+          ) : (
             <label key={f.name} className="block">
               <span className="text-[13px] font-medium">{f.label}{f.required && <span className="text-primary"> *</span>}</span>
               {f.type === "textarea" ? (

@@ -41,6 +41,12 @@ export function canTransition(from: AppStatus, to: AppStatus) {
   return workflowActions[from].some((a) => a.to === to);
 }
 
+/** Moving into these statuses is shared with the client, note included (enforced by set_event_visibility in the database). */
+export const clientVisibleStatuses: AppStatus[] = ["submitted", "info_requested", "approved", "rejected", "suspended"];
+export const sharedWithClient = (to: AppStatus) => clientVisibleStatuses.includes(to);
+/** When the client answers an information request, the application goes back to review (the staff "Information received" step). */
+export const clientResponse = { from: "info_requested", to: "in_review" } as const satisfies { from: AppStatus; to: AppStatus };
+
 /** Client account statuses, in lifecycle order. */
 export const accountStatuses = ["prospect", "onboarding", "active", "past_due", "on_hold", "suspended", "cancelled", "closed"] as const;
 export type AccountStatus = (typeof accountStatuses)[number];
@@ -72,7 +78,7 @@ export function guaranteeEligible(sub: { guarantee_ends_at: string | null; sales
 }
 
 /** Financial and legal records are never deleted, only voided or archived. */
-export const deletableTables = ["contacts", "tasks", "crm_activities", "support_tickets"] as const;
+export const deletableTables = ["contacts", "tasks", "crm_activities", "support_tickets", "message_templates"] as const;
 export const canDelete = (table: string) => (deletableTables as readonly string[]).includes(table);
 
 const tones: Record<string, string> = {
@@ -88,6 +94,11 @@ const tones: Record<string, string> = {
   suspended: "bg-red-50 text-red-700 ring-red-200", rejected: "bg-red-50 text-red-700 ring-red-200", failed: "bg-red-50 text-red-700 ring-red-200",
   cancelled: "bg-zinc-100 text-zinc-700 ring-zinc-300", void: "bg-zinc-100 text-zinc-700 ring-zinc-300",
   closed: "bg-zinc-200 text-zinc-800 ring-zinc-300", archived: "bg-zinc-100 text-zinc-600 ring-zinc-300",
+  draft: "bg-zinc-100 text-zinc-700 ring-zinc-300", changes_requested: "bg-orange-50 text-orange-700 ring-orange-200",
+  waiting_on_client: "bg-yellow-50 text-yellow-800 ring-yellow-200", running: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+  claimed: "bg-fuchsia-50 text-fuchsia-700 ring-fuchsia-200", refunded: "bg-sky-50 text-sky-700 ring-sky-200", denied: "bg-red-50 text-red-700 ring-red-200",
+  published: "bg-emerald-50 text-emerald-700 ring-emerald-200", breached: "bg-red-50 text-red-700 ring-red-200", due_soon: "bg-amber-50 text-amber-700 ring-amber-200",
+  on_track: "bg-blue-50 text-blue-700 ring-blue-200", met: "bg-emerald-50 text-emerald-700 ring-emerald-200",
 };
 export function statusTone(s: string) {
   return tones[s] ?? "bg-secondary text-foreground ring-border";

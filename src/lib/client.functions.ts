@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireSession } from "@/lib/session.middleware";
 import { plans } from "@/lib/signup";
 import { planChangeTiming, profileUpdateSchema } from "@/lib/client";
 import { orderingBlocked } from "@/lib/admin";
@@ -16,7 +16,7 @@ async function ownSub(admin: any, id: string, userId: string) {
 
 /** Client edits their own profile; only whitelisted fields pass validation. */
 export const updateMyProfile = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSession])
   .inputValidator((d: unknown) => profileUpdateSchema.parse(d))
   .handler(async ({ data, context }) => {
     const { getAdmin } = await import("@/lib/billing.server");
@@ -28,7 +28,7 @@ export const updateMyProfile = createServerFn({ method: "POST" })
 
 /** Client orders an additional plan: pending subscription, project and a Stripe invoice. Activation on payment. */
 export const orderAdditionalPlan = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSession])
   .inputValidator((d: unknown) => z.object({ planId: z.enum(["starter", "growth", "scale"]) }).parse(d))
   .handler(async ({ data, context }) => {
     const { getAdmin, issueStripeInvoice } = await import("@/lib/billing.server");
@@ -53,7 +53,7 @@ export const orderAdditionalPlan = createServerFn({ method: "POST" })
 
 /** Upgrade now (prorated through Stripe) or schedule a downgrade for renewal. */
 export const changePlan = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSession])
   .inputValidator((d: unknown) => z.object({ subscriptionId: uuid, planId: z.enum(["starter", "growth", "scale"]) }).parse(d))
   .handler(async ({ data, context }) => {
     const { getAdmin, assertClientMayAct } = await import("@/lib/billing.server");
@@ -82,7 +82,7 @@ export const changePlan = createServerFn({ method: "POST" })
 
 /** Keep a plan that was set to cancel at the end of the period. */
 export const undoCancel = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSession])
   .inputValidator((d: unknown) => z.object({ subscriptionId: uuid }).parse(d))
   .handler(async ({ data, context }) => {
     const { getAdmin } = await import("@/lib/billing.server");
@@ -98,7 +98,7 @@ export const undoCancel = createServerFn({ method: "POST" })
 
 /** Client asks for a data export or account closure; staff handle it within 30 days. */
 export const requestPrivacy = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSession])
   .inputValidator((d: unknown) => z.object({ kind: z.enum(["access", "deletion"]), details: z.string().trim().max(1000).optional() }).parse(d))
   .handler(async ({ data, context }) => {
     const { getAdmin } = await import("@/lib/billing.server");

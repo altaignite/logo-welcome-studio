@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import { db, Section } from "@/components/admin/record-bits";
 import { usePopup } from "@/components/popup";
+import { SwitchField } from "@/components/switch-field";
 import { defaultRules, type BillingRules } from "@/lib/billing";
 import { runCollectionsNow } from "@/lib/billing.functions";
 
@@ -32,7 +33,7 @@ function Settings() {
       <Section title="Extra hours">
         <div className="grid gap-4 p-5 sm:grid-cols-3">
           {Object.keys(r.overage_rates).map((p) => <F key={p} label={`${p} rate per hour (USD)`}><input className={input} type="number" value={r.overage_rates[p]} onChange={(e) => setR({ ...r, overage_rates: { ...r.overage_rates, [p]: num(e.target.value) } })} /></F>)}
-          <label className="flex items-center gap-2 text-sm sm:col-span-3"><input type="checkbox" className="size-4 accent-primary" checked={r.overage_needs_approval} onChange={(e) => setR({ ...r, overage_needs_approval: e.target.checked })} />Extra hours need approval before time is logged</label>
+          <SwitchField className="sm:col-span-3" checked={r.overage_needs_approval} onCheckedChange={(v) => setR({ ...r, overage_needs_approval: v })} label="Extra hours need approval before time is logged" />
         </div>
       </Section>
       <Section title="Unpaid invoices">

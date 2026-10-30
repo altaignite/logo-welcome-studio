@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { StatusBadge } from "@/components/admin/data-table";
 import { accountStatusLabel, auditLines, formatAccount, formatDate, formatDay, humanize, money, type AccountStatus } from "@/lib/admin";
 import type { Fmt } from "@/lib/records";
+import { metricsText } from "@/lib/work";
 
 /** Loosely typed table access for the generic record pages; RLS still applies. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -12,6 +13,7 @@ export const db = supabase as unknown as { from: (table: string) => any };
 
 export function fmtText(v: unknown, f: Fmt): string {
   if (v == null || v === "") return "—";
+  if (f === "metrics") return metricsText(v) || "—";
   if (f === "money") return money(Number(v));
   if (f === "date") return formatDate(String(v));
   if (f === "day") return formatDay(String(v));

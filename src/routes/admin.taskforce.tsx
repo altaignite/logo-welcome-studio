@@ -5,6 +5,8 @@ import { DataTable, StatusBadge } from "@/components/admin/data-table";
 import { FormModal, type FieldDef } from "@/components/admin/form-modal";
 import { db } from "@/components/admin/record-bits";
 import { formatDay } from "@/lib/admin";
+import { SwitchField } from "@/components/switch-field";
+import { useStaff, withStaffPicker } from "@/components/admin/staff";
 
 export const Route = createFileRoute("/admin/taskforce")({ component: Taskforce });
 const adminRoute = getRouteApi("/admin");
@@ -17,6 +19,7 @@ function Taskforce() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [view, setView] = useState<"list" | "board">("board");
+  const staff = useStaff();
   const [filter, setFilter] = useState({ client: "", assignee: "", priority: "", overdue: false });
   const [modal, setModal] = useState<{ title: string; fields: FieldDef[]; submit: (v: any) => Promise<string | null> } | null>(null);
 
@@ -48,12 +51,12 @@ function Taskforce() {
   };
   const newTask = () => setModal({
     title: "New task",
-    fields: [
+    fields: withStaffPicker([
       { name: "project", label: "Project", type: "select", options: (data?.projects ?? []).filter((p) => p.status !== "cancelled").map((p) => `${p.name}`), required: true },
       { name: "title", label: "Task", required: true }, { name: "details", label: "Details", type: "textarea" },
       { name: "priority", label: "Priority", type: "select", options: priorities, defaultValue: "normal" }, { name: "due_at", label: "Due date", type: "date" },
       { name: "estimated_hours", label: "Estimated hours", type: "number" }, { name: "assigned_to", label: "Assigned to", defaultValue: adminEmail },
-    ],
+    ], staff.emails),
     submit: async (v) => {
       const p = data?.projects.find((x) => x.name === v.project); if (!p) return "Choose a project.";
       const r = await db.from("tasks").insert({ user_id: p.user_id, project_id: p.id, subscription_id: p.subscription_id, title: v.title, details: v.details || null, priority: v.priority, due_at: v.due_at || null, estimated_hours: v.estimated_hours ? Number(v.estimated_hours) : null, assigned_to: v.assigned_to || null, actor_label: adminEmail });
@@ -97,7 +100,7 @@ function Taskforce() {
         <select aria-label="Client" className={sel} value={filter.client} onChange={(e) => setFilter({ ...filter, client: e.target.value })}><option value="">All clients</option>{clients.map((c) => <option key={c}>{c}</option>)}</select>
         <select aria-label="Assignee" className={sel} value={filter.assignee} onChange={(e) => setFilter({ ...filter, assignee: e.target.value })}><option value="">Anyone</option>{assignees.map((c) => <option key={c}>{c}</option>)}</select>
         <select aria-label="Priority" className={sel} value={filter.priority} onChange={(e) => setFilter({ ...filter, priority: e.target.value })}><option value="">Any priority</option>{priorities.map((c) => <option key={c}>{c}</option>)}</select>
-        <label className="inline-flex items-center gap-2 text-sm"><input type="checkbox" className="size-4 accent-primary" checked={filter.overdue} onChange={(e) => setFilter({ ...filter, overdue: e.target.checked })} />Overdue only</label>
+        <SwitchField checked={filter.overdue} onCheckedChange={(v) => setFilter({ ...filter, overdue: v })} label="Overdue only" />
       </div>
       {error ? <p className="text-sm text-destructive">{(error as Error).message}</p> : isLoading ? <p className="text-sm text-muted-foreground">Loading tasks…</p> : view === "board" ? (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">

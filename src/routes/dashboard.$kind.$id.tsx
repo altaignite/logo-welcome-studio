@@ -7,11 +7,15 @@ import { ActBtn, Actions, SubButtons, invoiceTotal, useClient, useClientActions,
 import { formatDate, formatDay, humanize, money, statusLabel, type AppStatus } from "@/lib/admin";
 import { stageLabel, type CollectionStage } from "@/lib/billing";
 import { plans } from "@/lib/signup";
+import { DocumentList, UploadButton } from "@/components/files";
+import { guaranteeClaimable } from "@/lib/client";
+import { deliverableLabel, metricTone, type Metric } from "@/lib/work";
 
-const kinds: RecordKind[] = ["subscription", "project", "task", "invoice", "payment", "application", "ticket"];
+const kinds: RecordKind[] = ["subscription", "project", "task", "invoice", "payment", "application", "ticket", "deliverable", "report"];
 const back: Record<RecordKind, [string, string]> = {
   subscription: ["subscriptions", "Subscriptions"], project: ["projects", "Projects"], task: ["tasks", "Tasks"], invoice: ["invoices", "Invoices"],
   payment: ["payments", "Payments"], application: ["applications", "Applications"], ticket: ["support", "Support"],
+  deliverable: ["deliverables", "Deliverables"], report: ["reports", "Reports"],
 };
 
 export const Route = createFileRoute("/dashboard/$kind/$id")({
@@ -26,7 +30,8 @@ function Details() {
   const a = useClientActions();
   if (error) return <p className="text-sm text-destructive">{(error as Error).message}</p>;
   if (isLoading || !data) return <p className="text-sm text-muted-foreground">Loading…</p>;
-  const list: Record<RecordKind, R[]> = { subscription: data.subs, project: data.projects, task: data.tasks, invoice: data.invoices, payment: data.payments, application: data.apps, ticket: data.tickets };
+  const list: Record<RecordKind, R[]> = { subscription: data.subs, project: data.projects, task: data.tasks, invoice: data.invoices, payment: data.payments, application: data.apps, ticket: data.tickets, deliverable: data.deliverables, report: data.reports };
+  const docsFor = (table: string, rid: string) => data.documents.filter((d: R) => d.related_table === table && d.related_id === rid);
   const r = list[kind].find((x) => x.id === id);
   const [sec, label] = back[kind];
   const header = (title: string, status?: ReactNode, actions?: ReactNode) => <>
@@ -52,12 +57,12 @@ function Details() {
     const pIds = new Set(projects.map((p) => p.id));
     const pending = plans.find((p) => p.id === r.pending_plan_id);
     return <>
-      {header(`${r.plan_name} plan`, <StatusBadge status={r.status} />, <><SubButtons s={r} a={a} /><ActBtn onClick={() => a.newTicket(r.id)}>Get help</ActBtn></>)}
+      {header(`${r.plan_name} plan`, <StatusBadge status={r.status} />, <><SubButtons s={r} a={a} />{guaranteeClaimable(r) && <ActBtn onClick={() => a.claim(r)}>Claim money-back guarantee</ActBtn>}<ActBtn onClick={() => a.newTicket(r.id)}>Get help</ActBtn></>)}
       {r.payment_warning && <p className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm">{r.payment_warning}</p>}
       <Section title="Plan">
         <FieldGrid items={[["Monthly fee", money(r.monthly_fee)], ["Hours this month", `${r.hours_used} of ${r.monthly_hours}`], ["Started", formatDay(r.started_at)],
           [r.cancel_at_period_end ? "Ends" : "Renews", formatDay(r.renews_at)], ["Scheduled change", pending ? `Moves to ${pending.name} at renewal` : "—"],
-          ["Money-back guarantee", r.guarantee_status === "running" ? `Until ${formatDay(r.guarantee_ends_at)}` : r.guarantee_status === "void" ? `Ended: ${r.guarantee_void_reason ?? "conditions not met"}` : humanize(r.guarantee_status)]]} />
+          ["Money-back guarantee", r.guarantee_status === "running" ? `Until ${formatDay(r.guarantee_ends_at)}` : r.guarantee_status === "void" ? `Ended: ${r.guarantee_void_reason ?? "conditions not met"}` : r.guarantee_status === "claimed" ? "Claim under review" : humanize(r.guarantee_status)]]} />
       </Section>
       {miniTable("Projects", projects, "project", [["Project", (x) => x.name], ["Status", (x) => <StatusBadge status={x.status} />], ["Hours", (x) => x.hours]])}
       {tasksTable(data.tasks.filter((t) => t.subscription_id === r.id || pIds.has(t.project_id)))}
@@ -71,6 +76,7 @@ function Details() {
   if (kind === "project") return <>
     {header(r.name, <StatusBadge status={r.status} />)}
     <Section title="Project"><FieldGrid items={[["Plan", subLink(r.subscription_id)], ["Service", r.service], ["Hours logged", r.hours], ["Started", formatDay(r.started_at)], ["Due", formatDay(r.due_at)], ["Completed", formatDate(r.completed_at)], ["Description", r.description ?? "—"]]} /></Section>
+    {miniTable("Deliverables", data.deliverables.filter((d: R) => d.project_id === r.id), "deliverable", [["Deliverable", (x) => x.title], ["Status", (x) => <StatusBadge status={x.status} label={deliverableLabel[x.status]} />]])}
     {tasksTable(data.tasks.filter((t) => t.project_id === r.id))}
     {hoursList(data.hours.filter((h) => h.project_id === r.id))}
   </>;
@@ -98,9 +104,44 @@ function Details() {
   </>;
   if (kind === "application") {
     const sub = data.subs.find((s) => s.application_id === r.id);
+    const events = data.events.filter((e: R) => e.application_id === r.id);
     return <>
       {header(`${r.plan_name} application`, <StatusBadge status={r.status} label={statusLabel[r.status as AppStatus]} />)}
+      {r.status === "info_requested" && <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4 text-sm">
+        <p className="font-semibold">We need a little more information</p>
+        <p className="mt-1 whitespace-pre-wrap">{[...events].reverse().find((e: R) => e.to_status === "info_requested")?.note ?? "See the timeline below."}</p>
+        <div className="mt-3 flex flex-wrap gap-2"><ActBtn dark onClick={() => a.respond(r)}>Send your reply</ActBtn><UploadButton relatedTable="applications" relatedId={r.id} onDone={a.refresh} label="Upload a file" className="h-8 rounded-full bg-secondary px-3 text-xs font-semibold" /></div>
+      </div>}
       <Section title="Application"><FieldGrid items={[["Plan", r.plan_name], ["Monthly fee", money(r.monthly_fee)], ["Monthly hours", r.monthly_hours], ["Submitted", formatDate(r.created_at)], ["Signed", formatDate(r.signed_at)], ["Decided", formatDate(r.decided_at)], ["Subscription", sub ? subLink(sub.id) : "—"]]} /></Section>
+      <Section title="Timeline">
+        <ol className="divide-y">{events.map((e: R) => <li key={e.id} className="px-5 py-3 text-sm">
+          <p className="font-medium">{e.actor_id === userId ? "You replied" : e.to_status ? statusLabel[e.to_status as AppStatus] : e.action}</p>
+          {e.note && <p className="mt-1 whitespace-pre-wrap rounded-lg bg-secondary/60 p-2">{e.note}</p>}
+          <p className="mt-1 text-xs text-muted-foreground">{e.actor_id === userId ? "You" : "FP team"}, {formatDate(e.created_at)}</p>
+        </li>)}{events.length === 0 && <li className="px-5 py-6 text-sm text-muted-foreground">No updates yet.</li>}</ol>
+      </Section>
+      {docsFor("applications", r.id).length > 0 && <Section title="Files you shared"><DocumentList docs={docsFor("applications", r.id)} /></Section>}
+      {a.modalEl}
+    </>;
+  }
+  if (kind === "deliverable") return <>
+    {header(r.title, <StatusBadge status={r.status} label={deliverableLabel[r.status]} />, r.status === "in_review" ? <><ActBtn dark onClick={() => a.review(r, "approved")}>Approve</ActBtn><ActBtn onClick={() => a.review(r, "changes_requested")}>Request changes</ActBtn></> : null)}
+    {r.status === "in_review" && <p className="rounded-xl border border-primary/30 bg-primary/5 p-3 text-sm">Please review the files below, then approve or tell us what to change.</p>}
+    <Section title="Deliverable"><FieldGrid items={[["Project", data.projects.find((p) => p.id === r.project_id)?.name ?? "—"], ["Plan", subLink(r.subscription_id)], ["Sent for review", formatDate(r.submitted_at)],
+      ["Review round", r.review_round || "—"], ["Due", formatDay(r.due_at)], ["Decided", formatDate(r.decided_at)], ["Description", r.description ?? "—"], ["Your feedback", r.client_feedback ?? "—"]]} /></Section>
+    <Section title="Files" actions={r.status === "in_review" ? <UploadButton relatedTable="deliverables" relatedId={r.id} onDone={a.refresh} label="Add a file" /> : undefined}>
+      <DocumentList docs={docsFor("deliverables", r.id)} empty="No files attached." />
+    </Section>
+    {a.modalEl}
+  </>;
+  if (kind === "report") {
+    const metrics = (Array.isArray(r.metrics) ? r.metrics : []) as Metric[];
+    return <>
+      {header(r.title, <StatusBadge status="published" label={new Date(`${r.period_start}T00:00:00Z`).toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" })} />)}
+      {metrics.length > 0 && <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{metrics.map((m) => <div key={m.label} className="rounded-2xl border bg-card p-4">
+        <p className="text-sm text-muted-foreground">{m.label}</p><p className="mt-1 text-2xl font-bold">{m.value}</p>{m.change && <p className={`text-xs font-semibold ${metricTone(m.change)}`}>{m.change}</p>}</div>)}</div>}
+      {r.summary && <Section title="Summary"><p className="whitespace-pre-wrap px-5 py-4 text-sm">{r.summary}</p></Section>}
+      <Section title="Files"><DocumentList docs={docsFor("client_reports", r.id)} empty="No files attached." /></Section>
     </>;
   }
   const msgs = data.messages.filter((m: R) => m.ticket_id === r.id);
@@ -111,6 +152,9 @@ function Details() {
         <li key={m.id} className={`rounded-xl p-3 text-sm ${m.actor_id === userId ? "ml-8 bg-secondary" : "mr-8 border"}`}><p className="whitespace-pre-wrap">{m.body}</p><p className="mt-1 text-xs text-muted-foreground">{m.actor_id === userId ? "You" : "FP team"}, {formatDate(m.created_at)}</p></li>
       ))}</ul>
       {r.status === "closed" && <p className="border-t p-4 text-sm text-muted-foreground">This ticket is closed and can't be reopened or replied to. Open a new request if you need more help.</p>}
+    </Section>
+    <Section title="Files" actions={r.status !== "closed" ? <UploadButton relatedTable="support_tickets" relatedId={r.id} onDone={a.refresh} label="Attach a file" /> : undefined}>
+      <DocumentList docs={docsFor("support_tickets", r.id)} empty="No files attached." />
     </Section>
     <Section title="Ticket"><FieldGrid items={[["Topic", humanize(r.category)], ["Priority", humanize(r.priority)], ["Plan", subLink(r.subscription_id)], ["Opened", formatDate(r.created_at)], ["Closed", formatDate(r.closed_at)]]} /></Section>
     {a.modalEl}

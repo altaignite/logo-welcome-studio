@@ -1,20 +1,27 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireSession } from "@/lib/session.middleware";
 import { plans } from "@/lib/signup";
 
 type Ctx = { supabase: any; userId: string; claims: any };
-async function isAdmin(ctx: Ctx) {
-  const { data } = await ctx.supabase.rpc("has_role", { _user_id: ctx.userId, _role: "admin" });
-  return !!data;
+/** Billing actions need the billing permission (see src/lib/staff.ts). */
+async function requireAdmin(ctx: Ctx) {
+  const { requirePerm } = await import("@/lib/access.server");
+  await requirePerm(ctx, "billing");
 }
-async function requireAdmin(ctx: Ctx) { if (!(await isAdmin(ctx))) throw new Error("Forbidden"); }
+/** Staff acting on a client's behalf: any staff member is treated as staff, but must hold the billing permission to act. */
+async function staffActor(ctx: Ctx) {
+  const { isStaff } = await import("@/lib/access.server");
+  if (!(await isStaff(ctx))) return false;
+  await requireAdmin(ctx);
+  return true;
+}
 const actorLabel = (ctx: Ctx) => String(ctx.claims?.email ?? "Client");
 const uuid = z.string().uuid();
 
 /** Staff create an order: approved application, pending subscription and project, and a Stripe invoice emailed to the client. */
 export const createOrder = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSession])
   .inputValidator((d: unknown) => z.object({ userId: uuid, planId: z.enum(["starter", "growth", "scale"]), notes: z.string().trim().max(1000).optional() }).parse(d))
   .handler(async ({ data, context }) => {
     await requireAdmin(context);
@@ -38,7 +45,7 @@ export const createOrder = createServerFn({ method: "POST" })
 
 /** Sends the first invoice for a pending subscription (e.g. after approving a signup). Activation happens on payment. */
 export const sendFirstInvoice = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSession])
   .inputValidator((d: unknown) => z.object({ subscriptionId: uuid }).parse(d))
   .handler(async ({ data, context }) => {
     await requireAdmin(context);
@@ -57,10 +64,10 @@ export const sendFirstInvoice = createServerFn({ method: "POST" })
 
 /** Pause, resume or cancel a subscription. Clients may act on their own; staff on any. */
 export const subscriptionAction = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSession])
   .inputValidator((d: unknown) => z.object({ subscriptionId: uuid, action: z.enum(["pause", "resume", "cancel_end", "cancel_now"]), reason: z.string().trim().min(3).max(1000) }).parse(d))
   .handler(async ({ data, context }) => {
-    const staff = await isAdmin(context);
+    const staff = await staffActor(context);
     const { getAdmin, applyStripeStatus, assertClientMayAct, voidOpenFirstInvoices } = await import("@/lib/billing.server");
     const { stripe, audit } = await import("@/lib/stripe.server");
     const { pauseVoidsGuarantee } = await import("@/lib/billing");
@@ -103,7 +110,7 @@ export const subscriptionAction = createServerFn({ method: "POST" })
 
 /** Bill hours used beyond the plan allowance, either on the next invoice or immediately. */
 export const billOverage = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSession])
   .inputValidator((d: unknown) => z.object({ subscriptionId: uuid, when: z.enum(["next_invoice", "now"]) }).parse(d))
   .handler(async ({ data, context }) => {
     await requireAdmin(context);
@@ -144,10 +151,10 @@ export const billOverage = createServerFn({ method: "POST" })
 
 /** Client (own task) or staff approve extra-hours work on a task. */
 export const approveOverage = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSession])
   .inputValidator((d: unknown) => z.object({ taskId: uuid }).parse(d))
   .handler(async ({ data, context }) => {
-    const staff = await isAdmin(context);
+    const staff = await staffActor(context);
     const { getAdmin, assertClientMayAct } = await import("@/lib/billing.server");
     const { audit } = await import("@/lib/stripe.server");
     const admin = await getAdmin();
@@ -161,7 +168,7 @@ export const approveOverage = createServerFn({ method: "POST" })
 
 /** Debt recovery actions on an unpaid invoice (staff only). */
 export const collectionAction = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSession])
   .inputValidator((d: unknown) => z.object({
     invoiceId: uuid,
     action: z.enum(["flag", "court", "settle", "write_off", "pause_interest", "resume_interest", "issue_arrears"]),
@@ -208,7 +215,7 @@ export const collectionAction = createServerFn({ method: "POST" })
 
 /** Opens Stripe's hosted billing portal for the signed-in client (update card, see receipts). */
 export const billingPortal = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSession])
   .handler(async ({ context }) => {
     const { getAdmin } = await import("@/lib/billing.server");
     const { stripe, ensureCustomer } = await import("@/lib/stripe.server");
@@ -222,7 +229,7 @@ export const billingPortal = createServerFn({ method: "POST" })
 
 /** Staff run the collections job on demand (the same job runs daily). */
 export const runCollectionsNow = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSession])
   .handler(async ({ context }) => {
     await requireAdmin(context);
     const { getAdmin, runCollections } = await import("@/lib/billing.server");
@@ -231,7 +238,7 @@ export const runCollectionsNow = createServerFn({ method: "POST" })
 
 /** Staff issue a one-off Stripe invoice against a subscription. */
 export const createInvoice = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSession])
   .inputValidator((d: unknown) => z.object({ subscriptionId: uuid, description: z.string().trim().min(2).max(300), amount: z.number().positive().max(1000000) }).parse(d))
   .handler(async ({ data, context }) => {
     await requireAdmin(context);
@@ -245,7 +252,7 @@ export const createInvoice = createServerFn({ method: "POST" })
 
 /** Refunds service fees through Stripe under the 90-day guarantee (only while it is still running). */
 export const guaranteeRefund = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSession])
   .inputValidator((d: unknown) => z.object({ subscriptionId: uuid, amount: z.number().positive().max(100000), reason: z.string().trim().min(3).max(1000) }).parse(d))
   .handler(async ({ data, context }) => {
     await requireAdmin(context);
@@ -255,7 +262,8 @@ export const guaranteeRefund = createServerFn({ method: "POST" })
     const { planRefund } = await import("@/lib/billing");
     const admin = await getAdmin();
     const { data: sub } = await admin.from("subscriptions").select("*").eq("id", data.subscriptionId).single();
-    if (!sub || sub.guarantee_status !== "running" || !guaranteeEligible(sub)) throw new Error("This subscription isn't eligible for a guarantee refund.");
+    // A claim made inside the window can still be refunded after the window ends.
+    if (!sub || sub.sales_received || !(sub.guarantee_status === "claimed" || (sub.guarantee_status === "running" && guaranteeEligible(sub)))) throw new Error("This subscription isn't eligible for a guarantee refund.");
     const { data: paid } = await admin.from("invoices").select("stripe_invoice_id").eq("subscription_id", sub.id).eq("status", "paid").not("stripe_invoice_id", "is", null).in("kind", ["first", "renewal", "service"]);
     // What's still refundable comes from Stripe, so refunds made earlier (or by a retry after a partial failure) are never repeated.
     const sources: { pi: string; refundable: number; refunded: number }[] = [];
@@ -282,7 +290,7 @@ export const guaranteeRefund = createServerFn({ method: "POST" })
 
 /** Voids unpaid invoices in Stripe first, then locally, so a voided invoice can't still be paid. Paid invoices are skipped. */
 export const voidInvoices = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSession])
   .inputValidator((d: unknown) => z.object({ invoiceIds: z.array(uuid).min(1).max(100), reason: z.string().trim().min(3).max(1000) }).parse(d))
   .handler(async ({ data, context }) => {
     await requireAdmin(context);

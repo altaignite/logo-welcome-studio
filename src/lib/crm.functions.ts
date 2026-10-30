@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireSession } from "@/lib/session.middleware";
 import { accountStatuses, signInBlocked, subscriptionEffect } from "@/lib/admin";
 
 const input = z.object({
@@ -11,11 +11,11 @@ const input = z.object({
 
 /** Changes client account status. Suspended and closed accounts are blocked from signing in. */
 export const setAccountStatus = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSession])
   .inputValidator((d: unknown) => input.parse(d))
   .handler(async ({ data, context }) => {
-    const { data: isAdmin } = await context.supabase.rpc("has_role", { _user_id: context.userId, _role: "admin" });
-    if (!isAdmin) throw new Error("Forbidden");
+    const { requirePerm } = await import("@/lib/access.server");
+    await requirePerm(context, "accounts");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { applyStripeStatus, must, voidOpenFirstInvoices } = await import("@/lib/billing.server");
     const { audit } = await import("@/lib/stripe.server");

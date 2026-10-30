@@ -6,6 +6,7 @@ import { FormModal, type FieldDef } from "@/components/admin/form-modal";
 import { setAccountStatus } from "@/lib/crm.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { DataTable, StatusBadge } from "@/components/admin/data-table";
+import { useEmailClients } from "@/components/admin/email-clients";
 import { accountStatusLabel, accountStatuses, formatAccount, formatDate, statusLabel, type AccountStatus } from "@/lib/admin";
 
 export const Route = createFileRoute("/admin/accounts/")({ component: Accounts });
@@ -15,6 +16,7 @@ function Accounts() {
   const qc = useQueryClient();
   const change = useServerFn(setAccountStatus);
   const [modal, setModal] = useState<{ ids: string[] } | null>(null);
+  const mail = useEmailClients(() => qc.invalidateQueries({ queryKey: ["admin"] }));
   const fields: FieldDef[] = [{ name: "status", label: "New status", type: "select", options: [...accountStatuses] }, { name: "reason", label: "Reason (saved in the audit log)", type: "textarea", required: true }];
   const { data = [], isLoading, error } = useQuery({
     queryKey: ["admin", "accounts"],
@@ -33,7 +35,7 @@ function Accounts() {
     <div className="space-y-6">
       <div><h1 className="text-2xl font-extrabold sm:text-3xl">Accounts</h1><p className="mt-1 text-sm text-muted-foreground">All client accounts. Select one to see the full account.</p></div>
       {error ? <p className="text-sm text-destructive">{(error as Error).message}</p> : isLoading ? <p className="text-sm text-muted-foreground">Loading accounts…</p> :
-        <DataTable<Row> title="Accounts" rows={data} getId={(r) => r.id} bulkActions={[{ label: "Change status", run: (rows) => setModal({ ids: rows.map((r) => r.id) }) }]} onRowClick={(r) => navigate({ to: "/admin/accounts/$id", params: { id: r.id } })} empty="No accounts yet." columns={[
+        <DataTable<Row> title="Accounts" rows={data} getId={(r) => r.id} bulkActions={[{ label: "Email", run: (rows) => mail.open(rows.map((r) => r.id)) }, { label: "Change status", run: (rows) => setModal({ ids: rows.map((r) => r.id) }) }]} onRowClick={(r) => navigate({ to: "/admin/accounts/$id", params: { id: r.id } })} empty="No accounts yet." columns={[
           { key: "acct", label: "Account no.", value: (r) => r.account_number, render: (r) => <span className="font-mono">{formatAccount(r.account_number)}</span> },
           { key: "name", label: "Name", value: (r) => `${r.first_name ?? ""} ${r.last_name ?? ""}`.trim() },
           { key: "company", label: "Business", value: (r) => r.company ?? "" },
@@ -46,6 +48,7 @@ function Accounts() {
         ]} />}
       {modal && <FormModal title={`Change status for ${modal.ids.length} account${modal.ids.length === 1 ? "" : "s"}`} description="Staff accounts and your own account are skipped." fields={fields} submitLabel="Save status" onClose={() => setModal(null)}
         onSubmit={async (v) => { if (v.reason!.length < 3) return "Add a short reason."; try { await change({ data: { userIds: modal.ids, status: v.status as AccountStatus, reason: v.reason! } }); await qc.invalidateQueries({ queryKey: ["admin"] }); return null; } catch (e) { return (e as Error).message; } }} />}
+      {mail.el}
     </div>
   );
 }
