@@ -1,17 +1,9 @@
--- Client and admin flow gaps: staff permission levels with optional enforced 2FA, notifications (in-app and email outbox),
--- client-visible application timeline, documents, signed agreements, deliverable reviews, client reports, onboarding briefs,
--- support SLAs and auto-assignment, message templates, global staff search and privacy request access for clients.
-
--- ===================================================================================================
--- Staff permission levels. Level rules mirror staffLevelGrants in src/lib/staff.ts.
--- ===================================================================================================
 CREATE TABLE public.staff_members (
   user_id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   level text NOT NULL DEFAULT 'viewer' CHECK (level IN ('owner','manager','support','billing','viewer')),
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
--- Staff who already have access keep full access.
 INSERT INTO public.staff_members (user_id, level) SELECT user_id, 'owner' FROM public.user_roles WHERE role = 'admin' ON CONFLICT DO NOTHING;
 GRANT SELECT ON public.staff_members TO authenticated;
 GRANT ALL ON public.staff_members TO service_role;
@@ -37,7 +29,6 @@ LANGUAGE sql IMMUTABLE SET search_path = public AS $$
     OR (_level = 'support' AND _perm = 'work')
     OR (_level = 'billing' AND _perm = 'billing') $$;
 
--- The signed-in session meets the 2FA rule: aal2 when the user has a verified factor (or staff 2FA is required).
 CREATE OR REPLACE FUNCTION public.mfa_satisfied() RETURNS boolean
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT coalesce(auth.jwt()->>'aal', 'aal1') = 'aal2'
@@ -47,7 +38,6 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
 REVOKE EXECUTE ON FUNCTION public.mfa_satisfied() FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.mfa_satisfied() TO authenticated;
 
--- Staff write access: staff role, a level that grants the permission, and (for the caller's own session) 2FA when required.
 CREATE OR REPLACE FUNCTION public.has_perm(_user_id uuid, _perm text) RETURNS boolean
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT public.has_role(_user_id, 'admin')
@@ -56,7 +46,6 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
 REVOKE EXECUTE ON FUNCTION public.has_perm(uuid, text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.has_perm(uuid, text) TO authenticated;
 
--- Write policies move from "any staff" to the matching permission. Reads stay open to all staff.
 DROP POLICY IF EXISTS "admin update profile" ON public.profiles;
 CREATE POLICY "staff update profile" ON public.profiles FOR UPDATE TO authenticated
   USING (public.has_perm(auth.uid(), 'accounts')) WITH CHECK (public.has_perm(auth.uid(), 'accounts'));
@@ -124,18 +113,14 @@ DROP POLICY IF EXISTS "admin update billing rules" ON public.billing_settings;
 CREATE POLICY "staff update billing rules" ON public.billing_settings FOR UPDATE TO authenticated
   USING (public.has_perm(auth.uid(), 'billing')) WITH CHECK (public.has_perm(auth.uid(), 'billing'));
 
--- ===================================================================================================
--- Notifications: in-app inbox plus an email outbox drained by /api/public/cron/notifications.
--- ===================================================================================================
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS email_notifications boolean NOT NULL DEFAULT true;
 
 CREATE TABLE public.notifications (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL,
   kind text NOT NULL,
   title text NOT NULL,
   body text,
-  -- In-app paths only, so a notification can never link off-site.
   link text CHECK (link IS NULL OR link ~ '^/[A-Za-z0-9]'),
   dedupe_key text UNIQUE,
   read_at timestamptz,
@@ -152,7 +137,6 @@ GRANT ALL ON public.notifications TO service_role;
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "own notifications" ON public.notifications FOR SELECT TO authenticated USING (user_id = auth.uid());
 
--- Marks the caller's own notifications read (all when ids is null).
 CREATE OR REPLACE FUNCTION public.mark_notifications_read(_ids uuid[] DEFAULT NULL) RETURNS int
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE n int;
@@ -179,7 +163,6 @@ END $$;
 REVOKE EXECUTE ON FUNCTION public.notify(uuid, text, text, text, text, boolean, text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.notify(uuid, text, text, text, text, boolean, text) TO service_role;
 
--- Notifies the assigned staff member (by email) when there is one, otherwise every staff member whose level grants the permission.
 CREATE OR REPLACE FUNCTION public.notify_staff(_perm text, _assigned text, _kind text, _title text, _body text, _link text, _dedupe text DEFAULT NULL)
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE target uuid;
@@ -200,7 +183,6 @@ END $$;
 REVOKE EXECUTE ON FUNCTION public.notify_staff(text, text, text, text, text, text, text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.notify_staff(text, text, text, text, text, text, text) TO service_role;
 
--- New staff (granted by the verified staff-domain trigger) start as viewers; owners are asked to set their level.
 CREATE OR REPLACE FUNCTION public.on_staff_role_granted() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE who text;
@@ -214,13 +196,9 @@ END $$;
 REVOKE EXECUTE ON FUNCTION public.on_staff_role_granted() FROM PUBLIC, anon, authenticated;
 CREATE TRIGGER staff_role_granted AFTER INSERT ON public.user_roles FOR EACH ROW EXECUTE FUNCTION public.on_staff_role_granted();
 
--- ===================================================================================================
--- Application timeline the client can see. Mirrors clientVisibleStatuses and clientResponse in src/lib/admin.ts.
--- ===================================================================================================
 ALTER TABLE public.application_events ADD COLUMN IF NOT EXISTS visible_to_client boolean NOT NULL DEFAULT false;
 UPDATE public.application_events SET visible_to_client = true WHERE to_status::text IN ('submitted','info_requested','approved','rejected','suspended');
 
--- Status changes into a client-facing status are always shared with the client, including their note; staff can't share anything else.
 CREATE OR REPLACE FUNCTION public.set_event_visibility() RETURNS trigger
 LANGUAGE plpgsql SET search_path = public AS $$
 DECLARE shared boolean := NEW.to_status IS NOT NULL AND NEW.to_status::text IN ('submitted','info_requested','approved','rejected','suspended');
@@ -242,7 +220,6 @@ BEGIN
   IF app.id IS NULL THEN RETURN NEW; END IF;
   IF NEW.actor_id IS NOT NULL AND NEW.actor_id = app.user_id THEN
     PERFORM notify_staff('accounts', app.assigned_to, 'application', 'Client replied on the ' || app.plan_name || ' application', NEW.note, '/admin/applications/' || app.id);
-  -- Suspensions are announced by the subscription status notification instead.
   ELSIF NEW.visible_to_client AND NEW.to_status IS DISTINCT FROM NEW.from_status AND NEW.to_status::text NOT IN ('submitted','suspended') THEN
     PERFORM notify(app.user_id, 'application',
       CASE NEW.to_status::text
@@ -268,9 +245,6 @@ END $$;
 REVOKE EXECUTE ON FUNCTION public.notify_new_application() FROM PUBLIC, anon, authenticated;
 CREATE TRIGGER application_created_notify AFTER INSERT ON public.applications FOR EACH ROW EXECUTE FUNCTION public.notify_new_application();
 
--- ===================================================================================================
--- Support: first-response and last-message times for SLAs, auto-assignment to the account manager, notifications.
--- ===================================================================================================
 ALTER TABLE public.support_tickets
   ADD COLUMN IF NOT EXISTS first_response_at timestamptz,
   ADD COLUMN IF NOT EXISTS last_client_message_at timestamptz,
@@ -302,7 +276,6 @@ END $$;
 REVOKE EXECUTE ON FUNCTION public.on_ticket_message() FROM PUBLIC, anon, authenticated;
 CREATE TRIGGER ticket_message_effects AFTER INSERT ON public.ticket_messages FOR EACH ROW EXECUTE FUNCTION public.on_ticket_message();
 
--- Runs after insert (RLS checks the client's row before this) and assigns the account manager when they are staff.
 CREATE OR REPLACE FUNCTION public.assign_new_ticket() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE mgr text;
@@ -317,9 +290,6 @@ END $$;
 REVOKE EXECUTE ON FUNCTION public.assign_new_ticket() FROM PUBLIC, anon, authenticated;
 CREATE TRIGGER ticket_auto_assign AFTER INSERT ON public.support_tickets FOR EACH ROW EXECUTE FUNCTION public.assign_new_ticket();
 
--- ===================================================================================================
--- Client notifications for plan, task, invoice and privacy changes.
--- ===================================================================================================
 CREATE OR REPLACE FUNCTION public.notify_subscription_status() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
@@ -350,7 +320,6 @@ END $$;
 REVOKE EXECUTE ON FUNCTION public.notify_task_overage() FROM PUBLIC, anon, authenticated;
 CREATE TRIGGER task_overage_notify AFTER UPDATE OF over_allowance ON public.tasks FOR EACH ROW EXECUTE FUNCTION public.notify_task_overage();
 
--- Stripe already emails invoices, so new ones are in-app only; overdue ones are emailed once.
 CREATE OR REPLACE FUNCTION public.notify_invoice() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
@@ -364,7 +333,6 @@ END $$;
 REVOKE EXECUTE ON FUNCTION public.notify_invoice() FROM PUBLIC, anon, authenticated;
 CREATE TRIGGER invoice_notify AFTER INSERT OR UPDATE OF status ON public.invoices FOR EACH ROW EXECUTE FUNCTION public.notify_invoice();
 
--- Clients can follow their own privacy requests.
 CREATE POLICY "client read own compliance" ON public.compliance_requests FOR SELECT TO authenticated USING (user_id = auth.uid());
 
 CREATE OR REPLACE FUNCTION public.notify_compliance() RETURNS trigger
@@ -380,27 +348,13 @@ END $$;
 REVOKE EXECUTE ON FUNCTION public.notify_compliance() FROM PUBLIC, anon, authenticated;
 CREATE TRIGGER compliance_notify AFTER INSERT OR UPDATE OF status ON public.compliance_requests FOR EACH ROW EXECUTE FUNCTION public.notify_compliance();
 
--- Follow-ups can be ticked off.
 ALTER TABLE public.crm_activities ADD COLUMN IF NOT EXISTS follow_up_done_at timestamptz;
-
--- ===================================================================================================
--- Documents: private storage bucket, accessed only through server functions that issue short-lived signed URLs.
--- ===================================================================================================
-INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-VALUES ('client-files', 'client-files', false, 26214400, ARRAY[
-  'application/pdf','image/png','image/jpeg','image/gif','image/webp','text/plain','text/csv','application/json','application/zip',
-  'application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'application/vnd.ms-excel','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  'application/vnd.ms-powerpoint','application/vnd.openxmlformats-officedocument.presentationml.presentation',
-  'video/mp4','audio/mpeg'])
-ON CONFLICT (id) DO NOTHING;
 
 CREATE TABLE public.documents (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL,
   kind text NOT NULL DEFAULT 'file' CHECK (kind IN ('file','deliverable','report','export')),
   title text NOT NULL CHECK (length(title) BETWEEN 1 AND 200),
-  -- Every object lives under its client's folder, so a document can only ever point at that client's files.
   storage_path text NOT NULL UNIQUE CHECK (split_part(storage_path, '/', 1) = user_id::text),
   size_bytes bigint,
   mime_type text,
@@ -425,7 +379,6 @@ CREATE POLICY "staff update documents" ON public.documents FOR UPDATE TO authent
   USING (public.has_perm(auth.uid(), 'work')) WITH CHECK (public.has_perm(auth.uid(), 'work'));
 CREATE TRIGGER audit_documents AFTER INSERT OR UPDATE OR DELETE ON public.documents FOR EACH ROW EXECUTE FUNCTION public.write_audit_log();
 
--- Staff may rename, hide or archive a document, never repoint it at another file or client.
 CREATE OR REPLACE FUNCTION public.guard_document() RETURNS trigger
 LANGUAGE plpgsql SET search_path = public AS $$
 BEGIN
@@ -453,7 +406,6 @@ END $$;
 REVOKE EXECUTE ON FUNCTION public.notify_document() FROM PUBLIC, anon, authenticated;
 CREATE TRIGGER document_notify AFTER INSERT OR UPDATE OF status ON public.documents FOR EACH ROW EXECUTE FUNCTION public.notify_document();
 
--- Signed agreements: an immutable server-rendered copy of what the client signed (see agreementDocuments in src/lib/signup.ts).
 CREATE TABLE public.signed_agreements (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL,
@@ -479,9 +431,6 @@ END $$;
 REVOKE EXECUTE ON FUNCTION public.guard_signed_agreement() FROM PUBLIC, anon, authenticated;
 CREATE TRIGGER signed_agreement_immutable BEFORE UPDATE OR DELETE ON public.signed_agreements FOR EACH ROW EXECUTE FUNCTION public.guard_signed_agreement();
 
--- ===================================================================================================
--- Deliverables sent to the client for review and sign-off.
--- ===================================================================================================
 CREATE TABLE public.deliverables (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL,
@@ -514,7 +463,6 @@ CREATE POLICY "staff update deliverables" ON public.deliverables FOR UPDATE TO a
   USING (public.has_perm(auth.uid(), 'work')) WITH CHECK (public.has_perm(auth.uid(), 'work'));
 CREATE TRIGGER audit_deliverables AFTER INSERT OR UPDATE OR DELETE ON public.deliverables FOR EACH ROW EXECUTE FUNCTION public.write_audit_log();
 
--- Only the client (through reviewDeliverable, service role) records a decision; staff can send, withdraw or archive.
 CREATE OR REPLACE FUNCTION public.guard_deliverable() RETURNS trigger
 LANGUAGE plpgsql SET search_path = public AS $$
 BEGIN
@@ -553,9 +501,6 @@ END $$;
 REVOKE EXECUTE ON FUNCTION public.notify_deliverable() FROM PUBLIC, anon, authenticated;
 CREATE TRIGGER deliverable_notify AFTER INSERT OR UPDATE OF status ON public.deliverables FOR EACH ROW EXECUTE FUNCTION public.notify_deliverable();
 
--- ===================================================================================================
--- Client results reports (metrics plus attached files), published by staff.
--- ===================================================================================================
 CREATE TABLE public.client_reports (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL,
@@ -593,11 +538,8 @@ END $$;
 REVOKE EXECUTE ON FUNCTION public.notify_report() FROM PUBLIC, anon, authenticated;
 CREATE TRIGGER report_notify AFTER INSERT OR UPDATE OF published_at ON public.client_reports FOR EACH ROW EXECUTE FUNCTION public.notify_report();
 
--- ===================================================================================================
--- Onboarding brief (questions and validation in src/lib/onboarding.ts, saved through saveOnboardingBrief).
--- ===================================================================================================
 CREATE TABLE public.onboarding_briefs (
-  user_id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  user_id uuid PRIMARY KEY,
   answers jsonb NOT NULL DEFAULT '{}' CHECK (jsonb_typeof(answers) = 'object' AND pg_column_size(answers) < 40000),
   submitted_at timestamptz,
   updated_at timestamptz NOT NULL DEFAULT now()
@@ -620,9 +562,6 @@ END $$;
 REVOKE EXECUTE ON FUNCTION public.notify_brief() FROM PUBLIC, anon, authenticated;
 CREATE TRIGGER brief_notify AFTER INSERT OR UPDATE OF submitted_at ON public.onboarding_briefs FOR EACH ROW EXECUTE FUNCTION public.notify_brief();
 
--- ===================================================================================================
--- Message templates for client emails.
--- ===================================================================================================
 CREATE TABLE public.message_templates (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name text NOT NULL UNIQUE CHECK (length(name) BETWEEN 1 AND 120),
@@ -640,9 +579,6 @@ CREATE POLICY "staff read templates" ON public.message_templates FOR SELECT TO a
 CREATE POLICY "staff write templates" ON public.message_templates FOR ALL TO authenticated
   USING (public.has_perm(auth.uid(), 'work')) WITH CHECK (public.has_perm(auth.uid(), 'work'));
 
--- ===================================================================================================
--- Scheduled job bookkeeping (daily reminders run once per day from the notifications job).
--- ===================================================================================================
 CREATE TABLE public.job_runs (
   name text PRIMARY KEY,
   last_run_on date,
@@ -651,9 +587,6 @@ CREATE TABLE public.job_runs (
 GRANT ALL ON public.job_runs TO service_role;
 ALTER TABLE public.job_runs ENABLE ROW LEVEL SECURITY;
 
--- ===================================================================================================
--- Staff directory (with 2FA status) and global search. Both are staff only.
--- ===================================================================================================
 CREATE OR REPLACE FUNCTION public.staff_directory() RETURNS TABLE (user_id uuid, email text, name text, level text, mfa_enabled boolean, created_at timestamptz)
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public AS $$
 BEGIN
@@ -667,7 +600,6 @@ END $$;
 REVOKE EXECUTE ON FUNCTION public.staff_directory() FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.staff_directory() TO authenticated;
 
--- Runs as the caller, so row level security still decides what is found.
 CREATE OR REPLACE FUNCTION public.staff_search(q text) RETURNS TABLE (kind text, id uuid, title text, subtitle text, account_id uuid)
 LANGUAGE plpgsql STABLE SECURITY INVOKER SET search_path = public AS $$
 DECLARE pat text; digits text;
@@ -699,10 +631,6 @@ END $$;
 REVOKE EXECUTE ON FUNCTION public.staff_search(text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.staff_search(text) TO authenticated;
 
--- ===================================================================================================
--- Two-factor sessions: once a user has a verified authenticator, a session that hasn't passed it (aal1) can read or change
--- nothing. Restrictive policies are ANDed with every other policy. Server functions check the same rule (requireSession).
--- ===================================================================================================
 CREATE OR REPLACE FUNCTION public.mfa_session_ok() RETURNS boolean
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT coalesce(auth.jwt()->>'aal', 'aal1') = 'aal2'
