@@ -11,6 +11,7 @@ import { usePopup } from "@/components/popup";
 import { isUnconfirmedEmail, unconfirmedPopup } from "@/lib/email-confirmation";
 import { supabase } from "@/integrations/supabase/client";
 import { agreementDocuments } from "@/lib/agreements";
+import { passwordProblem, passwordRules } from "@/lib/passwords";
 import { createAccountNumber, accountSchema, countries, personalSchema, plans, type Plan, type CountryCode, type PersonalDetails, formatPhoneInput, switchPhoneCountry, phonePlaceholder, phoneNational } from "@/lib/signup";
 import logo from "@/assets/logo.png.asset.json";
 import { AgreementsList, OrderWizard, PlanCards, ReviewRow, ReviewSection, SignDialog, formatAccountNumber } from "@/components/order-flow";
@@ -106,8 +107,16 @@ function Signup() {
     setGateBusy(true);
     try {
       const r = await fetch("/api/public/account-check", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email }) });
-      const body = (await r.json().catch(() => ({}))) as { exists?: boolean; error?: string };
-      if (!r.ok) throw new Error(body.error ?? "We couldn't check your email. Please try again.");
+      const body = (await r.json().catch(() => ({}))) as { exists?: boolean; error?: string; risk?: { suggestion?: string } };
+      if (!r.ok) {
+        const fix = body.risk?.suggestion;
+        if (fix) { popup({ type: "error", title: "Check your email address", description: `${body.error ?? "This email can't be used."} Did you mean ${fix}?`, primaryLabel: `Use ${fix}`, onPrimary: () => setAccount((a) => ({ ...a, email: fix })), secondaryLabel: "Edit it myself" }); return; }
+        throw new Error(body.error ?? "We couldn't check your email. Please try again.");
+      }
+      const fix = body.risk?.suggestion;
+      if (!body.exists && fix) {
+        popup({ type: "info", title: "Did you mean " + fix + "?", description: "Your email looks like it may have a typo. We'll send important account emails there.", primaryLabel: `Use ${fix}`, onPrimary: () => setAccount((a) => ({ ...a, email: fix })), secondaryLabel: "Keep " + email });
+      }
       setGate(body.exists ? "password" : null);
     } catch (e) { popup({ type: "error", title: "We couldn't check your email", description: (e as Error).message, primaryLabel: "Close", secondaryLabel: null }); }
     finally { setGateBusy(false); }
@@ -135,12 +144,18 @@ function Signup() {
     await supabase.auth.resetPasswordForEmail(account.email.trim(), { redirectTo: `${window.location.origin}/reset-password` });
     popup({ type: "success", title: "Check your email", description: `We sent a reset link to ${account.email.trim()}. Set a new password in the tab it opens, then come back here and sign in. Your order is kept on this page.`, primaryLabel: "Got it", secondaryLabel: null });
   };
-  const advance = (event: FormEvent) => {
+  const advance = async (event: FormEvent) => {
     event.preventDefault();
     const result = step === 1 ? personalSchema.safeParse(personal) : step === 2 ? accountSchema.safeParse(account) : null;
     if (result && !result.success) {
       popup({ type: "error", title: "Let's check your details", description: result.error.issues[0]?.message ?? "Please check your information.", primaryLabel: "Try again", secondaryLabel: null });
       return;
+    }
+    if (step === 2) {
+      setGateBusy(true);
+      const issue = await passwordProblem(account.password, account.email);
+      setGateBusy(false);
+      if (issue) { popup({ type: "error", title: "Choose a different password", description: issue, primaryLabel: "Try again", secondaryLabel: null }); return; }
     }
     if (step === 2 && !accountNumber) setAccountNumber(createAccountNumber());
     setStep((s) => s + 1);
@@ -229,7 +244,7 @@ function Signup() {
           </> : <>
             <div className="flex items-center justify-between gap-3 border-b pb-3 text-sm"><span className="min-w-0 truncate">{account.email}</span><button type="button" className="shrink-0 text-xs font-medium underline underline-offset-4" onClick={() => { setStep(1); setGate("email"); }}>Change</button></div>
             <Field label="Password"><div className="relative"><input className="signup-input pr-12" type={showPassword ? "text" : "password"} autoComplete="new-password" maxLength={128} value={account.password} onChange={(e) => setAccount({ ...account, password: e.target.value })} /><Button variant="ghost" size="icon" type="button" aria-label={showPassword ? "Hide password" : "Show password"} className="absolute right-1 top-1/2 -translate-y-1/2" onClick={() => setShowPassword((s) => !s)}>{showPassword ? <EyeOff /> : <Eye />}</Button></div></Field>
-            <p className="text-xs text-muted-foreground">At least 8 characters.</p>
+            <ul className="grid gap-1 text-xs text-muted-foreground sm:grid-cols-2">{passwordRules.map((r) => <li key={r} className="flex items-center gap-1.5"><Check className="size-3" />{r}</li>)}</ul>
             <Field label="Confirm password"><input className="signup-input" type={showPassword ? "text" : "password"} autoComplete="new-password" maxLength={128} value={account.confirmPassword} onChange={(e) => setAccount({ ...account, confirmPassword: e.target.value })} /></Field>
             <div className="flex gap-3 border-t pt-5 text-sm text-muted-foreground"><LockKeyhole className="size-5 shrink-0" /><p>Your account is created when you sign your agreement. We'll email you a link to confirm your address.</p></div>
           </>}

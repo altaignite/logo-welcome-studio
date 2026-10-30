@@ -162,6 +162,13 @@
       "when": 1793326363660,
       "tag": "0022_security_events",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1793326364660,
+      "tag": "0023_account_change_requests",
+      "breakpoints": true
     }
   ]
 }

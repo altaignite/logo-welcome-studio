@@ -17,13 +17,7 @@ export const profileUpdateSchema = z.object({
   marketing_opt_in: z.boolean().optional(), sms_opt_in: z.boolean().optional(), email_notifications: z.boolean().optional(),
 }).strict();
 
-/** Returns a message when a password is too weak, or null when it's acceptable. */
-export function passwordIssue(pw: string): string | null {
-  if (pw.length < 10) return "Use at least 10 characters.";
-  if (!/[a-z]/.test(pw) || !/[A-Z]/.test(pw)) return "Use both upper and lower case letters.";
-  if (!/\d/.test(pw)) return "Include at least one number.";
-  return null;
-}
+export { passwordIssue } from "@/lib/passwords";
 
 /** Upgrades take effect now (prorated); downgrades wait until renewal so paid hours aren't lost. */
 export function planChangeTiming(fromPlanName: string, toPlanId: string): "now" | "renewal" | "same" {

@@ -1,4 +1,7 @@
 /** Pure billing, overage, guarantee and debt-recovery rules shared by server and UI. */
+
+/** Only an order that never started (unpaid first invoice) may be cancelled immediately; started plans end at the period end. */
+export const cancelNowAllowed = (sub: { started_at: string | null; status: string }) => !sub.started_at && ["pending", "paused"].includes(sub.status);
 import { GUARANTEE_CLAIM_DAYS, GUARANTEE_DAYS } from "@/lib/admin";
 
 export type BillingRules = {

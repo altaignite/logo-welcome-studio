@@ -83,27 +83,12 @@ export const changePlan = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => z.object({ subscriptionId: uuid, planId: z.enum(["starter", "growth", "scale"]) }).parse(d))
   .handler(async ({ data, context }) => {
     const { getAdmin, assertClientMayAct } = await import("@/lib/billing.server");
-    const { stripe, planPrice, audit } = await import("@/lib/stripe.server");
+    const { applyPlanChange } = await import("@/lib/changes.server");
     const admin = await getAdmin();
     const sub = await ownSub(admin, data.subscriptionId, context.userId);
     await assertClientMayAct(admin, context.userId);
     if (sub.status !== "active") throw new Error("Only active plans can be changed.");
-    const plan = plans.find((p) => p.id === data.planId)!;
-    const timing = planChangeTiming(sub.plan_name, plan.id);
-    if (timing === "same" && !sub.pending_plan_id) return { timing };
-    if (sub.stripe_subscription_id) {
-        const s = await stripe("GET", `subscriptions/${sub.stripe_subscription_id}`);
-        const item = s.items?.data?.[0]?.id;
-        if (!item) throw new Error("Couldn't find the plan in billing.");
-        await stripe("POST", `subscriptions/${sub.stripe_subscription_id}`, { "items[0][id]": item, "items[0][price]": await planPrice(plan.name, plan.monthlyFee), proration_behavior: timing === "now" ? "always_invoice" : "none" });
-    }
-    if (timing === "now") {
-      await admin.from("subscriptions").update({ plan_name: plan.name, monthly_fee: plan.monthlyFee, monthly_hours: plan.monthlyHours, pending_plan_id: null }).eq("id", sub.id);
-    } else {
-      await admin.from("subscriptions").update({ pending_plan_id: timing === "same" ? null : plan.id }).eq("id", sub.id);
-    }
-    await audit(admin, sub.user_id, "subscriptions", sub.id, timing === "now" ? "plan_upgraded" : "plan_downgrade_scheduled", { plan: { from: sub.plan_name, to: plan.name } }, context.userId, label(context));
-    return { timing };
+    return applyPlanChange(admin, sub, plans.find((p) => p.id === data.planId)!, context.userId, label(context));
   });
 
 /** Keep a plan that was set to cancel at the end of the period. */

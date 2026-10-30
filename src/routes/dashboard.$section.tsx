@@ -1,5 +1,5 @@
 import { CountryField } from "@/components/country-field";
-import { createFileRoute, notFound, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
 import { ErrorState, PageSkeleton, SectionSkeleton } from "@/components/loading";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState, type FormEvent } from "react";
@@ -12,7 +12,8 @@ import { ActBtn, Actions, SubButtons, invoiceTotal, useClient, useClientActions,
 import { supabase } from "@/integrations/supabase/client";
 import { formatAccount, formatDate, formatDay, humanize, money, statusLabel, type AppStatus } from "@/lib/admin";
 import { stageLabel, type CollectionStage } from "@/lib/billing";
-import { passwordIssue, profileUpdateSchema } from "@/lib/client";
+import { profileUpdateSchema } from "@/lib/client";
+import { passwordProblem } from "@/lib/passwords";
 import { requestPrivacy, updateMyProfile } from "@/lib/client.functions";
 import { myAgreements, saveOnboardingBrief } from "@/lib/portal.functions";
 import { AgreementList, DocumentList, UploadButton } from "@/components/files";
@@ -189,6 +190,8 @@ function ProfileForm({ p, privacyRows, refresh }: { p: R; privacyRows: R[]; refr
     </Section>
     <Section title="Your privacy">
       <div className="flex flex-wrap gap-2 p-5"><ActBtn onClick={() => ask("access")}>Request my data</ActBtn><ActBtn danger onClick={() => ask("deletion")}>Close my account</ActBtn></div>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t px-5 py-4 text-sm"><span><span className="block font-medium">Close my account</span><span className="text-muted-foreground">Plans end at the end of their paid period; invoices stay payable.</span></span>
+        <Link to="/dashboard/close" className="inline-flex h-9 items-center rounded-full border border-destructive/40 px-4 text-xs font-semibold text-destructive">Close account</Link></div>
       {privacyRows.length > 0 && <ul className="divide-y border-t text-sm">{privacyRows.map((r) => <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 px-5 py-3">
         <span><span className="block font-medium capitalize">{humanize(r.kind)} request</span><span className="text-xs text-muted-foreground">Sent {formatDate(r.created_at)}{r.status === "open" ? `, due by ${formatDay(r.due_at)}` : ""}{r.outcome_note ? `. ${r.outcome_note}` : ""}</span></span>
         <StatusBadge status={r.status} /></li>)}</ul>}
@@ -204,11 +207,12 @@ function SecurityPanel() {
     e.preventDefault();
     const f = new FormData(e.currentTarget); const form = e.currentTarget;
     const current = String(f.get("current") ?? ""), pw = String(f.get("password") ?? ""), confirm = String(f.get("confirm") ?? "");
-    const issue = passwordIssue(pw);
     if (!current) return popup({ type: "error", title: "Enter your current password", description: "We need it to confirm it's you." });
-    if (issue) return popup({ type: "error", title: "Choose a stronger password", description: issue });
     if (pw !== confirm) return popup({ type: "error", title: "Passwords don't match", description: "Type the same new password twice." });
+    if (pw === current) return popup({ type: "error", title: "Choose a new password", description: "Your new password must be different from the current one." });
     setBusy("pw");
+    const issue = await passwordProblem(pw, (await supabase.auth.getUser()).data.user?.email);
+    if (issue) { setBusy(null); return popup({ type: "error", title: "Choose a different password", description: issue }); }
     const { error } = await supabase.auth.updateUser({ password: pw, current_password: current } as never);
     setBusy(null);
     if (error) return popup({ type: "error", title: "Couldn't change password", description: error.message });

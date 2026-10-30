@@ -14,6 +14,66 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_change_requests: {
+        Row: {
+          actor_label: string
+          created_at: string
+          details: string | null
+          effective_at: string | null
+          feedback: Json
+          from_plan: string | null
+          id: string
+          kind: string
+          reason: string
+          review_note: string | null
+          reviewed_at: string | null
+          reviewed_by_label: string | null
+          signed_at: string
+          status: string
+          subscription_id: string | null
+          to_plan: string | null
+          user_id: string
+        }
+        Insert: {
+          actor_label?: string
+          created_at?: string
+          details?: string | null
+          effective_at?: string | null
+          feedback?: Json
+          from_plan?: string | null
+          id?: string
+          kind: string
+          reason: string
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by_label?: string | null
+          signed_at: string
+          status?: string
+          subscription_id?: string | null
+          to_plan?: string | null
+          user_id: string
+        }
+        Update: {
+          actor_label?: string
+          created_at?: string
+          details?: string | null
+          effective_at?: string | null
+          feedback?: Json
+          from_plan?: string | null
+          id?: string
+          kind?: string
+          reason?: string
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by_label?: string | null
+          signed_at?: string
+          status?: string
+          subscription_id?: string | null
+          to_plan?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       application_events: {
         Row: {
           action: string

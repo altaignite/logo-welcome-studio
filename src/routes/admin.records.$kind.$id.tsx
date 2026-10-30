@@ -5,6 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { approveOverage, billOverage, collectionAction, createInvoice, guaranteeRefund, sendFirstInvoice, subscriptionAction, voidInvoices } from "@/lib/billing.functions";
 import { stageLabel, unbilledOverage, type CollectionStage } from "@/lib/billing";
 import { useState } from "react";
+import { reviewAccountChange } from "@/lib/changes.functions";
 import { Archive, ArchiveRestore, Ban, Check, Clock, CreditCard, Download, Eye, EyeOff, MessageSquare, Pencil, Plus, RefreshCw, RotateCcw, Send, Trash2, Undo2, UserX } from "lucide-react";
 import { DataTable } from "@/components/admin/data-table";
 import { FormModal, type FieldDef } from "@/components/admin/form-modal";
@@ -31,6 +32,7 @@ function RecordPage() {
   const [modal, setModal] = useState<Modal | null>(null);
   const cfg = isRecordKind(kind) ? recordKinds[kind] : null;
   const staff = useStaff();
+  const fnReview = useServerFn(reviewAccountChange);
   const fnAccess = useServerFn(fulfilAccessRequest), fnClose = useServerFn(fulfilDeletionRequest);
   const fnFirst = useServerFn(sendFirstInvoice), fnSub = useServerFn(subscriptionAction), fnOver = useServerFn(billOverage), fnColl = useServerFn(collectionAction), fnApprove = useServerFn(approveOverage), fnInvoice = useServerFn(createInvoice), fnRefund = useServerFn(guaranteeRefund), fnVoid = useServerFn(voidInvoices);
 
@@ -220,7 +222,9 @@ function RecordPage() {
           {kind === "invoices" && !!row.hosted_url && <Btn icon={CreditCard} onClick={() => window.open(String(row.hosted_url), "_blank", "noopener")}>Open Stripe invoice</Btn>}
           {kind === "invoices" && (row.status === "open" || row.status === "overdue") && <Btn icon={Ban} onClick={collections}>Collections</Btn>}
           {kind === "support_tickets" && <Btn icon={MessageSquare} onClick={reply}>Add message</Btn>}
-          {!isVoid && <Btn icon={Pencil} onClick={edit}>Edit</Btn>}
+          {!isVoid && !cfg.readonly && <Btn icon={Pencil} onClick={edit}>Edit</Btn>}
+          {kind === "account_change_requests" && row.status === "actioned" && <Btn icon={Check} onClick={() => setModal({ title: "Mark as reviewed", submitLabel: "Mark reviewed", description: "The change was applied when the client signed. Add a note for the team if anything needs follow-up.", fields: [{ name: "note", label: "Review note", type: "textarea" }],
+            onSubmit: async (v: Vals) => { try { await fnReview({ data: { id: row.id, ...(v.note ? { note: v.note } : {}) } }); await refresh(); return null; } catch (e) { return (e as Error).message; } } })}>Mark reviewed</Btn>}
           {cfg.archivable && <Btn icon={row.archived_at ? ArchiveRestore : Archive} onClick={archive}>{row.archived_at ? "Restore" : "Archive"}</Btn>}
           {cfg.voidable && !isVoid && <Btn icon={Ban} danger onClick={voidIt}>Void</Btn>}
           {canDelete(kind) && <Btn icon={Trash2} danger onClick={remove}>Delete</Btn>}

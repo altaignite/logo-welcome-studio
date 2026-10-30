@@ -73,24 +73,18 @@ export function useClientActions() {
   const fail = (e: unknown) => popup({ type: "error", title: "Something went wrong", description: (e as Error).message, primaryLabel: "Close", secondaryLabel: null });
   const err = (e: unknown) => (e as Error).message || "Something went wrong.";
 
-  const subAct = (s: R, action: "pause" | "resume" | "cancel_end") => setModal({
+  const subAct = (s: R, action: "pause" | "resume" | "cancel_end") => action === "cancel_end" ? void navigate({ to: "/dashboard/change/$id", params: { id: s.id }, search: { action: "cancel" } }) : setModal({
     title: { pause: "Pause your plan", resume: "Resume your plan", cancel_end: "Cancel your plan" }[action], submitLabel: "Confirm",
     description: action === "pause" && s.guarantee_status === "running" && pauseVoidsGuarantee(s.started_at)
       ? "Pausing within your first 90 days ends your money-back guarantee. Work and billing stop while paused."
-      : action === "cancel_end" ? "Your plan stays active until the end of the current billing period. You can undo this before then." : action === "pause" ? "Work and billing stop while paused." : "Work and billing restart today.",
+      : action === "pause" ? "Work and billing stop while paused." : "Work and billing restart today.",
     fields: [{ name: "reason", label: "Reason", type: "textarea", required: true }],
     onSubmit: async (v) => { try { await fnSub({ data: { subscriptionId: s.id, action, reason: v.reason } }); await refresh(); return null; } catch (e) { return err(e); } },
   });
   const undo = (s: R) => popup({ type: "info", title: "Keep your plan?", description: `Your ${s.plan_name} plan will keep renewing as normal.`, primaryLabel: "Keep plan", secondaryLabel: "Cancel",
     onPrimary: async () => { try { await fnUndo({ data: { subscriptionId: s.id } }); await refresh(); } catch (e) { fail(e); } } });
-  const change = (s: R) => setModal({
-    title: "Change plan", submitLabel: "Change plan",
-    description: "Upgrades start now and you pay the difference for this month. Downgrades start at your next renewal so you keep this month's hours.",
-    fields: [{ name: "plan", label: "New plan", type: "select", options: plans.map((p) => `${p.id}`), defaultValue: plans.find((p) => p.name === s.plan_name)?.id ?? "growth" }],
-    onSubmit: async (v) => { try { const r = await fnChange({ data: { subscriptionId: s.id, planId: v.plan } }); await refresh();
-      if (r.timing === "renewal") popup({ type: "success", title: "Change scheduled", description: "Your new plan starts at your next renewal.", primaryLabel: "Got it", secondaryLabel: null });
-      return null; } catch (e) { return err(e); } },
-  });
+  const change = (s: R) => navigate({ to: "/dashboard/change/$id", params: { id: s.id } });
+
   const order = () => navigate({ to: "/dashboard/order" });
 
   const approve = (t: R) => popup({ type: "info", title: "Approve extra hours?", description: "This task needs more hours than your plan has left this month. Extra hours are billed at your plan's hourly rate.", primaryLabel: "Approve", secondaryLabel: "Not now",

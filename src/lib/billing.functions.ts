@@ -1,3 +1,4 @@
+import { cancelNowAllowed } from "@/lib/billing";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { limited, requireSession } from "@/lib/session.middleware";
@@ -112,6 +113,8 @@ export const subscriptionAction = createServerFn({ method: "POST" })
       patch.cancel_at_period_end = true;
       patch.notes = [sub.notes, `Cancels at period end (${sub.renews_at?.slice(0, 10) ?? "next renewal"})`].filter(Boolean).join("\n");
     } else {
+      // No immediate cancellations once a plan has started: it runs to the end of the paid period, like Stripe's cancel at period end.
+      if (!cancelNowAllowed(sub)) throw new Error("Plans that have started are cancelled at the end of the billing period. Choose 'Cancel at period end'.");
       await applyStripeStatus(sub, "cancelled");
       if (sub.status === "pending") await voidOpenFirstInvoices(admin, sub.id, `Subscription cancelled: ${data.reason}`);
       patch.status = "cancelled"; patch.cancelled_at = new Date().toISOString();

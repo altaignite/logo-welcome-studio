@@ -26,6 +26,7 @@ import { Route as AdminTaskforceRouteImport } from './routes/admin.taskforce'
 import { Route as AdminTemplatesRouteImport } from './routes/admin.templates'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard.index'
 import { Route as DashboardSectionRouteImport } from './routes/dashboard.$section'
+import { Route as DashboardCloseRouteImport } from './routes/dashboard.close'
 import { Route as DashboardOrderRouteImport } from './routes/dashboard.order'
 import { Route as AdminAccountsIndexRouteImport } from './routes/admin.accounts.index'
 import { Route as AdminAccountsIdRouteImport } from './routes/admin.accounts.$id'
@@ -35,6 +36,7 @@ import { Route as AdminOrderUserIdRouteImport } from './routes/admin.order.$user
 import { Route as ApiPublicAccountCheckRouteImport } from './routes/api/public/account-check'
 import { Route as ApiPublicCspReportRouteImport } from './routes/api/public/csp-report'
 import { Route as DashboardKindIdRouteImport } from './routes/dashboard.$kind.$id'
+import { Route as DashboardChangeIdRouteImport } from './routes/dashboard.change.$id'
 import { Route as AdminRecordsKindIndexRouteImport } from './routes/admin.records.$kind.index'
 import { Route as AdminRecordsKindIdRouteImport } from './routes/admin.records.$kind.$id'
 import { Route as ApiPublicCronCollectionsRouteImport } from './routes/api/public/cron/collections'
@@ -126,6 +128,11 @@ const DashboardSectionRoute = DashboardSectionRouteImport.update({
   path: '/$section',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardCloseRoute = DashboardCloseRouteImport.update({
+  id: '/close',
+  path: '/close',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const DashboardOrderRoute = DashboardOrderRouteImport.update({
   id: '/order',
   path: '/order',
@@ -169,6 +176,11 @@ const ApiPublicCspReportRoute = ApiPublicCspReportRouteImport.update({
 const DashboardKindIdRoute = DashboardKindIdRouteImport.update({
   id: '/$kind/$id',
   path: '/$kind/$id',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardChangeIdRoute = DashboardChangeIdRouteImport.update({
+  id: '/change/$id',
+  path: '/change/$id',
   getParentRoute: () => DashboardRoute,
 } as any)
 const AdminRecordsKindIndexRoute = AdminRecordsKindIndexRouteImport.update({
@@ -215,6 +227,7 @@ export interface FileRoutesByFullPath {
   '/admin/taskforce': typeof AdminTaskforceRoute
   '/admin/templates': typeof AdminTemplatesRoute
   '/dashboard/$section': typeof DashboardSectionRoute
+  '/dashboard/close': typeof DashboardCloseRoute
   '/dashboard/order': typeof DashboardOrderRoute
   '/admin/': typeof AdminIndexRoute
   '/dashboard/': typeof DashboardIndexRoute
@@ -224,6 +237,7 @@ export interface FileRoutesByFullPath {
   '/api/public/account-check': typeof ApiPublicAccountCheckRoute
   '/api/public/csp-report': typeof ApiPublicCspReportRoute
   '/dashboard/$kind/$id': typeof DashboardKindIdRoute
+  '/dashboard/change/$id': typeof DashboardChangeIdRoute
   '/admin/accounts/': typeof AdminAccountsIndexRoute
   '/admin/applications/': typeof AdminApplicationsIndexRoute
   '/admin/records/$kind/$id': typeof AdminRecordsKindIdRoute
@@ -246,6 +260,7 @@ export interface FileRoutesByTo {
   '/admin/taskforce': typeof AdminTaskforceRoute
   '/admin/templates': typeof AdminTemplatesRoute
   '/dashboard/$section': typeof DashboardSectionRoute
+  '/dashboard/close': typeof DashboardCloseRoute
   '/dashboard/order': typeof DashboardOrderRoute
   '/admin': typeof AdminIndexRoute
   '/dashboard': typeof DashboardIndexRoute
@@ -255,6 +270,7 @@ export interface FileRoutesByTo {
   '/api/public/account-check': typeof ApiPublicAccountCheckRoute
   '/api/public/csp-report': typeof ApiPublicCspReportRoute
   '/dashboard/$kind/$id': typeof DashboardKindIdRoute
+  '/dashboard/change/$id': typeof DashboardChangeIdRoute
   '/admin/accounts': typeof AdminAccountsIndexRoute
   '/admin/applications': typeof AdminApplicationsIndexRoute
   '/admin/records/$kind/$id': typeof AdminRecordsKindIdRoute
@@ -280,6 +296,7 @@ export interface FileRoutesById {
   '/admin/taskforce': typeof AdminTaskforceRoute
   '/admin/templates': typeof AdminTemplatesRoute
   '/dashboard/$section': typeof DashboardSectionRoute
+  '/dashboard/close': typeof DashboardCloseRoute
   '/dashboard/order': typeof DashboardOrderRoute
   '/admin/': typeof AdminIndexRoute
   '/dashboard/': typeof DashboardIndexRoute
@@ -289,6 +306,7 @@ export interface FileRoutesById {
   '/api/public/account-check': typeof ApiPublicAccountCheckRoute
   '/api/public/csp-report': typeof ApiPublicCspReportRoute
   '/dashboard/$kind/$id': typeof DashboardKindIdRoute
+  '/dashboard/change/$id': typeof DashboardChangeIdRoute
   '/admin/accounts/': typeof AdminAccountsIndexRoute
   '/admin/applications/': typeof AdminApplicationsIndexRoute
   '/admin/records/$kind/$id': typeof AdminRecordsKindIdRoute
@@ -315,6 +333,7 @@ export interface FileRouteTypes {
     | '/admin/taskforce'
     | '/admin/templates'
     | '/dashboard/$section'
+    | '/dashboard/close'
     | '/dashboard/order'
     | '/admin/'
     | '/dashboard/'
@@ -324,6 +343,7 @@ export interface FileRouteTypes {
     | '/api/public/account-check'
     | '/api/public/csp-report'
     | '/dashboard/$kind/$id'
+    | '/dashboard/change/$id'
     | '/admin/accounts/'
     | '/admin/applications/'
     | '/admin/records/$kind/$id'
@@ -346,6 +366,7 @@ export interface FileRouteTypes {
     | '/admin/taskforce'
     | '/admin/templates'
     | '/dashboard/$section'
+    | '/dashboard/close'
     | '/dashboard/order'
     | '/admin'
     | '/dashboard'
@@ -355,6 +376,7 @@ export interface FileRouteTypes {
     | '/api/public/account-check'
     | '/api/public/csp-report'
     | '/dashboard/$kind/$id'
+    | '/dashboard/change/$id'
     | '/admin/accounts'
     | '/admin/applications'
     | '/admin/records/$kind/$id'
@@ -379,6 +401,7 @@ export interface FileRouteTypes {
     | '/admin/taskforce'
     | '/admin/templates'
     | '/dashboard/$section'
+    | '/dashboard/close'
     | '/dashboard/order'
     | '/admin/'
     | '/dashboard/'
@@ -388,6 +411,7 @@ export interface FileRouteTypes {
     | '/api/public/account-check'
     | '/api/public/csp-report'
     | '/dashboard/$kind/$id'
+    | '/dashboard/change/$id'
     | '/admin/accounts/'
     | '/admin/applications/'
     | '/admin/records/$kind/$id'
@@ -534,6 +558,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardSectionRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/close': {
+      id: '/dashboard/close'
+      path: '/close'
+      fullPath: '/dashboard/close'
+      preLoaderRoute: typeof DashboardCloseRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/order': {
       id: '/dashboard/order'
       path: '/order'
@@ -595,6 +626,13 @@ declare module '@tanstack/react-router' {
       path: '/$kind/$id'
       fullPath: '/dashboard/$kind/$id'
       preLoaderRoute: typeof DashboardKindIdRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/change/$id': {
+      id: '/dashboard/change/$id'
+      path: '/change/$id'
+      fullPath: '/dashboard/change/$id'
+      preLoaderRoute: typeof DashboardChangeIdRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/admin/records/$kind/': {
@@ -673,16 +711,20 @@ const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
 interface DashboardRouteChildren {
   DashboardSectionRoute: typeof DashboardSectionRoute
+  DashboardCloseRoute: typeof DashboardCloseRoute
   DashboardOrderRoute: typeof DashboardOrderRoute
   DashboardIndexRoute: typeof DashboardIndexRoute
   DashboardKindIdRoute: typeof DashboardKindIdRoute
+  DashboardChangeIdRoute: typeof DashboardChangeIdRoute
 }
 
 const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardSectionRoute: DashboardSectionRoute,
+  DashboardCloseRoute: DashboardCloseRoute,
   DashboardOrderRoute: DashboardOrderRoute,
   DashboardIndexRoute: DashboardIndexRoute,
   DashboardKindIdRoute: DashboardKindIdRoute,
+  DashboardChangeIdRoute: DashboardChangeIdRoute,
 }
 
 const DashboardRouteWithChildren = DashboardRoute._addFileChildren(

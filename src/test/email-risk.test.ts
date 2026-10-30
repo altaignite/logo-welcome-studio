@@ -1,0 +1,39 @@
+import { describe, expect, it } from "vitest";
+import { combineRisk, emailSyntaxOk, localSignals, typoSuggestion } from "@/lib/email-risk";
+import { passwordIssue } from "@/lib/passwords";
+
+describe("email risk", () => {
+  const ok = { acceptsMail: true, ageDays: 4000, blockedInDb: false };
+  it("blocks invalid, disposable, undeliverable and brand-new domains", () => {
+    expect(emailSyntaxOk("jane@example.com")).toBe(true);
+    expect(localSignals("jane@@example").verdict).toBe("block");
+    expect(localSignals("x@mailinator.com").verdict).toBe("block");
+    expect(combineRisk(localSignals("jane@acme.com"), { ...ok, acceptsMail: false }).verdict).toBe("block");
+    expect(combineRisk(localSignals("jane@acme.com"), { ...ok, ageDays: 2 }).verdict).toBe("block");
+    expect(combineRisk(localSignals("jane@acme.com"), { ...ok, blockedInDb: true }).verdict).toBe("block");
+  });
+  it("flags risky signs for review and suggests typo fixes", () => {
+    expect(combineRisk(localSignals("jane@acme.com"), { ...ok, ageDays: 12 }).verdict).toBe("review");
+    expect(localSignals("info@acme.com").verdict).toBe("review");
+    expect(localSignals("user8475629104@acme.com").verdict).toBe("review");
+    expect(typoSuggestion("jane@gmial.com")).toBe("jane@gmail.com");
+    expect(typoSuggestion("jane@gmail.com")).toBeUndefined();
+  });
+  it("lets ordinary addresses through, and never blocks when a lookup fails", () => {
+    expect(combineRisk(localSignals("jane.doe@acme.com"), ok).verdict).toBe("ok");
+    expect(combineRisk(localSignals("jane.doe@acme.com"), { acceptsMail: null, ageDays: null, blockedInDb: false }).verdict).toBe("ok");
+  });
+});
+
+describe("password rules", () => {
+  it("require length, mixed characters, no patterns and nothing from the email", () => {
+    expect(passwordIssue("Short1!")).toMatch(/12 characters/);
+    expect(passwordIssue("alllowercase12!")).toMatch(/upper and lower/);
+    expect(passwordIssue("NoNumbersHere!!")).toMatch(/number/);
+    expect(passwordIssue("NoSymbols12345x")).toMatch(/symbol/);
+    expect(passwordIssue("Aaa111!!!bbbX")).toMatch(/repeating/);
+    expect(passwordIssue("Xy!9Password77")).toMatch(/common words/);
+    expect(passwordIssue("Janedoe!2026Zq", "janedoe@acme.com")).toMatch(/email/);
+    expect(passwordIssue("Tr0ub4dor&Horse")).toBeNull();
+  });
+});

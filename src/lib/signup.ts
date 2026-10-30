@@ -3,6 +3,7 @@ import { AsYouType, getCountries, getCountryCallingCode, getExampleNumber, type 
 import { parsePhoneNumberFromString as parseMobile } from "libphonenumber-js/mobile";
 import examples from "libphonenumber-js/mobile/examples";
 import { isBlockedDomain } from "@/lib/disposable-domains";
+import { passwordIssue } from "@/lib/passwords";
 
 export const subscription = {
   name: "Marketing Accelerator",
@@ -90,9 +91,13 @@ export const personalSchema = z.object({
 });
 export const accountSchema = z.object({
   email: z.string().trim().email("Enter a valid email address.").max(254).refine((v) => !isBlockedDomain(v), "Disposable email addresses can't be used. Please use your business or personal email."),
-  password: z.string().min(10, "Use at least 10 characters for your password.").max(128).regex(/[a-z]/, "Add a lower case letter.").regex(/[A-Z]/, "Add an upper case letter.").regex(/\d/, "Add a number."),
+  password: z.string(),
   confirmPassword: z.string(),
-}).refine((v) => v.password === v.confirmPassword, { message: "Your passwords don't match.", path: ["confirmPassword"] });
+}).superRefine((v, ctx) => {
+  const issue = passwordIssue(v.password, v.email);
+  if (issue) ctx.addIssue({ code: "custom", message: issue, path: ["password"] });
+  if (v.password !== v.confirmPassword) ctx.addIssue({ code: "custom", message: "Your passwords don't match.", path: ["confirmPassword"] });
+});
 
 export function createSignatureCode(previousCodes: ReadonlySet<string> = new Set()) {
   if (previousCodes.size >= 900000) throw new Error("No unused confirmation codes remain.");

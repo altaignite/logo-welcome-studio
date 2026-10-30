@@ -20,8 +20,8 @@ describe("disposable email domains", () => {
     expect(isBlockedDomain("a@gmail.com")).toBe(false);
   });
   it("are refused at signup", () => {
-    expect(accountSchema.safeParse({ email: "x@guerrillamail.com", password: "Password123", confirmPassword: "Password123" }).success).toBe(false);
-    expect(accountSchema.safeParse({ email: "x@business.com", password: "Password123", confirmPassword: "Password123" }).success).toBe(true);
+    expect(accountSchema.safeParse({ email: "x@guerrillamail.com", password: "Tr0ub4dor&Horse", confirmPassword: "Tr0ub4dor&Horse" }).success).toBe(false);
+    expect(accountSchema.safeParse({ email: "x@business.com", password: "Tr0ub4dor&Horse", confirmPassword: "Tr0ub4dor&Horse" }).success).toBe(true);
   });
   it("are also checked by the signup trigger", () => {
     expect(sql).toMatch(/IF public\.email_domain_blocked\(new\.email\) THEN\s+RAISE EXCEPTION/);

@@ -19,6 +19,17 @@ export const Route = createFileRoute("/api/public/account-check")({
         const { data, error } = await supabaseAdmin.from("profiles").select("id, status, created_at").ilike("email", email.replace(/[\\%_]/g, (c) => `\\${c}`)).limit(1);
         if (error) return json({ error: "We couldn't check that email. Please try again." }, 503);
         const row = (data ?? [])[0] as { status: string; created_at: string } | undefined;
+        // New addresses are risk-checked: fake, disposable, undeliverable or brand-new domains are refused; risky ones are logged.
+        if (!row) {
+          const { emailRisk } = await import("@/lib/email-risk.server");
+          const risk = await emailRisk(email);
+          if (risk.verdict === "block") return json({ error: risk.reasons[0], risk }, 422);
+          if (risk.verdict === "review") {
+            const { logSecurityEvent } = await import("@/lib/security-log.server");
+            await logSecurityEvent({ kind: "email_high_risk", severity: "medium", request, group: email.split("@")[1] ?? email, summary: `Signup started with a high-risk email (${email.split("@")[1]}): ${risk.reasons.join(" ")}`, detail: { reasons: risk.reasons } });
+          }
+          return json({ exists: false, risk });
+        }
         // Right after signup, the flow asks whether security checks restricted the new account so it can show the KYC page.
         // Only accounts created in the last 10 minutes answer, so this can't be used to probe existing accounts.
         const fresh = !!row && Date.now() - new Date(row.created_at).getTime() < 10 * 60_000;

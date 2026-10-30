@@ -15,6 +15,23 @@ export async function recordSignIn(admin: Admin, userId: string, sessionId: stri
     user_id: userId, session_id: sessionId, ...place, user_agent: (req.headers.get("user-agent") ?? "").slice(0, 300) || null,
     new_location: isNewLocation(place, prev),
   }, { onConflict: "session_id", ignoreDuplicates: true });
+  // First sign-in: re-check the email, since the signup API can be called without the signup page's check.
+  if (!prev.length) {
+    const { data: u } = await admin.auth.admin.getUserById(userId);
+    const email = u?.user?.email;
+    const { data: staffRole } = await admin.from("user_roles").select("user_id").eq("user_id", userId).eq("role", "admin").maybeSingle();
+    if (email && !staffRole) {
+      const { emailRisk } = await import("@/lib/email-risk.server");
+      const risk = await emailRisk(email);
+      if (risk.verdict === "block") {
+        const { flagForKyc } = await import("@/lib/kyc.server");
+        await flagForKyc(admin, userId, `The account's email failed the email risk check: ${risk.reasons.join(" ")}`, "email risk check");
+      } else if (risk.verdict === "review") {
+        const { logSecurityEvent } = await import("@/lib/security-log.server");
+        await logSecurityEvent({ kind: "email_high_risk", severity: "medium", userId, summary: `New account with a high-risk email (${email.split("@")[1]}): ${risk.reasons.join(" ")}`, detail: { reasons: risk.reasons } });
+      }
+    }
+  }
   // Security pattern: many accounts from one network in a day.
   const { checkSharedIp } = await import("@/lib/kyc.server");
   await checkSharedIp(admin, userId, place.ip);

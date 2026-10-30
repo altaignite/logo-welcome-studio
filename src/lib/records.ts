@@ -3,7 +3,7 @@ import { metricsText, parseMetrics } from "@/lib/work";
 
 /** Display formats for record fields. */
 export type Fmt = "text" | "money" | "date" | "day" | "status" | "bool" | "hours" | "long" | "metrics";
-export type RecordKind = "subscriptions" | "projects" | "invoices" | "transactions" | "support_tickets" | "crm_activities" | "tasks" | "contacts" | "compliance_requests" | "deliverables" | "client_reports";
+export type RecordKind = "account_change_requests" | "subscriptions" | "projects" | "invoices" | "transactions" | "support_tickets" | "crm_activities" | "tasks" | "contacts" | "compliance_requests" | "deliverables" | "client_reports";
 
 export type Child = { label: string; kind: RecordKind | "time_entries" | "ticket_messages" | "invoice_charges"; fk: string; columns: [string, string, Fmt][] };
 /** A saved filter on the cross-account list page for a record type. */
@@ -23,6 +23,8 @@ export type KindConfig = {
   archivable?: boolean;
   /** Cross-account list at /admin/records/$kind: columns, saved views and newest-first sort column. */
   list?: { columns: [string, string, Fmt][]; views: ListView[]; order: string };
+  /** Created only by the client's own signed application: staff review it but can't create or edit it. */
+  readonly?: boolean;
   /** Files can be attached to these records (documents.related_table). */
   files?: boolean;
   /** Form fields stored in another shape (for example report metrics typed one per line). */
@@ -97,6 +99,16 @@ export const recordKinds: Record<RecordKind, KindConfig> = {
     parents: [{ label: "Subscription", kind: "subscriptions", fk: "subscription_id" }],
     children: [{ label: "Interest and fees", kind: "invoice_charges", fk: "invoice_id", columns: [["Date", "created_at", "date"], ["Type", "kind", "text"], ["Charge", "description", "text"], ["Amount", "amount", "money"]] },
       { label: "Payments", kind: "transactions", fk: "invoice_id", columns: [["Reference", "reference", "text"], ["Amount", "amount", "money"], ["Method", "method", "text"], ["Date", "created_at", "date"]] }],
+  },
+  account_change_requests: {
+    singular: "Change request", plural: "Change requests", readonly: true,
+    list: { order: "created_at", columns: [["Change", "kind", "text"], ["Plan", "from_plan", "text"], ["New plan", "to_plan", "text"], ["Reason", "reason", "text"], ["Effective", "effective_at", "day"], ["Status", "status", "status"], ["Submitted", "created_at", "date"]],
+      views: [{ id: "new", label: "To review", match: (r) => r.status === "actioned" }, { id: "cancel", label: "Cancellations", match: (r) => r.kind === "cancel" }, { id: "close", label: "Account closures", match: (r) => r.kind === "close_account" }, { id: "plan", label: "Upgrades and downgrades", match: (r) => r.kind === "upgrade" || r.kind === "downgrade" }, all] },
+    title: (r) => `${({ cancel: "Cancellation", upgrade: "Upgrade", downgrade: "Downgrade", close_account: "Account closure" } as Record<string, string>)[r.kind] ?? "Change"}${r.from_plan ? `, ${r.from_plan}${r.to_plan ? ` to ${r.to_plan}` : ""}` : ""}`,
+    fields: [["Change", "kind", "text"], ["Status", "status", "status"], ["Plan", "from_plan", "text"], ["New plan", "to_plan", "text"], ["Effective", "effective_at", "day"], ["Signed", "signed_at", "date"], ["Submitted by", "actor_label", "text"],
+      ["Reason", "reason", "text"], ["Details", "details", "long"], ["Feedback", "feedback", "long"], ["Reviewed", "reviewed_at", "date"], ["Reviewed by", "reviewed_by_label", "text"], ["Review note", "review_note", "long"]],
+    edit: [],
+    parents: [{ label: "Subscription", kind: "subscriptions", fk: "subscription_id" }],
   },
   transactions: {
     singular: "Transaction", plural: "Transactions", voidable: true,

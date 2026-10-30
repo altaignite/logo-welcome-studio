@@ -3,7 +3,8 @@
  * closures cancel them, and a return to good standing resumes only the plans a hold paused. Server only. */
 import { subscriptionEffect } from "@/lib/admin";
 import { applyStripeStatus, must, voidOpenFirstInvoices } from "@/lib/billing.server";
-import { audit } from "@/lib/stripe.server";
+import { audit, stripe } from "@/lib/stripe.server";
+import { cancelNowAllowed } from "@/lib/billing";
 
 type Admin = any;
 
@@ -15,6 +16,15 @@ export async function applyAccountStatusEffects(admin: Admin, userId: string, st
     const affected = must(await admin.from("subscriptions").select("*").eq("user_id", userId)
       .in("status", ["active", "past_due", "pending", ...(effect === "cancelled" ? ["paused", "suspended"] : [])])) ?? [];
     for (const sub of affected) {
+      // Closing or cancelling an account never ends a started plan early: it is set to cancel at the end of the paid period.
+      if (effect === "cancelled" && !cancelNowAllowed(sub)) {
+        if (sub.cancel_at_period_end) continue;
+        if (sub.stripe_subscription_id) await stripe("POST", `subscriptions/${sub.stripe_subscription_id}`, { cancel_at_period_end: true, ...(sub.status === "paused" ? { pause_collection: "" } : {}) });
+        must(await admin.from("subscriptions").update({ cancel_at_period_end: true, paused_by_account_status: false, notes: [sub.notes, `${new Date().toISOString().slice(0, 10)} cancels at period end: ${why}`].filter(Boolean).join("\n") }).eq("id", sub.id));
+        await audit(admin, userId, "subscriptions", sub.id, "cancel_at_period_end", { reason: why }, actorId, actor);
+        out.plansCancelled++;
+        continue;
+      }
       await applyStripeStatus(sub, effect);
       if (effect === "cancelled" && sub.status === "pending") await voidOpenFirstInvoices(admin, sub.id, why);
       must(await admin.from("subscriptions").update({ status: effect, paused_by_account_status: effect === "paused", ...(effect === "cancelled" ? { cancelled_at: new Date().toISOString() } : {}) }).eq("id", sub.id));

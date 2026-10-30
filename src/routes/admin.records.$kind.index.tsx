@@ -99,7 +99,7 @@ function RecordList() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3"><div><h1 className="text-2xl font-extrabold sm:text-3xl">{cfg.plural}</h1><p className="mt-1 text-sm text-muted-foreground">{stripeOnly.includes(kind) ? "Recorded from Stripe. Select one to see its details or void it." : "Across every client. Select one to view, edit or archive it."}</p></div>
-        {!stripeOnly.includes(kind) && <Btn icon={Plus} onClick={startNew}>New {cfg.singular.toLowerCase()}</Btn>}</div>
+        {!stripeOnly.includes(kind) && !cfg.readonly && <Btn icon={Plus} onClick={startNew}>New {cfg.singular.toLowerCase()}</Btn>}</div>
       <div className="flex flex-wrap gap-2">
         {views.map((v) => <button key={v.id} type="button" onClick={() => setView(v.id)} className={`rounded-full border px-4 py-1.5 text-sm ${active.id === v.id ? "border-foreground bg-foreground text-background" : "bg-card"}`}>
           {v.label} <span className="opacity-60">{all.filter((r) => v.match(r, today)).length}</span></button>)}

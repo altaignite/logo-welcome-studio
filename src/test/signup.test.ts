@@ -50,7 +50,7 @@ describe("Marketing subscription rules", () => {
     expect(personalSchema.safeParse({ ...details, phone: "123" }).success).toBe(false);
   });
   it("validates email and matching account passwords", () => {
-    expect(accountSchema.safeParse({ email: "bao@example.com", password: "Testing123", confirmPassword: "Testing123" }).success).toBe(true);
+    expect(accountSchema.safeParse({ email: "bao@example.com", password: "Tr0ub4dor&Horse", confirmPassword: "Tr0ub4dor&Horse" }).success).toBe(true);
     expect(accountSchema.safeParse({ email: "not-email", password: "Testing123", confirmPassword: "other" }).success).toBe(false);
   });
 });

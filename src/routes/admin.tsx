@@ -1,7 +1,7 @@
 import { createFileRoute, Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { BarChart3, Contact, FileCheck2, FileText, FolderKanban, LayoutDashboard, LifeBuoy, ListChecks, LogOut, Mail, Menu, PhoneCall, Receipt, Repeat, Settings, ShieldAlert, ShieldCheck, UserCog, Users, Wallet, X } from "lucide-react";
+import { BarChart3, ClipboardList, Contact, FileCheck2, FileText, FolderKanban, LayoutDashboard, LifeBuoy, ListChecks, LogOut, Mail, Menu, PhoneCall, Receipt, Repeat, Settings, ShieldAlert, ShieldCheck, UserCog, Users, Wallet, X } from "lucide-react";
 import logo from "@/assets/logo.png.asset.json";
 import { supabase } from "@/integrations/supabase/client";
 import { NotificationBell } from "@/components/notifications";
@@ -53,6 +53,7 @@ const nav = [
     { to: "/admin/records/invoices", kind: "invoices", label: "Invoices", icon: Receipt },
     { to: "/admin/records/subscriptions", kind: "subscriptions", label: "Subscriptions", icon: Repeat },
     { to: "/admin/records/transactions", kind: "transactions", label: "Payments", icon: Wallet },
+    { to: "/admin/records/account_change_requests", kind: "account_change_requests", label: "Change requests", icon: ClipboardList },
     { to: "/admin/settings", label: "Billing rules", icon: Settings },
   ] },
   { group: "Team", items: [
