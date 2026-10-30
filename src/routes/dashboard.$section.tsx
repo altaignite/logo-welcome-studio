@@ -1,3 +1,4 @@
+import { CountryField } from "@/components/country-field";
 import { createFileRoute, notFound, useNavigate } from "@tanstack/react-router";
 import { ErrorState, PageSkeleton, SectionSkeleton } from "@/components/loading";
 import { useServerFn } from "@tanstack/react-start";
@@ -139,6 +140,11 @@ function SectionPage() {
 }
 
 const fieldCls = "mt-1 h-10 w-full rounded-lg border bg-background px-2.5 text-sm outline-none focus:ring-2 focus:ring-ring";
+/** Country picker for the profile form; saves the two-letter code like signup does. */
+function ProfileCountry({ initial }: { initial: string }) {
+  const [value, setValue] = useState(initial);
+  return <><input type="hidden" name="country" value={value} /><CountryField value={value} onChange={setValue} /></>;
+}
 const profileFields: [string, string, number][] = [["first_name", "First name", 80], ["last_name", "Last name", 80], ["company", "Business name", 160], ["phone", "Phone", 40], ["website", "Website", 200], ["industry", "Industry", 100], ["company_size", "Company size", 40], ["address_line", "Address", 200], ["city", "City", 100], ["state", "State or region", 100], ["postal_code", "Postal code", 20], ["country", "Country", 80], ["timezone", "Time zone", 60]];
 
 function ProfileForm({ p, privacyRows, refresh }: { p: R; privacyRows: R[]; refresh: () => Promise<void> }) {
@@ -169,7 +175,8 @@ function ProfileForm({ p, privacyRows, refresh }: { p: R; privacyRows: R[]; refr
       <form onSubmit={submit} className="p-5">
         <p className="mb-4 text-sm text-muted-foreground">Account number {formatAccount(p.account_number)}. Email {p.email}. To change your email, use Security.</p>
         <div className="grid gap-4 sm:grid-cols-2">
-          {profileFields.map(([k, l, max]) => <label key={k} className="block"><span className="text-[13px] font-medium">{l}{(k === "first_name" || k === "last_name") && <span className="text-primary"> *</span>}</span>
+          {profileFields.map(([k, l, max]) => k === "country" ? <div key={k} className="block"><span className="text-[13px] font-medium">{l}</span><ProfileCountry initial={p.country ?? ""} /></div>
+            : <label key={k} className="block"><span className="text-[13px] font-medium">{l}{(k === "first_name" || k === "last_name") && <span className="text-primary"> *</span>}</span>
             <input name={k} defaultValue={p[k] ?? ""} maxLength={max} className={fieldCls} /></label>)}
         </div>
         <div className="mt-4 max-w-md space-y-3">
