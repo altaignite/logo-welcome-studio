@@ -1,9 +1,10 @@
 import { useState, type ReactNode } from "react";
 import { Switch } from "@/components/ui/switch";
 import { Spinner } from "@/components/loading";
+import { CountryField } from "@/components/country-field";
 
 export type FieldDef = {
-  name: string; label: string; type?: "text" | "textarea" | "number" | "date" | "select" | "email" | "url"; options?: string[];
+  name: string; label: string; type?: "text" | "textarea" | "number" | "date" | "select" | "email" | "url" | "country"; options?: string[];
   required?: boolean; defaultValue?: string; max?: number; placeholder?: string;
 };
 
@@ -36,6 +37,11 @@ export function FormModal({ title, description, fields, submitLabel, onSubmit, o
               <span className="text-[13px] font-medium">{f.label}</span>
               <Switch checked={values[f.name] === "yes"} onCheckedChange={(v) => setValues({ ...values, [f.name]: v ? "yes" : "no" })} />
             </label>
+          ) : f.type === "country" ? (
+            <div key={f.name} className="block">
+              <span className="text-[13px] font-medium">{f.label}{f.required && <span className="text-primary"> *</span>}</span>
+              <div className="mt-1"><CountryField value={values[f.name]?.toUpperCase() ?? ""} onChange={(c) => setValues({ ...values, [f.name]: c })} /></div>
+            </div>
           ) : (
             <label key={f.name} className="block">
               <span className="text-[13px] font-medium">{f.label}{f.required && <span className="text-primary"> *</span>}</span>

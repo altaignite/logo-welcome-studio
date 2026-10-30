@@ -131,7 +131,7 @@ function AccountDetail() {
     { name: "industry", label: "Industry" }, { name: "company_size", label: "Company size", type: "select", options: ["", "1-10", "11-50", "51-200", "201-1000", "1000+"] },
     { name: "email", label: "Contact email", type: "email" }, { name: "phone", label: "Mobile number" }, { name: "website", label: "Website", type: "url" },
     { name: "address_line", label: "Street address" }, { name: "city", label: "City" }, { name: "state", label: "State or region" }, { name: "postal_code", label: "Postal code" },
-    { name: "country", label: "Country" }, { name: "timezone", label: "Time zone" },
+    { name: "country", label: "Country", type: "country" }, { name: "timezone", label: "Time zone" },
     { name: "lifecycle_stage", label: "Lifecycle stage", type: "select", options: [...lifecycleStages] }, { name: "account_manager", label: "Account manager" },
     { name: "lead_source", label: "Lead source" }, { name: "internal_notes", label: "Internal notes", type: "textarea" },
   ];
