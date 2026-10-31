@@ -239,8 +239,14 @@ export const billingPortal = createServerFn({ method: "POST" })
     const admin = await getAdmin();
     const { getRequest } = await import("@tanstack/react-start/server");
     const origin = new URL(getRequest().url).origin;
+    const { cardPortalConfiguration } = await import("@/lib/billing.server");
     const customer = await ensureCustomer(admin, context.userId);
-    const s = await stripe("POST", "billing_portal/sessions", { customer, return_url: `${origin}/dashboard` });
+    // Straight to "update your card", in a portal that can't cancel plans or change account details (those stay in the app).
+    const s = await stripe("POST", "billing_portal/sessions", {
+      customer, configuration: await cardPortalConfiguration(admin), return_url: `${origin}/dashboard/invoices`,
+      "flow_data[type]": "payment_method_update",
+      "flow_data[after_completion][type]": "redirect", "flow_data[after_completion][redirect][return_url]": `${origin}/dashboard/invoices?card=updated`,
+    });
     return { url: s.url as string };
   });
 
@@ -333,7 +339,7 @@ export const voidInvoices = createServerFn({ method: "POST" })
 export const requiredStripeEvents = [
   "invoice.finalized", "invoice.paid", "invoice.payment_failed", "invoice.marked_uncollectible", "invoice.voided", "invoice.updated",
   "customer.subscription.created", "customer.subscription.updated", "customer.subscription.paused", "customer.subscription.resumed", "customer.subscription.deleted",
-  "charge.refunded", "radar.early_fraud_warning.created", "charge.dispute.created",
+  "charge.refunded", "radar.early_fraud_warning.created", "charge.dispute.created", "customer.updated",
 ];
 
 /** Billing setup check for staff: key, account, webhook endpoint and events, and plans left waiting for an invoice. */

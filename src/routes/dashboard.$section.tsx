@@ -36,6 +36,15 @@ function SectionPage() {
   const { data, isLoading, error } = useClient();
   const a = useClientActions();
   const navigate = useNavigate();
+  const popup = usePopup();
+  // Back from Stripe's card update: renewals use the new card once Stripe confirms it (customer.updated webhook).
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("card") !== "updated") return;
+    url.searchParams.delete("card"); window.history.replaceState(null, "", url);
+    popup({ type: "success", title: "Payment card updated", description: "Your plans renew on your new card from now on. Open invoices can be paid with it too.", primaryLabel: "Got it", secondaryLabel: null });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   if (error) return <ErrorState error={error} retry={() => location.reload()} />;
   if (isLoading || !data) return <PageSkeleton />;
   const open = (kind: RecordKind) => (r: R) => navigate({ to: "/dashboard/$kind/$id", params: { kind, id: r.id } });
@@ -107,7 +116,7 @@ function SectionPage() {
         {r.hosted_url && r.status !== "paid" && r.status !== "void" && <a href={r.hosted_url} target="_blank" rel="noopener noreferrer" className="h-8 rounded-full bg-foreground px-3 text-xs font-semibold leading-8 text-background">Pay now</a>}
         {r.pdf_url && <a href={r.pdf_url} target="_blank" rel="noopener noreferrer" className="h-8 rounded-full bg-secondary px-3 text-xs font-semibold leading-8">PDF</a>}
       </Actions> },
-    ], <ActBtn onClick={a.portal}>Manage card and receipts</ActBtn>)}
+    ], <ActBtn onClick={a.portal}>Update payment card</ActBtn>)}
 
     {s === "payments" && table("Payments", "payment", data.payments, [
       { key: "r", label: "Reference", value: (r) => r.reference },

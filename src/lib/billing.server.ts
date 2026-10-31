@@ -377,6 +377,41 @@ export async function sendFirstInvoiceFor(admin: Admin, subscriptionId: string, 
   return startStripeSubscription(admin, subscriptionId, collect);
 }
 
+/** The customer portal clients reach from the dashboard: payment card updates only. Cancelling, plan changes and profile edits
+ * stay in the app (signed change requests, Profile), so Stripe's default portal (which allows cancelling and email changes) is
+ * never used. Created once and remembered in app_secrets. */
+export async function cardPortalConfiguration(admin: Admin): Promise<string> {
+  const saved = (await admin.from("app_secrets").select("value").eq("name", "stripe_card_portal_configuration").maybeSingle()).data?.value;
+  if (saved) {
+    const live = await stripe("GET", `billing_portal/configurations/${saved}`).catch(() => null);
+    if (live?.active) return saved;
+  }
+  const c = await stripe("POST", "billing_portal/configurations", {
+    name: "FP payment card only", "metadata[app]": "fp_card_portal",
+    "features[payment_method_update][enabled]": true, "features[invoice_history][enabled]": true,
+    "features[customer_update][enabled]": false, "features[subscription_cancel][enabled]": false,
+    "features[subscription_update][enabled]": false, "features[subscription_pause][enabled]": false,
+  }, "fp-card-portal-v1");
+  await admin.from("app_secrets").upsert({ name: "stripe_card_portal_configuration", value: c.id }, { onConflict: "name" });
+  return c.id as string;
+}
+
+/** A client changed their default card (customer portal or Stripe): subscriptions keep their own saved card, which Stripe uses
+ * before the customer default, so the new card is copied onto every running subscription. Plans still billed by emailed invoice
+ * switch to automatic charging now that a card is on file, as the agreement says. Called from the signed customer.updated webhook. */
+export async function applyDefaultCard(customerId: string, paymentMethodId: string) {
+  const subs = await stripe("GET", "subscriptions", { customer: customerId, status: "all", limit: 100 });
+  let updated = 0;
+  for (const s of subs.data ?? []) {
+    if (!["active", "past_due", "trialing", "unpaid", "paused"].includes(s.status)) continue;
+    const current = typeof s.default_payment_method === "string" ? s.default_payment_method : s.default_payment_method?.id;
+    if (current === paymentMethodId && s.collection_method === "charge_automatically") continue;
+    await stripe("POST", `subscriptions/${s.id}`, { default_payment_method: paymentMethodId, collection_method: "charge_automatically" });
+    updated++;
+  }
+  return updated;
+}
+
 /** Stripe's publishable key for the in-page card form: public by design (it ships to every browser), so it can live in Lovable's
  * STRIPE_PUBLISHABLE_KEY secret or in app_secrets. Null hides the card form and falls back to Stripe's hosted invoice page. */
 export async function stripePublishableKey(admin: Admin): Promise<string | null> {

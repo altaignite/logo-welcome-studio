@@ -62,6 +62,13 @@ export const Route = createFileRoute("/api/public/stripe/webhook")({
             if (subId) await B.syncSubscriptionFromStripe(admin, subId, o);
           }
           switch (event.type) {
+            // A new default card (customer portal): renewals must charge it, so it goes onto the subscriptions too.
+            case "customer.updated": {
+              const live = await stripe("GET", `customers/${o.id}`);
+              const pm = idOf(live.invoice_settings?.default_payment_method);
+              if (pm && !live.deleted) await B.applyDefaultCard(live.id, pm);
+              break;
+            }
             // Security patterns from Stripe: a card issuer's early fraud warning or a chargeback restricts the account for KYC.
             case "radar.early_fraud_warning.created":
             case "charge.dispute.created": {
