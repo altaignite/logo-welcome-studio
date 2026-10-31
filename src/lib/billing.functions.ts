@@ -26,7 +26,7 @@ export const createOrder = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => z.object({ userId: uuid, planId: z.enum(["starter", "growth", "scale"]), notes: z.string().trim().max(1000).optional() }).parse(d))
   .handler(async ({ data, context }) => {
     await requireAdmin(context);
-    const { getAdmin, issueStripeInvoice } = await import("@/lib/billing.server");
+    const { getAdmin, startStripeSubscription } = await import("@/lib/billing.server");
     const admin = await getAdmin();
     const plan = plans.find((p) => p.id === data.planId);
     if (!plan) throw new Error("Unknown plan.");
@@ -44,18 +44,18 @@ export const createOrder = createServerFn({ method: "POST" })
     await admin.from("projects").insert({ user_id: data.userId, subscription_id: sub.data.id, name: prof.company || `${prof.first_name ?? ""} ${prof.last_name ?? ""}`.trim() || "Client project", service: "Marketing", status: "planned", description: `${plan.name} plan` });
     let inv;
     try {
-      inv = await issueStripeInvoice(admin, {
-      userId: data.userId, subscriptionId: sub.data.id, kind: "first", description: `${plan.name} plan, first month`,
-      lines: [{ description: `${plan.name} plan, ${plan.monthlyHours} service hours per month`, amount: plan.monthlyFee }], idem: `order-${sub.data.id}`,
-    });
+      inv = await startStripeSubscription(admin, sub.data.id, "invoice");
     } catch (e) {
-      // No half-made orders: if Stripe didn't take the invoice, the plan never starts.
+      // No half-made orders: if Stripe didn't take the invoice, the plan never starts (and a half-started Stripe subscription is cancelled).
+      const { applyStripeStatus } = await import("@/lib/billing.server");
+      const started = (await admin.from("subscriptions").select("stripe_subscription_id").eq("id", sub.data.id).maybeSingle()).data;
+      if (started?.stripe_subscription_id) await applyStripeStatus(started, "cancelled").catch(() => null);
       await admin.from("subscriptions").update({ status: "cancelled", cancelled_at: new Date().toISOString(), notes: `Order not completed: ${(e as Error).message}` }).eq("id", sub.data.id);
       await admin.from("projects").update({ status: "cancelled" }).eq("subscription_id", sub.data.id);
       await admin.from("applications").update({ archived_at: new Date().toISOString(), internal_notes: "Order not completed: Stripe invoice failed" }).eq("id", app.data.id);
       throw e;
     }
-    return { subscriptionId: sub.data.id, invoiceId: inv.id as string };
+    return { subscriptionId: sub.data.id, invoiceId: inv.invoiceId };
   });
 
 /** Sends the first invoice for a pending subscription (e.g. after approving a signup). Activation happens on payment. */

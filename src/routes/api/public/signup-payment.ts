@@ -30,7 +30,11 @@ export const Route = createFileRoute("/api/public/signup-payment")({
           try { await autoApproveSignup(admin, userId, true); } catch (e) { console.error("Signup approval failed", e); }
         }
         const { data: inv } = await admin.from("invoices").select("id").eq("user_id", userId).eq("kind", "first").eq("status", "open").order("created_at", { ascending: false }).limit(1).maybeSingle();
-        if (!inv) return json({ payment: null, review: true });
+        if (!inv) {
+          // No open first invoice: either staff review the signup first, or the unpaid first invoice expired (about 23 hours).
+          const { count } = await admin.from("applications").select("id", { count: "exact", head: true }).eq("user_id", userId).in("status", ["submitted", "in_review", "info_requested", "escalated"]);
+          return json({ payment: null, review: (count ?? 0) > 0 });
+        }
         const { invoicePayment } = await import("@/lib/billing.server");
         try { return json({ payment: await invoicePayment(admin, inv.id, userId), review: false }); }
         catch (e) { console.error("Signup payment details failed", e); return json({ payment: null, review: false }, 503); }

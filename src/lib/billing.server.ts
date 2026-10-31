@@ -27,7 +27,7 @@ export async function applyStripeStatus(sub: { stripe_subscription_id: string | 
   else if (to === "active") await stripe("POST", `subscriptions/${sid}`, { pause_collection: "" });
   else {
     try { await stripe("DELETE", `subscriptions/${sid}`); }
-    catch (e) { if ((await stripe("GET", `subscriptions/${sid}`)).status !== "canceled") throw e; }
+    catch (e) { if (!["canceled", "incomplete_expired"].includes((await stripe("GET", `subscriptions/${sid}`)).status)) throw e; }
   }
 }
 
@@ -100,7 +100,13 @@ export async function activateSubscription(admin: Admin, subId: string) {
   }
   const now = new Date(); const next = new Date(now); next.setMonth(next.getMonth() + 1);
   let stripeSubId: string | null = sub.stripe_subscription_id;
-  if (!stripeSubId) {
+  if (stripeSubId) {
+    // First invoice was emailed (send_invoice): once paid, its card is the subscription default, so renewals charge it automatically.
+    const live = await stripe("GET", `subscriptions/${stripeSubId}`).catch(() => null);
+    if (live?.collection_method === "send_invoice" && live.default_payment_method) {
+      await stripe("POST", `subscriptions/${stripeSubId}`, { collection_method: "charge_automatically" }).catch((e) => console.error("Switch to automatic charging failed", e));
+    }
+  } else {
     const customer = await ensureCustomer(admin, sub.user_id);
     const price = await planPrice(sub.plan_name, Number(sub.monthly_fee));
     const pms = await stripe("GET", "payment_methods", { customer, type: "card", limit: 1 }).catch(() => ({ data: [] }));
@@ -326,18 +332,49 @@ export async function resyncAllStanding(admin: Admin) {
 }
 
 /** Sends the first Stripe invoice for a pending subscription (staff approval and automatic approval). Activation happens on payment. */
-export async function sendFirstInvoiceFor(admin: Admin, subscriptionId: string) {
-  const { data: sub } = await admin.from("subscriptions").select("*").eq("id", subscriptionId).single();
-  if (!sub || sub.status !== "pending") throw new Error("Only pending subscriptions can be invoiced.");
+/** How a new plan's first payment is collected. "now": the client pays in the page right away (signup and self-serve orders);
+ * Stripe's standard for subscriptions, and an unpaid first invoice expires after about 23 hours. "invoice": Stripe emails the
+ * first invoice, due in 7 days (staff orders and staff-approved signups). Either way the card used is saved on the subscription. */
+export type FirstPayment = "now" | "invoice";
+
+/** Starts a plan's Stripe subscription immediately; its first invoice is the plan's first month. Stripe saves the card used to
+ * pay it as the subscription's default (save_default_payment_method), so every renewal is charged automatically, as the signed
+ * agreement says. The plan itself only starts when that invoice is paid (recordInvoicePaid → activateSubscription). */
+export async function startStripeSubscription(admin: Admin, subscriptionId: string, collect: FirstPayment) {
+  const sub = must(await admin.from("subscriptions").select("*").eq("id", subscriptionId).maybeSingle());
+  if (!sub || sub.status !== "pending") throw new Error("Only pending subscriptions can be started.");
   const { data: owner } = await admin.from("profiles").select("status").eq("id", sub.user_id).maybeSingle();
   if (owner?.status === "fraud_kyc") throw new Error("This account is restricted for KYC review. Reinstate it before sending invoices.");
   const { data: existing } = await admin.from("invoices").select("id").eq("subscription_id", sub.id).eq("kind", "first").neq("status", "void").maybeSingle();
   if (existing) throw new Error("A first invoice was already sent.");
-  const inv = await issueStripeInvoice(admin, {
-    userId: sub.user_id, subscriptionId: sub.id, kind: "first", description: `${sub.plan_name} plan, first month`,
-    lines: [{ description: `${sub.plan_name} plan, ${sub.monthly_hours} service hours per month`, amount: Number(sub.monthly_fee) }], idem: `first-${sub.id}`,
-  });
-  return { invoiceId: inv.id as string };
+  const customer = await ensureCustomer(admin, sub.user_id);
+  const price = await planPrice(sub.plan_name, Number(sub.monthly_fee));
+  const meta = { "metadata[subscription_id]": sub.id, "metadata[user_id]": sub.user_id };
+  const s = await stripe("POST", "subscriptions", {
+    customer, "items[0][price]": price, ...meta, "payment_settings[save_default_payment_method]": "on_subscription", "expand[]": "latest_invoice",
+    ...(collect === "now" ? { collection_method: "charge_automatically", payment_behavior: "default_incomplete" } : { collection_method: "send_invoice", days_until_due: 7 }),
+  }, `sub-start-${sub.id}-${collect}`);
+  // Saved before anything else, so webhooks for this subscription find the local plan.
+  must(await admin.from("subscriptions").update({ stripe_subscription_id: s.id, stripe_status: s.status, stripe_synced_at: new Date().toISOString() }).eq("id", sub.id));
+  let inv = s.latest_invoice;
+  if (typeof inv === "string") inv = await stripe("GET", `invoices/${inv}`);
+  // send_invoice subscriptions finalize their first invoice an hour later; finalize and email it now instead.
+  if (inv.status === "draft") inv = await stripe("POST", `invoices/${inv.id}/finalize`, {}, `fin-${inv.id}`);
+  if (collect === "invoice") await stripe("POST", `invoices/${inv.id}/send`, {}, `send-${inv.id}`).catch(() => null);
+  await stripe("POST", `invoices/${inv.id}`, { "metadata[kind]": "first", ...meta }).catch((e) => console.error("Invoice metadata update failed", e));
+  const { data: row, error } = await admin.from("invoices").upsert({
+    user_id: sub.user_id, subscription_id: sub.id, number: inv.number ?? inv.id, amount: Number(inv.total ?? inv.amount_due ?? 0) / 100, description: `${sub.plan_name} plan, first month`,
+    due_at: new Date(inv.due_date ? inv.due_date * 1000 : Date.now() + 864e5).toISOString().slice(0, 10), status: "open", kind: "first",
+    stripe_invoice_id: inv.id, hosted_url: inv.hosted_invoice_url, pdf_url: inv.invoice_pdf,
+  }, { onConflict: "stripe_invoice_id" }).select("*").single();
+  if (error) throw new Error("The subscription was started but its invoice couldn't be saved locally.");
+  await applySubscriptionStanding(admin, sub.id, `Invoice ${row.number} issued`);
+  return { invoiceId: row.id as string };
+}
+
+/** First invoice for a pending plan (staff approval, automatic approval): starts its Stripe subscription. */
+export async function sendFirstInvoiceFor(admin: Admin, subscriptionId: string, collect: FirstPayment = "invoice") {
+  return startStripeSubscription(admin, subscriptionId, collect);
 }
 
 /** Stripe's publishable key for the in-page card form: public by design (it ships to every browser), so it can live in Lovable's
@@ -378,7 +415,7 @@ export async function autoApproveSignup(admin: Admin, userId: string, emailClean
     if (!up.data?.length) continue;
     await admin.from("application_events").insert({ application_id: app.id, actor_label: "Automatic", action: "Approved automatically: no risk signals", from_status: "submitted", to_status: "approved", note: "Your first invoice has been sent. Your plan starts as soon as it's paid.", visible_to_client: true });
     const subs = (await admin.from("subscriptions").select("id").eq("application_id", app.id).eq("status", "pending")).data ?? [];
-    for (const s of subs) { try { await sendFirstInvoiceFor(admin, s.id); } catch (e) { console.error("Automatic first invoice failed", e); } }
+    for (const s of subs) { try { await sendFirstInvoiceFor(admin, s.id, "now"); } catch (e) { console.error("Automatic first invoice failed", e); } }
   }
   if (prof.status !== "active") await admin.from("profiles").update({ status: "active", status_changed_at: now }).eq("id", userId);
   return true;

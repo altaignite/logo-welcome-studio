@@ -85,6 +85,8 @@ type StripeInvoiceLike = {
 export function invoiceKind(o: StripeInvoiceLike): string {
   const own = o.metadata?.["kind"];
   if (own) return own;
+  // The invoice that starts a subscription is the plan's first month: paying it activates the plan.
+  if (o.billing_reason === "subscription_create") return "first";
   if (o.billing_reason === "subscription_cycle") return "renewal";
   if (o.billing_reason === "subscription_update") return "plan_change";
   return "service";

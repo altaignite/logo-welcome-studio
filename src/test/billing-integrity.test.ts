@@ -9,6 +9,8 @@ describe("Stripe invoice kinds", () => {
     expect(invoiceKind({ metadata: { kind: "arrears" } })).toBe("arrears");
   });
   it("treats only billing-cycle invoices as renewals", () => {
+    // The invoice that starts a subscription is the plan's first month, so paying it activates the plan.
+    expect(invoiceKind({ metadata: {}, billing_reason: "subscription_create" })).toBe("first");
     expect(invoiceKind({ metadata: {}, billing_reason: "subscription_cycle" })).toBe("renewal");
     expect(invoiceKind({ metadata: {}, billing_reason: "subscription_update" })).toBe("plan_change");
     expect(invoiceKind({ billing_reason: "manual" })).toBe("service");

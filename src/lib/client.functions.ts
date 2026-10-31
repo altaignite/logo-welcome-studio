@@ -41,7 +41,7 @@ export const orderAdditionalPlan = createServerFn({ method: "POST" })
   // The client signs the plan's agreements in the order flow before ordering.
   .inputValidator((d: unknown) => z.object({ planId: z.enum(["starter", "growth", "scale"]), signed: z.literal(true) }).parse(d))
   .handler(async ({ data, context }) => {
-    const { getAdmin, issueStripeInvoice } = await import("@/lib/billing.server");
+    const { getAdmin, startStripeSubscription } = await import("@/lib/billing.server");
     const admin = await getAdmin();
     const plan = plans.find((p) => p.id === data.planId)!;
     const { data: prof } = await admin.from("profiles").select("account_number, company, first_name, last_name, status, phone").eq("id", context.userId).single();
@@ -63,18 +63,18 @@ export const orderAdditionalPlan = createServerFn({ method: "POST" })
     await admin.from("projects").insert({ user_id: context.userId, subscription_id: sub.data.id, name: `${prof.company || "Client"} ${plan.name}`, service: "Marketing", status: "planned", description: `${plan.name} plan` });
     let inv;
     try {
-      inv = await issueStripeInvoice(admin, {
-      userId: context.userId, subscriptionId: sub.data.id, kind: "first", description: `${plan.name} plan, first month`,
-      lines: [{ description: `${plan.name} plan, ${plan.monthlyHours} service hours per month`, amount: plan.monthlyFee }], idem: `client-order-${sub.data.id}`,
-    });
+      inv = await startStripeSubscription(admin, sub.data.id, "now");
     } catch (e) {
-      // No half-made orders: if Stripe didn't take the invoice, the plan never starts.
+      // No half-made orders: if Stripe didn't take the invoice, the plan never starts (and a half-started Stripe subscription is cancelled).
+      const { applyStripeStatus } = await import("@/lib/billing.server");
+      const started = (await admin.from("subscriptions").select("stripe_subscription_id").eq("id", sub.data.id).maybeSingle()).data;
+      if (started?.stripe_subscription_id) await applyStripeStatus(started, "cancelled").catch(() => null);
       await admin.from("subscriptions").update({ status: "cancelled", cancelled_at: new Date().toISOString(), notes: `Order not completed: ${(e as Error).message}` }).eq("id", sub.data.id);
       await admin.from("projects").update({ status: "cancelled" }).eq("subscription_id", sub.data.id);
       await admin.from("applications").update({ archived_at: new Date().toISOString(), internal_notes: "Order not completed: Stripe invoice failed" }).eq("id", app.data.id);
       throw e;
     }
-    return { subscriptionId: sub.data.id as string, invoiceId: inv.id as string };
+    return { subscriptionId: sub.data.id as string, invoiceId: inv.invoiceId };
   });
 
 /** The in-page card form for one of the client's own open invoices (first payments on orders, and any invoice in the dashboard). */
