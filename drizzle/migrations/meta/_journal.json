@@ -197,6 +197,13 @@
       "when": 1793411698841,
       "tag": "0027_security_scan_hardening",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1793446159553,
+      "tag": "0028_billing_write_guards",
+      "breakpoints": true
     }
   ]
 }

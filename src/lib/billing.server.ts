@@ -370,6 +370,10 @@ export async function startStripeSubscription(admin: Admin, subscriptionId: stri
   if (owner?.status === "fraud_kyc") throw new Error("This account is restricted for KYC review. Reinstate it before sending invoices.");
   const { data: existing } = await admin.from("invoices").select("id").eq("subscription_id", sub.id).eq("kind", "first").neq("status", "void").maybeSingle();
   if (existing) throw new Error("A first invoice was already sent.");
+  // A standard plan is billed at its official price, whatever the row says (prices never come from the browser).
+  const { plans } = await import("@/lib/signup");
+  const official = plans.find((p) => p.name === sub.plan_name);
+  if (official && (Number(sub.monthly_fee) !== official.monthlyFee || Number(sub.monthly_hours) !== official.monthlyHours)) throw new Error(`The ${sub.plan_name} plan's price doesn't match the official price list, so it wasn't billed.`);
   const customer = await ensureCustomer(admin, sub.user_id);
   const price = await planPrice(sub.plan_name, Number(sub.monthly_fee));
   const meta = { "metadata[subscription_id]": sub.id, "metadata[user_id]": sub.user_id };

@@ -48,11 +48,13 @@ export async function ensureCustomer(admin: any, userId: string): Promise<string
 export async function planPrice(plan: string, monthlyFee: number): Promise<string> {
   const lookup = `fp_${plan.toLowerCase()}_${cents(monthlyFee)}_monthly`;
   const found = await stripe("GET", "prices", { "lookup_keys[]": lookup, limit: 1 });
-  if (found.data?.[0]) return found.data[0].id;
+  const p = found.data?.[0];
+  // Only use a price that really is this amount, in USD, monthly and active: a lookup key can be moved to another price in Stripe.
+  if (p && p.active && p.unit_amount === cents(monthlyFee) && p.currency === "usd" && p.recurring?.interval === "month" && (p.recurring?.interval_count ?? 1) === 1) return p.id;
   const product = await stripe("POST", "products", { name: `${plan} plan`, "metadata[plan]": plan }, `prod-${lookup}`);
   const price = await stripe("POST", "prices", {
-    product: product.id, currency: "usd", unit_amount: cents(monthlyFee), "recurring[interval]": "month", lookup_key: lookup,
-  }, `price-${lookup}`);
+    product: product.id, currency: "usd", unit_amount: cents(monthlyFee), "recurring[interval]": "month", lookup_key: lookup, transfer_lookup_key: true,
+  }, `price-${lookup}${p ? `-fix-${p.id}` : ""}`);
   return price.id;
 }
 
