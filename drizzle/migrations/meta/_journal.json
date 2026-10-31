@@ -190,6 +190,13 @@
       "when": 1793411340349,
       "tag": "0026_security_settings_staff_only",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1793411698841,
+      "tag": "0027_security_scan_hardening",
+      "breakpoints": true
     }
   ]
 }
