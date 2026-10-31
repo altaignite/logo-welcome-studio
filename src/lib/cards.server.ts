@@ -7,7 +7,7 @@ import { applyDefaultCard, applySubscriptionStanding, must, stripePublishableKey
 
 type Admin = any;
 
-export type SavedCard = { id: string; brand: string; last4: string; expMonth: number; expYear: number; isDefault: boolean; expired: boolean; expiresSoon: boolean; plans: string[] };
+export type SavedCard = { id: string; brand: string; last4: string; expMonth: number; expYear: number; isDefault: boolean; expired: boolean; expiresSoon: boolean; plans: string[]; holder: string | null; funding: string | null; country: string | null; wallet: string | null };
 
 const idOf = (v: any): string | null => (typeof v === "string" ? v : v?.id ?? null);
 const RUNNING = ["active", "past_due", "trialing", "unpaid", "paused"];
@@ -27,6 +27,8 @@ export async function listCards(admin: Admin, userId: string, now = new Date()):
     const c = pm.card ?? {};
     return {
       id: pm.id, brand: String(c.display_brand ?? c.brand ?? "card"), last4: String(c.last4 ?? ""), expMonth: Number(c.exp_month), expYear: Number(c.exp_year),
+      // For the card preview: what Stripe shares about the card (never the number or the bank's artwork).
+      holder: pm.billing_details?.name ? String(pm.billing_details.name).slice(0, 60) : null, funding: c.funding ?? null, country: c.country ?? null, wallet: c.wallet?.type ?? null,
       isDefault: pm.id === def, ...cardExpiry(Number(c.exp_month), Number(c.exp_year), now),
       plans: (subs.data ?? []).filter((s: any) => RUNNING.includes(s.status) && idOf(s.default_payment_method) === pm.id).map((s: any) => planOf(s.id)),
     };
