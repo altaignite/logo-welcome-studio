@@ -183,6 +183,13 @@
       "when": 1793326366660,
       "tag": "0025_security_review_flags",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1793411340349,
+      "tag": "0026_security_settings_staff_only",
+      "breakpoints": true
     }
   ]
 }
