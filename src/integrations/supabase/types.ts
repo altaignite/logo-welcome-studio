@@ -72,6 +72,32 @@ export type Database = {
           to_plan?: string | null
           user_id?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: "account_change_requests_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      app_secrets: {
+        Row: {
+          name: string
+          updated_at: string
+          value: string
+        }
+        Insert: {
+          name: string
+          updated_at?: string
+          value: string
+        }
+        Update: {
+          name?: string
+          updated_at?: string
+          value?: string
+        }
         Relationships: []
       }
       application_events: {
@@ -1058,6 +1084,57 @@ export type Database = {
         }
         Relationships: []
       }
+      security_events: {
+        Row: {
+          count: number
+          country: string | null
+          dedupe: string | null
+          detail: Json
+          first_seen: string
+          id: string
+          ip: string | null
+          kind: string
+          last_seen: string
+          path: string | null
+          resolved_at: string | null
+          resolved_by_label: string | null
+          severity: string
+          user_id: string | null
+        }
+        Insert: {
+          count?: number
+          country?: string | null
+          dedupe?: string | null
+          detail?: Json
+          first_seen?: string
+          id?: string
+          ip?: string | null
+          kind: string
+          last_seen?: string
+          path?: string | null
+          resolved_at?: string | null
+          resolved_by_label?: string | null
+          severity?: string
+          user_id?: string | null
+        }
+        Update: {
+          count?: number
+          country?: string | null
+          dedupe?: string | null
+          detail?: Json
+          first_seen?: string
+          id?: string
+          ip?: string | null
+          kind?: string
+          last_seen?: string
+          path?: string | null
+          resolved_at?: string | null
+          resolved_by_label?: string | null
+          severity?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       security_settings: {
         Row: {
           id: number
@@ -1164,6 +1241,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      staff_invites: {
+        Row: {
+          accepted_at: string | null
+          created_at: string
+          email: string
+          expires_at: string
+          invited_by: string | null
+          invited_by_label: string
+          level: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          created_at?: string
+          email: string
+          expires_at?: string
+          invited_by?: string | null
+          invited_by_label?: string
+          level?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          created_at?: string
+          email?: string
+          expires_at?: string
+          invited_by?: string | null
+          invited_by_label?: string
+          level?: string
+        }
+        Relationships: []
       }
       staff_members: {
         Row: {
@@ -1625,36 +1732,6 @@ export type Database = {
           },
         ]
       }
-      staff_invites: {
-        Row: {
-          accepted_at: string | null
-          created_at: string
-          email: string
-          expires_at: string
-          invited_by: string | null
-          invited_by_label: string
-          level: string
-        }
-        Insert: {
-          accepted_at?: string | null
-          created_at?: string
-          email: string
-          expires_at?: string
-          invited_by?: string | null
-          invited_by_label?: string
-          level?: string
-        }
-        Update: {
-          accepted_at?: string | null
-          created_at?: string
-          email?: string
-          expires_at?: string
-          invited_by?: string | null
-          invited_by_label?: string
-          level?: string
-        }
-        Relationships: []
-      }
       user_roles: {
         Row: {
           id: string
@@ -1683,7 +1760,16 @@ export type Database = {
         Args: { _invoice: string }
         Returns: boolean
       }
+      duplicate_phone_owner: { Args: { _user: string }; Returns: string }
       email_domain_blocked: { Args: { _email: string }; Returns: boolean }
+      flag_for_kyc: {
+        Args: { _reason: string; _source?: string; _user: string }
+        Returns: boolean
+      }
+      flag_for_review: {
+        Args: { _reason: string; _source?: string; _user: string }
+        Returns: boolean
+      }
       has_perm: { Args: { _perm: string; _user_id: string }; Returns: boolean }
       has_role: {
         Args: {
@@ -1699,6 +1785,19 @@ export type Database = {
       level_grants: {
         Args: { _level: string; _perm: string }
         Returns: boolean
+      }
+      log_security_event: {
+        Args: {
+          _country: string
+          _dedupe: string
+          _detail: Json
+          _ip: string
+          _kind: string
+          _path: string
+          _severity: string
+          _user: string
+        }
+        Returns: undefined
       }
       mark_notifications_read: { Args: { _ids?: string[] }; Returns: number }
       mfa_satisfied: { Args: never; Returns: boolean }
@@ -1727,6 +1826,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      phone_digits: { Args: { _phone: string }; Returns: string }
       revoke_user_sessions: {
         Args: { _session?: string; _user: string }
         Returns: number
