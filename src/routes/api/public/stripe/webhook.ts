@@ -8,6 +8,10 @@ export const Route = createFileRoute("/api/public/stripe/webhook")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        // Cheap checks before any database work: Stripe always signs, and its events are well under 1 MB.
+        const sig = request.headers.get("stripe-signature");
+        if (!sig || !/(^|,)t=\d+/.test(sig) || !/(^|,)v1=[0-9a-f]{64}/.test(sig)) return new Response("Invalid signature", { status: 400 });
+        if (Number(request.headers.get("content-length") ?? 0) > 1_000_000) return new Response("Too large", { status: 413 });
         const body = await request.text();
         const { verifyStripeSignature, audit, stripe, webhookSecrets } = await import("@/lib/stripe.server");
         const B = await import("@/lib/billing.server");
@@ -16,7 +20,6 @@ export const Route = createFileRoute("/api/public/stripe/webhook")({
         const admin = await B.getAdmin();
         const secrets = await webhookSecrets(admin);
         if (!secrets.length) return new Response("Not configured", { status: 500 });
-        const sig = request.headers.get("stripe-signature");
         let valid = false;
         for (const s of secrets) if (await verifyStripeSignature(body, sig, s)) { valid = true; break; }
         if (!valid) {

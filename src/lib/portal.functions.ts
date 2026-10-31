@@ -74,7 +74,7 @@ export const saveOnboardingBrief = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { getAdmin, must } = await import("@/lib/billing.server");
     const admin = await getAdmin();
-    const answers = Object.fromEntries(Object.entries(data.answers).filter(([, v]) => typeof v === "string" && v.trim()));
+    const answers = Object.fromEntries(Object.entries(data.answers).filter(([, v]) => typeof v === "string" && v.trim())) as Record<string, string>;
     if (data.submit) {
       const missing = missingAnswers(answers);
       if (missing.length) throw new Error(`Please answer: ${missing.join("; ")}`);

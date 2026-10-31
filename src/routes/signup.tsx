@@ -156,7 +156,7 @@ function Signup() {
   const checkEmail = async (event: FormEvent) => {
     event.preventDefault();
     const email = account.email.trim();
-    const valid = accountSchema.innerType().shape.email.safeParse(email);
+    const valid = accountSchema.shape.email.safeParse(email);
     if (!valid.success) { popup({ type: "error", title: "Let's check your email", description: valid.error.issues[0]?.message ?? "Enter a valid email address.", primaryLabel: "Try again", secondaryLabel: null }); return; }
     setGateBusy(true);
     try {

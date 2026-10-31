@@ -85,8 +85,38 @@ function withSecurityHeaders(response: Response) {
   }
 }
 
+/** HTTPS only: a plain-HTTP request is redirected permanently (HSTS then keeps browsers on HTTPS). Local development is exempt. */
+export function httpsRedirect(request: Request): Response | null {
+  const url = new URL(request.url);
+  const local = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(url.hostname);
+  const proto = request.headers.get("x-forwarded-proto") ?? url.protocol.replace(":", "");
+  if (local || proto !== "http") return null;
+  url.protocol = "https:";
+  return new Response(null, { status: 308, headers: { Location: url.toString() } });
+}
+
+/** Cross-site request forgery guard: sign-in uses a bearer token, not cookies, so forged requests carry no credentials anyway;
+ * on top of that, any state-changing request sent by a browser from another site (its Origin header names a different host) is
+ * refused. Stripe's signed webhook and server-to-server calls send no Origin and are unaffected. */
+export function crossSiteRefused(request: Request): Response | null {
+  if (["GET", "HEAD", "OPTIONS"].includes(request.method)) return null;
+  const origin = request.headers.get("origin");
+  if (!origin) return null;
+  const url = new URL(request.url);
+  if (url.pathname === "/api/public/stripe/webhook") return null;
+  try { if (new URL(origin).host === url.host) return null; } catch { /* malformed Origin: refuse */ }
+  return new Response("Cross-site request refused", { status: 403, headers: { "content-type": "text/plain" } });
+}
+
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
+    const early = httpsRedirect(request) ?? crossSiteRefused(request);
+    if (early) {
+      if (early.status === 403) {
+        try { const { logSecurityEvent } = await import("@/lib/security-log.server"); await logSecurityEvent({ kind: "cross_site_request", severity: "medium", request, group: new URL(request.url).pathname, summary: `A cross-site ${request.method} to ${new URL(request.url).pathname} from ${request.headers.get("origin")} was refused.` }); } catch { /* never block on logging */ }
+      }
+      return withSecurityHeaders(early);
+    }
     try {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);

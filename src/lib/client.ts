@@ -35,6 +35,6 @@ export function guaranteeClaimable(sub: Parameters<typeof guaranteeCheck>[0], in
 export const guaranteeClaimSchema = z.object({
   subscriptionId: z.string().uuid(),
   statement: z.string().trim().min(20, "Tell us briefly what happened in the first 90 days.").max(4000),
-  confirmNoSales: z.literal(true, { errorMap: () => ({ message: "Confirm that you received no sales." }) }),
+  confirmNoSales: z.literal(true, { error: "Confirm that you received no sales." }),
 });
 export const infoResponseSchema = z.object({ applicationId: z.string().uuid(), message: z.string().trim().min(3, "Write a short reply.").max(4000) });

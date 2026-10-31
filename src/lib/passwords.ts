@@ -43,3 +43,15 @@ export async function passwordProblem(pw: string, email?: string | null): Promis
   if (seen && seen > 0) return `This password has appeared in ${seen.toLocaleString()} known data breaches, so attackers try it first. Please choose a different one.`;
   return null;
 }
+
+/** Reset links expire: the password can only be set from a session that a reset (recovery) link created in the last hour.
+ * A normal signed-in session doesn't count (changing a password there needs the current one, on the Security page). */
+export const RESET_WINDOW_SECONDS = 60 * 60;
+export function recoveryAllowed(accessToken: string | null | undefined, nowSeconds = Math.floor(Date.now() / 1000)): boolean {
+  if (!accessToken) return false;
+  try {
+    const part = accessToken.split(".")[1] ?? "";
+    const claims = JSON.parse(atob(part.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(part.length / 4) * 4, "="))) as { amr?: { method?: string; timestamp?: number }[] };
+    return (claims.amr ?? []).some((a) => (a.method === "recovery" || a.method === "otp") && typeof a.timestamp === "number" && nowSeconds - a.timestamp <= RESET_WINDOW_SECONDS && a.timestamp <= nowSeconds + 60);
+  } catch { return false; }
+}

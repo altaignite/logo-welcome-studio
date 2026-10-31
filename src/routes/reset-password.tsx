@@ -4,7 +4,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { usePopup } from "@/components/popup";
 import { AuthShell } from "@/components/auth-shell";
-import { passwordProblem, passwordRules } from "@/lib/passwords";
+import { passwordProblem, passwordRules, recoveryAllowed } from "@/lib/passwords";
 
 export const Route = createFileRoute("/reset-password")({
   head: () => ({
@@ -27,8 +27,10 @@ function Reset() {
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
-    const { data } = supabase.auth.onAuthStateChange((event) => { if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") setReady(true); });
-    supabase.auth.getSession().then(({ data: s }) => { if (s.session) setReady(true); });
+    // Only a session opened from a reset link in the last hour may set a password here (recoveryAllowed).
+    const check = (token: string | null | undefined) => setReady(recoveryAllowed(token));
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => check(session?.access_token));
+    supabase.auth.getSession().then(({ data: s }) => check(s.session?.access_token));
     return () => data.subscription.unsubscribe();
   }, []);
   const submit = async (e: FormEvent<HTMLFormElement>) => {
@@ -37,6 +39,8 @@ function Reset() {
     const pw = String(f.get("password") ?? ""), confirm = String(f.get("confirm") ?? "");
     if (pw !== confirm) { popup({ type: "error", title: "Passwords don't match", description: "Type the same password in both fields." }); return; }
     setBusy(true);
+    const { data: cur } = await supabase.auth.getSession();
+    if (!recoveryAllowed(cur.session?.access_token)) { setBusy(false); setReady(false); popup({ type: "error", title: "This reset link has expired", description: "Reset links work for one hour. Request a new one." }); return; }
     const { data: who } = await supabase.auth.getUser();
     const issue = await passwordProblem(pw, who.user?.email);
     if (issue) { setBusy(false); popup({ type: "error", title: "Choose a different password", description: issue }); return; }
@@ -47,7 +51,7 @@ function Reset() {
     popup({ type: "success", title: "Password updated", description: "Log in with your new password.", primaryLabel: "Go to login", secondaryLabel: null, onPrimary: () => navigate({ to: "/" }) });
   };
   return (
-    <AuthShell title="Set a new password" subtitle={ready ? `${passwordRules.join(", ")}.` : "Open this page from the link in your reset email."}>
+    <AuthShell title="Set a new password" subtitle={ready ? `${passwordRules.join(", ")}.` : "Open this page from the link in your reset email. Links work for one hour."}>
       {ready ? (
         <form onSubmit={submit} className="space-y-4" noValidate>
           <label className="block space-y-1.5"><span className="block text-[13px] font-medium">New password<span className="text-primary">*</span></span>

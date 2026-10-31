@@ -57,8 +57,8 @@ export async function ensureBucket(admin: Admin) {
   if (found.error) {
     const made = await admin.storage.createBucket(FILE_BUCKET, { public: false, fileSizeLimit: MAX_FILE_BYTES, allowedMimeTypes: [...allowedMimeTypes] });
     if (made.error && !/exists/i.test(made.error.message)) throw new Error("File storage isn't available right now.");
-  } else if (found.data?.public) {
-    // Never serve client files publicly.
+  } else if (found.data?.public || Number(found.data?.file_size_limit) !== MAX_FILE_BYTES || (found.data?.allowed_mime_types ?? []).length !== allowedMimeTypes.length) {
+    // Never serve client files publicly, and keep the size and type limits on the bucket itself (it refuses anything else).
     await admin.storage.updateBucket(FILE_BUCKET, { public: false, fileSizeLimit: MAX_FILE_BYTES, allowedMimeTypes: [...allowedMimeTypes] });
   }
   bucketReady = true;

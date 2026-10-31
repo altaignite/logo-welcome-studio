@@ -1,0 +1,17 @@
+# Automatic dependency updates: Dependabot opens pull requests for security fixes as soon as they're published, and groups
+# routine updates weekly. CI (.github/workflows/ci.yml) runs typecheck, lint, tests and build on each one before merging.
+version: 2
+updates:
+  - package-ecosystem: "bun"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 10
+    groups:
+      minor-and-patch:
+        update-types: ["minor", "patch"]
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"

@@ -58,7 +58,7 @@ export const revokeSessions = createServerFn({ method: "POST" })
 /** Replaces the user's profile metadata (short flat values only). */
 export const updateUserMetadata = createServerFn({ method: "POST" })
   .middleware([limited("sessionAdmin")])
-  .inputValidator((d: unknown) => z.object({ userId: uuid, metadata: z.record(z.union([z.string(), z.number(), z.boolean(), z.null()])) }).parse(d))
+  .inputValidator((d: unknown) => z.object({ userId: uuid, metadata: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])) }).parse(d))
   .handler(async ({ data, context }) => {
     await requireTarget(context, data.userId);
     const { metadataIssue } = await import("@/lib/security");
