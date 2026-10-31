@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { loadStripe, type Stripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
-import { Lock, Plus, Send, Star, Trash2, Zap } from "lucide-react";
+import { CreditCard, Lock, Plus, Send, Star, Trash2, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ErrorState, SectionSkeleton, Spinner } from "@/components/loading";
 import { usePopup } from "@/components/popup";
@@ -16,55 +16,12 @@ import { money } from "@/lib/admin";
 import { reportError } from "@/lib/errors";
 
 /** Saved cards for clients (Invoices page) and staff (account page). Card numbers are only ever typed into Stripe's own form. */
-export type SavedCard = { id: string; brand: string; last4: string; expMonth: number; expYear: number; isDefault: boolean; expired: boolean; expiresSoon: boolean; plans: string[]; holder: string | null; funding: string | null; country: string | null; wallet: string | null };
+export type SavedCard = { id: string; brand: string; last4: string; expMonth: number; expYear: number; isDefault: boolean; expired: boolean; expiresSoon: boolean; plans: string[] };
 
 const brandName = (b: string) => ({ visa: "Visa", mastercard: "Mastercard", amex: "American Express", discover: "Discover", diners: "Diners Club", jcb: "JCB", unionpay: "UnionPay", cartes_bancaires: "Cartes Bancaires" } as Record<string, string>)[b] ?? b.charAt(0).toUpperCase() + b.slice(1);
 export const cardLabel = (c: Pick<SavedCard, "brand" | "last4">) => `${brandName(c.brand)} ending ${c.last4}`;
 const expiry = (c: SavedCard) => `${String(c.expMonth).padStart(2, "0")}/${String(c.expYear).slice(-2)}`;
 const appearance = { theme: "stripe" as const, variables: { colorPrimary: "#111111", borderRadius: "12px", fontFamily: "Inter, system-ui, sans-serif" } };
-
-
-/** Network colours for the card preview. The bank's own card artwork isn't available from Stripe (or any card API), so the preview
- * shows the network, last 4 digits, expiry, cardholder and card type on the network's colours. */
-const looks: Record<string, { bg: string; mark: ReactNode }> = {
-  visa: { bg: "linear-gradient(135deg,#1a1f71 0%,#2b3a9e 55%,#1a1f71 100%)", mark: <span className="text-[1.35em] font-black italic tracking-tight">VISA</span> },
-  mastercard: { bg: "linear-gradient(135deg,#1c1c1c 0%,#3a3a3a 100%)", mark: <span className="relative inline-flex h-[1.6em] w-[2.6em]" aria-hidden><span className="absolute left-0 h-[1.6em] w-[1.6em] rounded-full bg-[#eb001b]" /><span className="absolute right-0 h-[1.6em] w-[1.6em] rounded-full bg-[#f79e1b] mix-blend-screen" /></span> },
-  amex: { bg: "linear-gradient(135deg,#006fcf 0%,#4aa3e8 100%)", mark: <span className="rounded-sm border border-white/80 px-1 text-[0.8em] font-bold tracking-wide">AMERICAN EXPRESS</span> },
-  discover: { bg: "linear-gradient(135deg,#2b2b2b 0%,#4a4a4a 70%,#ff6000 100%)", mark: <span className="text-[1em] font-bold tracking-wide">DISCOVER</span> },
-  jcb: { bg: "linear-gradient(135deg,#0e4c96 0%,#c8102e 50%,#007b40 100%)", mark: <span className="text-[1.1em] font-black italic">JCB</span> },
-  unionpay: { bg: "linear-gradient(135deg,#e21836 0%,#00447c 55%,#007b84 100%)", mark: <span className="text-[0.9em] font-bold">UnionPay</span> },
-  diners: { bg: "linear-gradient(135deg,#0079be 0%,#2c2c2c 100%)", mark: <span className="text-[0.85em] font-bold">Diners Club</span> },
-};
-
-/** A picture of the card: chip, network mark, •••• last 4, expiry and cardholder. "mini" is a small thumbnail for lists. */
-export function CardVisual({ card, size = "full" }: { card: SavedCard; size?: "full" | "mini" }) {
-  const look = looks[card.brand] ?? { bg: "linear-gradient(135deg,#334155 0%,#64748b 100%)", mark: <span className="text-[0.9em] font-bold">{brandName(card.brand)}</span> };
-  const label = `${cardLabel(card)}, expires ${expiry(card)}${card.expired ? ", expired" : ""}`;
-  if (size === "mini") return <span role="img" aria-label={label} className={`relative inline-flex h-9 w-14 shrink-0 items-end justify-end overflow-hidden rounded-md p-1 text-[7px] text-white shadow-sm ${card.expired ? "grayscale" : ""}`} style={{ background: look.bg }}>
-    <span className="absolute left-1.5 top-1.5 h-2 w-2.5 rounded-[2px] bg-gradient-to-br from-amber-200 to-amber-400" />{look.mark}</span>;
-  return <div role="img" aria-label={label} className={`relative aspect-[1.586] w-full max-w-[340px] overflow-hidden rounded-2xl p-5 text-white shadow-lg ${card.expired ? "grayscale" : ""}`} style={{ background: look.bg, fontSize: "clamp(11px, 3.6vw, 14px)" }}>
-    <span className="pointer-events-none absolute -right-10 -top-16 h-48 w-48 rounded-full bg-white/10" />
-    <span className="pointer-events-none absolute -bottom-20 -left-10 h-48 w-48 rounded-full bg-white/5" />
-    <div className="relative flex h-full flex-col justify-between">
-      <div className="flex items-start justify-between">
-        <span className="h-[2.1em] w-[2.9em] rounded-md bg-gradient-to-br from-amber-100 via-amber-300 to-amber-500 shadow-inner" aria-hidden />
-        <span className="text-right text-[0.75em] font-medium uppercase tracking-wider text-white/80">{[card.wallet ? card.wallet.replace(/_/g, " ") : null, card.funding && card.funding !== "unknown" ? card.funding : null].filter(Boolean).join(" · ")}</span>
-      </div>
-      <p className="font-mono text-[1.35em] tracking-[0.18em]" aria-hidden>•••• •••• •••• {card.last4}</p>
-      <div className="flex items-end justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-[0.65em] uppercase tracking-wider text-white/70">{card.holder ? "Cardholder" : "Card"}</p>
-          <p className="truncate text-[0.95em] font-semibold uppercase tracking-wide">{card.holder ?? brandName(card.brand)}</p>
-        </div>
-        <div className="shrink-0 text-right">
-          <p className="text-[0.65em] uppercase tracking-wider text-white/70">{card.expired ? "Expired" : "Expires"}</p>
-          <p className="font-mono text-[0.95em] font-semibold">{expiry(card)}</p>
-        </div>
-        <span className="shrink-0">{look.mark}</span>
-      </div>
-    </div>
-  </div>;
-}
 
 const stripes = new Map<string, Promise<Stripe | null>>();
 const stripeFor = (key: string) => { if (!stripes.has(key)) stripes.set(key, loadStripe(key)); return stripes.get(key)!; };
@@ -72,7 +29,7 @@ const stripeFor = (key: string) => { if (!stripes.has(key)) stripes.set(key, loa
 function CardRow({ card, children }: { card: SavedCard; children?: ReactNode }) {
   return <li className="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
     <div className="flex min-w-0 items-center gap-3">
-      <CardVisual card={card} size="mini" />
+      <CreditCard className="size-5 shrink-0 text-muted-foreground" />
       <div className="min-w-0">
         <p className="text-sm font-semibold">{cardLabel(card)}{card.isDefault && <span className="ml-2 rounded-full bg-secondary px-2 py-0.5 text-[11px] font-medium">Default</span>}</p>
         <p className={`text-xs ${card.expired ? "text-destructive" : card.expiresSoon ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground"}`}>
@@ -155,18 +112,10 @@ export function MyPaymentCards() {
     {warn && <p className="border-b bg-amber-50 px-5 py-2 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">Your card {list.some((c) => c.expired) ? "has expired" : "expires soon"}. Add a new card so your plans keep running.</p>}
     {cards.isLoading ? <div className="p-5"><SectionSkeleton /></div> : cards.error ? <div className="p-5"><ErrorState error={cards.error} retry={() => void cards.refetch()} /></div>
       : list.length === 0 ? <p className="px-5 py-4 text-sm text-muted-foreground">No saved cards yet. The card you pay your first invoice with is saved automatically for your plan's renewals.</p>
-      : <ul className="grid gap-5 p-5 sm:grid-cols-2">{list.map((c) => <li key={c.id} className="space-y-2">
-          <CardVisual card={c} />
-          <div className="flex max-w-[340px] flex-wrap items-center justify-between gap-2">
-            <p className={`text-xs ${c.expired ? "text-destructive" : c.expiresSoon ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground"}`}>
-              {c.isDefault ? "Default card" : c.expired ? "Expired" : c.expiresSoon ? "Expires soon" : "Saved card"}{c.plans.length > 0 && ` · Pays for ${c.plans.join(", ")}`}
-            </p>
-            <span className="flex gap-1">
-              {!c.isDefault && !c.expired && <button type="button" onClick={() => void makeDefault(c)} className="h-8 rounded-full bg-secondary px-3 text-xs font-semibold">Make default</button>}
-              <button type="button" onClick={() => remove(c)} className="h-8 rounded-full px-3 text-xs font-semibold text-muted-foreground underline underline-offset-4">Remove</button>
-            </span>
-          </div>
-        </li>)}</ul>}
+      : <ul className="divide-y">{list.map((c) => <CardRow key={c.id} card={c}>
+          {!c.isDefault && !c.expired && <button type="button" onClick={() => void makeDefault(c)} className="h-8 rounded-full bg-secondary px-3 text-xs font-semibold">Make default</button>}
+          <button type="button" onClick={() => remove(c)} className="h-8 rounded-full px-3 text-xs font-semibold text-muted-foreground underline underline-offset-4">Remove</button>
+        </CardRow>)}</ul>}
     <Modal open={adding} onClose={() => setAdding(false)} title="Add a card" description="Your new card becomes the default: your plans renew on it from now on.">
       {adding && <AddCardForm onCancel={() => setAdding(false)} onAdded={async (pm) => { await fnDefault({ data: { paymentMethodId: pm } }); setAdding(false); await refresh();
         popup({ type: "success", title: "Card saved", description: "Your plans renew on this card from now on.", primaryLabel: "Got it", secondaryLabel: null }); }} />}
@@ -217,7 +166,7 @@ function PayInvoice({ invoice, onDone }: { invoice: { id: string; number: string
       <legend className="sr-only">Card</legend>
       {usable.map((c) => <label key={c.id} className={`flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 text-sm ${choice === c.id ? "border-foreground" : ""}`}>
         <input type="radio" name="card" checked={choice === c.id} onChange={() => setChoice(c.id)} className="accent-foreground" />
-        <CardVisual card={c} size="mini" /><span className="flex-1">{cardLabel(c)}<span className="block text-xs text-muted-foreground">Expires {expiry(c)}{c.isDefault ? " · Default" : ""}</span></span>
+        <span className="flex-1">{cardLabel(c)}<span className="block text-xs text-muted-foreground">Expires {expiry(c)}{c.isDefault ? " · Default" : ""}</span></span>
       </label>)}
       <label className={`flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 text-sm ${choice === "new" ? "border-foreground" : ""}`}>
         <input type="radio" name="card" checked={choice === "new"} onChange={() => setChoice("new")} className="accent-foreground" /><span>Use a new card</span>
