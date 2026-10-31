@@ -1,4 +1,5 @@
 import { createFileRoute, Link, getRouteApi, useNavigate } from "@tanstack/react-router";
+import { friendlyError } from "@/lib/errors";
 import { ErrorState, PageSkeleton } from "@/components/loading";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -55,7 +56,7 @@ function RecordPage() {
     },
   });
   const refresh = () => qc.invalidateQueries({ queryKey: ["admin"] });
-  const done = async (e: { message: string } | null) => { if (e) return e.message; await refresh(); return null; };
+  const done = async (e: { message: string } | null) => { if (e) return friendlyError(e); await refresh(); return null; };
 
   if (!cfg) return <p className="text-sm text-muted-foreground">This record type doesn't exist.</p>;
   if (error) return <ErrorState error={error} retry={() => location.reload()} />;
@@ -82,7 +83,7 @@ function RecordPage() {
     primaryLabel: "Delete", secondaryLabel: "Cancel",
     onPrimary: async () => {
       const r = await db.from(kind).delete().eq("id", id);
-      if (r.error) popup({ type: "error", title: "Couldn't delete", description: r.error.message, secondaryLabel: null, primaryLabel: "Close" });
+      if (r.error) popup({ type: "error", title: "Couldn't delete", description: friendlyError(r.error), secondaryLabel: null, primaryLabel: "Close" });
       else { await refresh(); back(); }
     },
   });
@@ -90,11 +91,11 @@ function RecordPage() {
     title: `Void ${cfg.singular.toLowerCase()}`, submitLabel: "Void", description: "Voided records stay on file for tax and legal purposes.",
     fields: [{ name: "reason", label: "Reason", type: "textarea", required: true }],
     onSubmit: async (v) => {
-      if (kind === "invoices") { try { await fnVoid({ data: { invoiceIds: [id], reason: v.reason } }); await refresh(); return null; } catch (e) { return (e as Error).message; } }
+      if (kind === "invoices") { try { await fnVoid({ data: { invoiceIds: [id], reason: v.reason } }); await refresh(); return null; } catch (e) { return friendlyError(e); } }
       return done((await db.from(kind).update({ status: "void", void_reason: v.reason }).eq("id", id)).error);
     },
   });
-  const archive = async () => { const r = await db.from(kind).update({ archived_at: row.archived_at ? null : new Date().toISOString() }).eq("id", id); if (r.error) popup({ type: "error", title: "Couldn't archive", description: r.error.message, secondaryLabel: null, primaryLabel: "Close" }); await refresh(); };
+  const archive = async () => { const r = await db.from(kind).update({ archived_at: row.archived_at ? null : new Date().toISOString() }).eq("id", id); if (r.error) popup({ type: "error", title: "Couldn't archive", description: friendlyError(r.error), secondaryLabel: null, primaryLabel: "Close" }); await refresh(); };
 
   const subProjects = data.children.find((c) => c.kind === "projects")?.rows ?? [];
   const logHours = (projectId?: string) => setModal({
@@ -124,7 +125,7 @@ function RecordPage() {
         const patch = toPatch(fields, v, childKind === "client_reports" ? recordKinds.client_reports.codec : undefined);
         if (childKind === "invoices") {
           if (!(Number(v.amount) > 0)) return "Enter an amount above 0.";
-          try { await fnInvoice({ data: { subscriptionId: id, description: v.description, amount: Number(v.amount) } }); await refresh(); return null; } catch (e) { return (e as Error).message; }
+          try { await fnInvoice({ data: { subscriptionId: id, description: v.description, amount: Number(v.amount) } }); await refresh(); return null; } catch (e) { return friendlyError(e); }
         }
         if (childKind === "tasks" || childKind === "deliverables" || childKind === "client_reports") Object.assign(patch, { actor_label: adminEmail });
         const ins = childKind === "projects" ? { user_id: row.user_id, subscription_id: id, ...patch } : { ...base, ...patch };
@@ -137,7 +138,7 @@ function RecordPage() {
     fields: [{ name: "amount", label: "Amount (USD)", type: "number", required: true }, { name: "reason", label: "Reason", type: "textarea", required: true }],
     onSubmit: async (v) => {
       const a = Number(v.amount); if (!(a > 0)) return "Enter an amount above 0.";
-      try { await fnRefund({ data: { subscriptionId: id, amount: a, reason: v.reason } }); await refresh(); return null; } catch (e) { return (e as Error).message; }
+      try { await fnRefund({ data: { subscriptionId: id, amount: a, reason: v.reason } }); await refresh(); return null; } catch (e) { return friendlyError(e); }
     },
   });
   const reply = () => setModal({
@@ -145,7 +146,7 @@ function RecordPage() {
       { name: "then", label: "Then", type: "select", options: ["keep_status", "waiting_on_client", "closed"] }],
     onSubmit: async (v) => {
       const m = await db.from("ticket_messages").insert({ ticket_id: id, user_id: row.user_id, body: v.body, internal: v.internal !== "visible_to_client", ...actor });
-      if (m.error) return m.error.message;
+      if (m.error) return friendlyError(m.error);
       const next = v.then === "keep_status" ? (row.status === "open" ? { status: "in_progress" } : {}) : { status: v.then, closed_at: v.then === "closed" ? new Date().toISOString() : null };
       return done((await db.from("support_tickets").update({ updated_at: new Date().toISOString(), ...next }).eq("id", id)).error);
     },
@@ -153,18 +154,18 @@ function RecordPage() {
 
   const attempt = async (title: string, description: string, fn: () => Promise<unknown>) => {
     try { await fn(); await refresh(); popup({ type: "success", title, description, primaryLabel: "Done", secondaryLabel: null }); }
-    catch (e) { popup({ type: "error", title: "Something went wrong", description: (e as Error).message, primaryLabel: "Close", secondaryLabel: null }); }
+    catch (e) { popup({ type: "error", title: "Something went wrong", description: friendlyError(e), primaryLabel: "Close", secondaryLabel: null }); }
   };
   const subAct = (action: "pause" | "resume" | "cancel_now" | "cancel_end") => setModal({
     title: { pause: "Pause subscription", resume: "Resume subscription", cancel_now: "Cancel immediately", cancel_end: "Cancel at period end" }[action], submitLabel: "Confirm",
     description: action === "pause" && row.guarantee_status === "running" ? "Pausing within the first 90 days voids the money-back guarantee. Billing in Stripe stops while paused." : "This is applied in Stripe and saved in the audit log.",
     fields: [{ name: "reason", label: "Reason", type: "textarea", required: true }],
-    onSubmit: async (v) => { try { await fnSub({ data: { subscriptionId: id, action, reason: v.reason } }); await refresh(); return null; } catch (e) { return (e as Error).message; } },
+    onSubmit: async (v) => { try { await fnSub({ data: { subscriptionId: id, action, reason: v.reason } }); await refresh(); return null; } catch (e) { return friendlyError(e); } },
   });
   const overage = () => setModal({
     title: "Bill extra hours", submitLabel: "Bill", description: `${unbilledOverage(Number(row.hours_used), Number(row.monthly_hours), Number(row.overage_billed_hours ?? 0))} hours beyond the ${row.monthly_hours} hour allowance.`,
     fields: [{ name: "when", label: "When", type: "select", options: ["next_invoice", "now"] }],
-    onSubmit: async (v) => { try { await fnOver({ data: { subscriptionId: id, when: v.when as "now" | "next_invoice" } }); await refresh(); return null; } catch (e) { return (e as Error).message; } },
+    onSubmit: async (v) => { try { await fnOver({ data: { subscriptionId: id, when: v.when as "now" | "next_invoice" } }); await refresh(); return null; } catch (e) { return friendlyError(e); } },
   });
   const collections = () => setModal({
     title: "Debt recovery", submitLabel: "Apply", description: `Stage: ${stageLabel[(row.collection_stage as CollectionStage) ?? "none"]}. Interest ${money(Number(row.interest_accrued ?? 0))}, fees ${money(Number(row.fees_accrued ?? 0))}.`,
@@ -177,12 +178,12 @@ function RecordPage() {
         let courtFees: { name: string; amount: number }[] | undefined;
         if (v.action === "court") courtFees = ((await db.from("billing_settings").select("court_fees").eq("id", 1).maybeSingle()).data?.court_fees ?? []) as { name: string; amount: number }[];
         await fnColl({ data: { invoiceId: id, action: v.action as "flag", note: v.note, ...(courtFees ? { courtFees } : {}) } }); await refresh(); return null;
-      } catch (e) { return (e as Error).message; }
+      } catch (e) { return friendlyError(e); }
     },
   });
   const setFields = async (patch: Row, title: string, description: string) => {
     const r = await db.from(kind).update({ ...patch, ...(kind === "deliverables" || kind === "client_reports" ? { updated_at: new Date().toISOString() } : {}) }).eq("id", id);
-    if (r.error) popup({ type: "error", title: "Couldn't update", description: r.error.message, primaryLabel: "Close", secondaryLabel: null });
+    if (r.error) popup({ type: "error", title: "Couldn't update", description: friendlyError(r.error), primaryLabel: "Close", secondaryLabel: null });
     else { await refresh(); popup({ type: "success", title, description, primaryLabel: "Done", secondaryLabel: null }); }
   };
   const fulfil = () => row.kind === "access"
@@ -190,7 +191,7 @@ function RecordPage() {
       onPrimary: () => attempt("Request completed", "The export is in the client's Documents and they've been notified.", () => fnAccess({ data: { requestId: id } })) })
     : setModal({ title: "Close and anonymise this account", submitLabel: "Close account", description: "Blocks sign-in, removes personal details and the client's uploaded files, and keeps invoices, payments, agreements and the audit log as the law requires. Cancel every plan and settle or void unpaid invoices first. This can't be undone.",
       fields: [{ name: "note", label: "Note to the client", type: "textarea", required: true, defaultValue: "Your account has been closed and your personal details removed. We keep billing records for as long as the law requires." }],
-      onSubmit: async (v) => { try { await fnClose({ data: { requestId: id, note: v.note } }); await refresh(); return null; } catch (e) { return (e as Error).message; } } });
+      onSubmit: async (v) => { try { await fnClose({ data: { requestId: id, note: v.note } }); await refresh(); return null; } catch (e) { return friendlyError(e); } } });
   const isVoid = row.status === "void";
   return (
     <div className="space-y-6">
@@ -224,7 +225,7 @@ function RecordPage() {
           {kind === "support_tickets" && <Btn icon={MessageSquare} onClick={reply}>Add message</Btn>}
           {!isVoid && !cfg.readonly && <Btn icon={Pencil} onClick={edit}>Edit</Btn>}
           {kind === "account_change_requests" && row.status === "actioned" && <Btn icon={Check} onClick={() => setModal({ title: "Mark as reviewed", submitLabel: "Mark reviewed", description: "The change was applied when the client signed. Add a note for the team if anything needs follow-up.", fields: [{ name: "note", label: "Review note", type: "textarea" }],
-            onSubmit: async (v: Vals) => { try { await fnReview({ data: { id: row.id, ...(v.note ? { note: v.note } : {}) } }); await refresh(); return null; } catch (e) { return (e as Error).message; } } })}>Mark reviewed</Btn>}
+            onSubmit: async (v: Vals) => { try { await fnReview({ data: { id: row.id, ...(v.note ? { note: v.note } : {}) } }); await refresh(); return null; } catch (e) { return friendlyError(e); } } })}>Mark reviewed</Btn>}
           {cfg.archivable && <Btn icon={row.archived_at ? ArchiveRestore : Archive} onClick={archive}>{row.archived_at ? "Restore" : "Archive"}</Btn>}
           {cfg.voidable && !isVoid && <Btn icon={Ban} danger onClick={voidIt}>Void</Btn>}
           {canDelete(kind) && <Btn icon={Trash2} danger onClick={remove}>Delete</Btn>}

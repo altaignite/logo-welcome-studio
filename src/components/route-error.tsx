@@ -20,8 +20,9 @@ export function RouteError({ error, reset }: ErrorComponentProps) {
           <button type="button" onClick={() => { void router.invalidate(); reset(); }} className="signup-primary">Try again</button>
           <a href="/" className="app-modal-secondary inline-flex items-center justify-center">Go home</a>
         </div>
-        <button type="button" onClick={() => setDetails((d) => !d)} className="mt-4 text-xs text-muted-foreground underline">{details ? "Hide details" : "Show details"}</button>
-        {details && <pre className="mt-2 max-h-48 overflow-auto rounded-lg bg-secondary p-3 text-left text-[11px]">{error instanceof Error ? `${error.message}\n${error.stack ?? ""}` : String(error)}</pre>}
+        {/* Technical details (message and stack) are for developers only: never shown on the live site. */}
+        {import.meta.env.DEV && <button type="button" onClick={() => setDetails((d) => !d)} className="mt-4 text-xs text-muted-foreground underline">{details ? "Hide details" : "Show details"}</button>}
+        {import.meta.env.DEV && details && <pre className="mt-2 max-h-48 overflow-auto rounded-lg bg-secondary p-3 text-left text-[11px]">{error instanceof Error ? `${error.message}\n${error.stack ?? ""}` : String(error)}</pre>}
       </div>
     </div>
   );

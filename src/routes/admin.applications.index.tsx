@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { friendlyError } from "@/lib/errors";
 import { ErrorState, TableSkeleton } from "@/components/loading";
 import { SwitchField } from "@/components/switch-field";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -41,7 +42,7 @@ function Applications() {
         onPrimary: async () => {
           if (!list.length) return;
           const up = await supabase.from("applications").update({ ...patch, updated_at: new Date().toISOString() }).in("id", list.map((r) => r.id));
-          if (up.error) { popup({ type: "error", title: "Couldn't update", description: up.error.message, primaryLabel: "Close", secondaryLabel: null }); return; }
+          if (up.error) { popup({ type: "error", title: "Couldn't update", description: friendlyError(up.error), primaryLabel: "Close", secondaryLabel: null }); return; }
           await supabase.from("application_events").insert(list.map((r) => ({ application_id: r.id, actor_id: adminId, actor_label: adminEmail, action: `${label} (bulk)`, ...(toStatus ? { from_status: r.status, to_status: toStatus } : {}) })));
           qc.invalidateQueries({ queryKey: ["admin"] });
         } });

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/loading";
 import { ReviewRow, ReviewSection } from "@/components/order-flow";
 import { money } from "@/lib/admin";
-import { reportError } from "@/lib/errors";
+import { reportError, friendlyError } from "@/lib/errors";
 import type { Plan } from "@/lib/signup";
 
 /** What the server returns for an open invoice (invoicePayment in src/lib/billing.server.ts). */
@@ -60,7 +60,7 @@ function CardForm({ amount, returnPath, onPaid }: { amount: number; returnPath: 
     if (res.error) {
       // Card and validation errors are written by Stripe for the cardholder; anything else is ours to look at.
       if (res.error.type !== "card_error" && res.error.type !== "validation_error") reportError(res.error, { area: "payment" });
-      setError(res.error.message ?? "The payment didn't go through. Please try again or use another card.");
+      setError(friendlyError(res.error) ?? "The payment didn't go through. Please try again or use another card.");
       return;
     }
     const status = res.paymentIntent?.status;

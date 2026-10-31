@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { friendlyError } from "@/lib/errors";
 import { ErrorState, TableSkeleton } from "@/components/loading";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -58,13 +59,13 @@ function Accounts() {
       {modal && <FormModal title={`Change status for ${modal.ids.length} account${modal.ids.length === 1 ? "" : "s"}`} description="Staff accounts and your own account are skipped." fields={fields} submitLabel="Save status" onClose={() => setModal(null)}
         onSubmit={async (v) => { if (v.reason!.length < 3) return "Add a short reason."; try { const r = await change({ data: { userIds: modal.ids, status: v.status as AccountStatus, reason: v.reason! } }); await qc.invalidateQueries({ queryKey: ["admin"] });
           popup({ type: "success", title: `${r.accounts} account${r.accounts === 1 ? "" : "s"} updated`, description: `${r.sessionsEnded} sessions ended, ${r.plansPaused} plans paused, ${r.plansCancelled} cancelled, ${r.plansResumed} resumed.${r.skipped ? ` ${r.skipped} staff or own accounts skipped.` : ""}`, primaryLabel: "Done", secondaryLabel: null });
-          return null; } catch (e) { return (e as Error).message; } }} />}
+          return null; } catch (e) { return friendlyError(e); } }} />}
       {inviting && <FormModal title="New client" submitLabel="Send invitation" description="The client gets an email to set their password. Add a plan from their account once it's created."
         fields={[{ name: "first_name", label: "First name", required: true }, { name: "last_name", label: "Last name", required: true }, { name: "email", label: "Email", type: "email", required: true },
           { name: "company", label: "Business name" }, { name: "phone", label: "Phone" }]}
         onClose={() => setInviting(false)}
         onSubmit={async (v) => { try { const r = await invite({ data: { email: v.email, first_name: v.first_name, last_name: v.last_name, ...(v.company ? { company: v.company } : {}), ...(v.phone ? { phone: v.phone } : {}) } });
-          await qc.invalidateQueries({ queryKey: ["admin"] }); navigate({ to: "/admin/accounts/$id", params: { id: r.userId } }); return null; } catch (e) { return (e as Error).message; } }} />}
+          await qc.invalidateQueries({ queryKey: ["admin"] }); navigate({ to: "/admin/accounts/$id", params: { id: r.userId } }); return null; } catch (e) { return friendlyError(e); } }} />}
       {mail.el}
     </div>
   );

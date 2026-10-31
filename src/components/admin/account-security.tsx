@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { friendlyError } from "@/lib/errors";
 import { ErrorState, PageSkeleton } from "@/components/loading";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
@@ -22,12 +23,12 @@ export function AccountSecurity({ userId, adminEmail }: { userId: string; adminE
   const key = ["admin", "account-security", userId];
   const { data, isLoading, error } = useQuery({ queryKey: key, queryFn: () => load({ data: { userId } }) });
   const refresh = () => qc.invalidateQueries({ queryKey: ["admin"] });
-  const fail = (e: unknown) => popup({ type: "error", title: "Something went wrong", description: (e as Error).message, primaryLabel: "Close", secondaryLabel: null });
+  const fail = (e: unknown) => popup({ type: "error", title: "Something went wrong", description: friendlyError(e), primaryLabel: "Close", secondaryLabel: null });
   if (error) return <ErrorState error={error} retry={() => location.reload()} />;
   if (isLoading || !data) return <PageSkeleton />;
   const reason = (title: string, submitLabel: string, description: string, run: (r: string) => Promise<unknown>) => setModal({
     title, submitLabel, description, fields: [{ name: "reason", label: "Reason (saved in the audit log)", type: "textarea", required: true }],
-    onSubmit: async (v) => { try { await run(v.reason); await refresh(); return null; } catch (e) { return (e as Error).message; } },
+    onSubmit: async (v) => { try { await run(v.reason); await refresh(); return null; } catch (e) { return friendlyError(e); } },
   });
   const endAll = () => reason("Sign out of every device?", "Sign out everywhere", "Ends every session now. Pages already open stop working within the hour, or at once if the account is suspended.",
     (r) => fnRevoke({ data: { userId, reason: r } }));
@@ -46,7 +47,7 @@ export function AccountSecurity({ userId, adminEmail }: { userId: string; adminE
         const raw = line.slice(i + 1).trim();
         metadata[line.slice(0, i).trim()] = raw === "" ? null : raw === "true" ? true : raw === "false" ? false : /^-?\d+(\.\d+)?$/.test(raw) ? Number(raw) : raw;
       }
-      try { await fnMeta({ data: { userId, metadata } }); await refresh(); return null; } catch (e) { return (e as Error).message; }
+      try { await fnMeta({ data: { userId, metadata } }); await refresh(); return null; } catch (e) { return friendlyError(e); }
     },
   });
   const review = async (ids: string[]) => {

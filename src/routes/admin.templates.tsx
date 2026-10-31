@@ -1,4 +1,5 @@
 import { createFileRoute, getRouteApi } from "@tanstack/react-router";
+import { friendlyError } from "@/lib/errors";
 import { ErrorState, TableSkeleton } from "@/components/loading";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -35,13 +36,13 @@ function Templates() {
       if (bad.length) return `Unknown placeholder: ${bad.map((b) => `{{${b}}}`).join(", ")}`;
       const row = { name: v.name, purpose: v.purpose, subject: v.subject, body: v.body, updated_by_label: adminEmail, updated_at: new Date().toISOString() };
       const r = t ? await db.from("message_templates").update(row).eq("id", t.id) : await db.from("message_templates").insert(row);
-      if (r.error) return r.error.message;
+      if (r.error) return friendlyError(r.error);
       await qc.invalidateQueries({ queryKey: ["admin", "templates"] }); return null;
     },
   });
   const preview = (t: T) => popup({ type: "info", title: renderTemplate(t.subject, sample), description: renderTemplate(t.body, sample), primaryLabel: "Close", secondaryLabel: null });
   const remove = (rows: T[]) => popup({ type: "error", title: `Delete ${rows.length} template${rows.length > 1 ? "s" : ""}?`, description: "Messages already sent are not affected.", primaryLabel: "Delete", secondaryLabel: "Cancel",
-    onPrimary: async () => { const r = await db.from("message_templates").delete().in("id", rows.map((x) => x.id)); if (r.error) popup({ type: "error", title: "Couldn't delete", description: r.error.message, primaryLabel: "Close", secondaryLabel: null }); await qc.invalidateQueries({ queryKey: ["admin", "templates"] }); } });
+    onPrimary: async () => { const r = await db.from("message_templates").delete().in("id", rows.map((x) => x.id)); if (r.error) popup({ type: "error", title: "Couldn't delete", description: friendlyError(r.error), primaryLabel: "Close", secondaryLabel: null }); await qc.invalidateQueries({ queryKey: ["admin", "templates"] }); } });
   return (
     <div className="space-y-6">
       <div><h1 className="text-2xl font-extrabold sm:text-3xl">Message templates</h1>

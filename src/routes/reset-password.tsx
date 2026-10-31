@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { friendlyError } from "@/lib/errors";
 import { Spinner } from "@/components/loading";
 import { useEffect, useState, type FormEvent } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -46,7 +47,7 @@ function Reset() {
     if (issue) { setBusy(false); popup({ type: "error", title: "Choose a different password", description: issue }); return; }
     const { error } = await supabase.auth.updateUser({ password: pw });
     setBusy(false);
-    if (error) { popup({ type: "error", title: "Couldn't update your password", description: error.message }); return; }
+    if (error) { popup({ type: "error", title: "Couldn't update your password", description: friendlyError(error) }); return; }
     await supabase.auth.signOut();
     popup({ type: "success", title: "Password updated", description: "Log in with your new password.", primaryLabel: "Go to login", secondaryLabel: null, onPrimary: () => navigate({ to: "/" }) });
   };

@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { friendlyError } from "@/lib/errors";
 import { Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
@@ -19,14 +20,14 @@ export function StripeHealth() {
   const autoSetup = async () => {
     setBusy("webhook");
     try { const r = await setup(); await q.refetch(); popup({ type: "success", title: "Webhook set up", description: `Stripe now sends events to ${r.url}. The signing secret is stored securely on the server.`, primaryLabel: "Done", secondaryLabel: null }); }
-    catch (e) { popup({ type: "error", title: "Couldn't set up the webhook", description: (e as Error).message, primaryLabel: "Close", secondaryLabel: null }); }
+    catch (e) { popup({ type: "error", title: "Couldn't set up the webhook", description: friendlyError(e), primaryLabel: "Close", secondaryLabel: null }); }
     setBusy(null);
   };
   const q = useQuery({ queryKey: ["admin", "stripe-health"], queryFn: () => check() });
   const resend = async (id: string) => {
     setBusy(id);
     try { await send({ data: { subscriptionId: id } }); await qc.invalidateQueries({ queryKey: ["admin"] }); popup({ type: "success", title: "Invoice sent", description: "Stripe emailed the first invoice. The plan starts when it's paid.", primaryLabel: "Done", secondaryLabel: null }); }
-    catch (e) { popup({ type: "error", title: "Stripe didn't send the invoice", description: (e as Error).message, primaryLabel: "Close", secondaryLabel: null }); }
+    catch (e) { popup({ type: "error", title: "Stripe didn't send the invoice", description: friendlyError(e), primaryLabel: "Close", secondaryLabel: null }); }
     setBusy(null);
   };
   return (

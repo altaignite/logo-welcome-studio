@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { friendlyError } from "@/lib/errors";
 import { createFileRoute, getRouteApi } from "@tanstack/react-router";
 import { ErrorState, TableSkeleton } from "@/components/loading";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -32,24 +33,24 @@ function Staff() {
   const changeLevel = (r: StaffRow) => setModal({
     title: `Access for ${r.email}`, submitLabel: "Save level", description: staffLevels.map((l) => `${levelLabel[l]}: ${levelDescription[l]}`).join(" "),
     fields: [{ name: "level", label: "Staff level", type: "select", options: [...staffLevels], defaultValue: r.level }],
-    onSubmit: async (v) => { try { await fnLevel({ data: { userId: r.user_id, level: v.level as StaffLevel } }); await refresh(); return null; } catch (e) { return (e as Error).message; } },
+    onSubmit: async (v) => { try { await fnLevel({ data: { userId: r.user_id, level: v.level as StaffLevel } }); await refresh(); return null; } catch (e) { return friendlyError(e); } },
   });
   const revoke = (r: StaffRow) => setModal({
     title: `Remove ${r.email}?`, submitLabel: "Remove staff access", description: "They keep their sign-in but lose the admin dashboard straight away. This is kept in the audit log.",
     fields: [{ name: "reason", label: "Reason", type: "textarea", required: true }],
-    onSubmit: async (v) => { try { await fnRevoke({ data: { userId: r.user_id, reason: v.reason } }); await refresh(); return null; } catch (e) { return (e as Error).message; } },
+    onSubmit: async (v) => { try { await fnRevoke({ data: { userId: r.user_id, reason: v.reason } }); await refresh(); return null; } catch (e) { return friendlyError(e); } },
   });
   const invite = () => setModal({
     title: "Invite a staff member", submitLabel: "Send invitation", description: "Staff access is by invitation only. We email them a link to set their password; the access level applies once they accept. Invitations expire after 7 days.",
     fields: [{ name: "email", label: "Work email", type: "email", required: true }, { name: "level", label: "Staff level", type: "select", options: [...staffLevels], defaultValue: "viewer" }],
     onSubmit: async (v) => { try { const r = await fnInvite({ data: { email: v.email, level: v.level as StaffLevel } }); await refresh();
-      popup({ type: "success", title: r.granted ? "Staff access granted" : "Invitation sent", description: r.granted ? `${v.email} already had a confirmed account and now has staff access.` : `We emailed ${v.email} a link to join.`, primaryLabel: "Done", secondaryLabel: null }); return null; } catch (e) { return (e as Error).message; } },
+      popup({ type: "success", title: r.granted ? "Staff access granted" : "Invitation sent", description: r.granted ? `${v.email} already had a confirmed account and now has staff access.` : `We emailed ${v.email} a link to join.`, primaryLabel: "Done", secondaryLabel: null }); return null; } catch (e) { return friendlyError(e); } },
   });
   const toggleMfa = () => popup({
     type: "info", title: s.requireMfa ? "Stop requiring two-factor sign-in?" : "Require two-factor sign-in for all staff?",
-    description: s.requireMfa ? "Staff without an authenticator can make changes again." : "Staff without an authenticator app can still view the admin, but can't change anything until they set one up.",
+    description: s.requireMfa ? "Staff without an authenticator can see client data and make changes again." : "Staff without an authenticator app can open the admin to set one up, but can't see client data or change anything until they set one up.",
     primaryLabel: s.requireMfa ? "Stop requiring" : "Require it", secondaryLabel: "Cancel",
-    onPrimary: async () => { try { await fnMfa({ data: { required: !s.requireMfa } }); await refresh(); } catch (e) { popup({ type: "error", title: "Couldn't change this", description: (e as Error).message, primaryLabel: "Close", secondaryLabel: null }); } },
+    onPrimary: async () => { try { await fnMfa({ data: { required: !s.requireMfa } }); await refresh(); } catch (e) { popup({ type: "error", title: "Couldn't change this", description: friendlyError(e), primaryLabel: "Close", secondaryLabel: null }); } },
   });
   return (
     <div className="space-y-6">
@@ -76,7 +77,7 @@ function Staff() {
         <Section title={s.requireMfa ? "Your two-factor authentication (required for staff)" : "Your two-factor authentication"}><MfaSettings onChange={refresh} /></Section>
         <Section title="Staff security rule">
           <div className="space-y-3 p-5 text-sm">
-            <p>{s.requireMfa ? "Two-factor sign-in is required. Staff without it can only view." : "Two-factor sign-in is optional for staff."} Staff who turn it on always need their code to make changes.</p>
+            <p>{s.requireMfa ? "Two-factor sign-in is required. Staff without it can't see client data or change anything until they set it up." : "Two-factor sign-in is optional for staff."} Staff who turn it on always need their code to make changes.</p>
             {owner ? <button type="button" onClick={toggleMfa} className="h-10 rounded-full bg-foreground px-6 text-sm font-semibold text-background">{s.requireMfa ? "Stop requiring it" : "Require for all staff"}</button>
               : <p className="text-muted-foreground">Only owners can change this.</p>}
           </div>

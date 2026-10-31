@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { friendlyError } from "@/lib/errors";
 import { ErrorState, TableSkeleton } from "@/components/loading";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -64,9 +65,9 @@ function RecordList() {
   ];
   const bulk: BulkAction<Row>[] = [];
   if (kind === "invoices") bulk.push({ label: "Void", danger: true, run: (sel) => setModal({ title: `Void ${sel.length} invoice${sel.length > 1 ? "s" : ""}`, submitLabel: "Void", fields: [{ name: "reason", label: "Reason", type: "textarea", required: true }],
-    onSubmit: async (v) => { try { const r = await fnVoid({ data: { invoiceIds: sel.map((x) => x.id), reason: v.reason } }); await refresh(); return r.skipped ? `${r.voided} voided. ${r.skipped} paid or already void were skipped.` : null; } catch (e) { return (e as Error).message; } } }) });
-  if (kind === "crm_activities") bulk.push({ label: "Mark follow-up done", run: async (sel) => { const r = await db.from("crm_activities").update({ follow_up_done_at: new Date().toISOString() }).in("id", sel.map((x) => x.id)); if (r.error) fail(r.error.message); await refresh(); } });
-  if (cfg.archivable) bulk.push({ label: "Archive", run: async (sel) => { const r = await db.from(kind).update({ archived_at: new Date().toISOString() }).in("id", sel.map((x) => x.id)); if (r.error) fail(r.error.message); await refresh(); } });
+    onSubmit: async (v) => { try { const r = await fnVoid({ data: { invoiceIds: sel.map((x) => x.id), reason: v.reason } }); await refresh(); return r.skipped ? `${r.voided} voided. ${r.skipped} paid or already void were skipped.` : null; } catch (e) { return friendlyError(e); } } }) });
+  if (kind === "crm_activities") bulk.push({ label: "Mark follow-up done", run: async (sel) => { const r = await db.from("crm_activities").update({ follow_up_done_at: new Date().toISOString() }).in("id", sel.map((x) => x.id)); if (r.error) fail(friendlyError(r.error)); await refresh(); } });
+  if (cfg.archivable) bulk.push({ label: "Archive", run: async (sel) => { const r = await db.from(kind).update({ archived_at: new Date().toISOString() }).in("id", sel.map((x) => x.id)); if (r.error) fail(friendlyError(r.error)); await refresh(); } });
   const clients = data?.clients ?? [];
   const extra = (k: string): Row => k === "crm_activities" ? { actor_id: adminId, actor_label: adminEmail } : ["tasks", "deliverables", "client_reports", "compliance_requests"].includes(k) ? { actor_label: adminEmail } : {};
   /** Step 2: the record's own form for the chosen client. */
@@ -79,7 +80,7 @@ function RecordList() {
           { name: "sub", label: "Subscription", type: "select", options: subs.map((x) => `${x.plan_name} (${x.status}) ${String(x.id).slice(0, 8)}`) },
           { name: "description", label: "Description", required: true }, { name: "amount", label: "Amount (USD)", type: "number", required: true }],
           onSubmit: async (v) => { const sub = subs.find((x) => v.sub.endsWith(String(x.id).slice(0, 8))); const amount = Number(v.amount); if (!sub || !(amount > 0)) return "Choose a plan and an amount above 0.";
-            try { const r = await fnInvoice({ data: { subscriptionId: sub.id, description: v.description, amount } }); await refresh(); navigate({ to: "/admin/records/$kind/$id", params: { kind, id: r.invoiceId } }); return null; } catch (e) { return (e as Error).message; } } });
+            try { const r = await fnInvoice({ data: { subscriptionId: sub.id, description: v.description, amount } }); await refresh(); navigate({ to: "/admin/records/$kind/$id", params: { kind, id: r.invoiceId } }); return null; } catch (e) { return friendlyError(e); } } });
       }
       return navigate({ to: "/admin/order/$userId", params: { userId: clientId } });
     }
@@ -87,7 +88,7 @@ function RecordList() {
     setModal({ title: `New ${cfg.singular.toLowerCase()}`, submitLabel: "Create", fields,
       onSubmit: async (v) => {
         const r = await db.from(kind).insert({ user_id: clientId, ...toPatch(fields, v, cfg.codec), ...extra(kind) }).select("id").single();
-        if (r.error) return r.error.message;
+        if (r.error) return friendlyError(r.error);
         await refresh(); navigate({ to: "/admin/records/$kind/$id", params: { kind, id: r.data.id } }); return null;
       } });
   };
@@ -95,7 +96,7 @@ function RecordList() {
   const startNew = () => setModal({ title: `New ${cfg.singular.toLowerCase()}`, submitLabel: "Continue", fields: [{ name: "client", label: "Client", type: "select", options: clients.map((c) => c.label) }],
     onSubmit: async (v) => { const c = clients.find((x) => x.label === v.client); if (!c) return "Choose a client."; setTimeout(() => void createFor(c.id)); return null; } });
   if (canDelete(kind)) bulk.push({ label: "Delete", danger: true, run: (sel) => popup({ type: "error", title: `Delete ${sel.length} record${sel.length > 1 ? "s" : ""}?`, description: "This can't be undone. Deletions are kept in the audit log.", primaryLabel: "Delete", secondaryLabel: "Cancel",
-    onPrimary: async () => { const r = await db.from(kind).delete().in("id", sel.map((x) => x.id)); if (r.error) fail(r.error.message); await refresh(); } }) });
+    onPrimary: async () => { const r = await db.from(kind).delete().in("id", sel.map((x) => x.id)); if (r.error) fail(friendlyError(r.error)); await refresh(); } }) });
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3"><div><h1 className="text-2xl font-extrabold sm:text-3xl">{cfg.plural}</h1><p className="mt-1 text-sm text-muted-foreground">{stripeOnly.includes(kind) ? "Recorded from Stripe. Select one to see its details or void it." : "Across every client. Select one to view, edit or archive it."}</p></div>

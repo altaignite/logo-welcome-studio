@@ -13,7 +13,7 @@ import { FormModal } from "@/components/admin/form-modal";
 import { addMyCard, chargeClientCard, clientCards, myCards, removeClientCard, removeMyCard, requestClientCard, setClientDefaultCard, setMyDefaultCard } from "@/lib/cards.functions";
 import { invoicePaymentDetails } from "@/lib/client.functions";
 import { money } from "@/lib/admin";
-import { reportError } from "@/lib/errors";
+import { reportError, friendlyError } from "@/lib/errors";
 
 /** Saved cards for clients (Invoices page) and staff (account page). Card numbers are only ever typed into Stripe's own form. */
 export type SavedCard = { id: string; brand: string; last4: string; expMonth: number; expYear: number; isDefault: boolean; expired: boolean; expiresSoon: boolean; plans: string[] };
@@ -64,10 +64,10 @@ function SetupForm({ onAdded, onCancel, submitLabel }: { onAdded: (paymentMethod
     const res = await stripe.confirmSetup({ elements, redirect: "if_required", confirmParams: { return_url: `${window.location.origin}/dashboard/invoices?card=updated` } });
     if (res.error) {
       if (res.error.type !== "card_error" && res.error.type !== "validation_error") reportError(res.error, { area: "card setup" });
-      setError(res.error.message ?? "The card couldn't be saved. Please try another card."); setBusy(false); return;
+      setError(friendlyError(res.error) ?? "The card couldn't be saved. Please try another card."); setBusy(false); return;
     }
     const pm = res.setupIntent?.payment_method;
-    try { await onAdded(typeof pm === "string" ? pm : pm?.id ?? ""); } catch (err) { setError((err as Error).message); }
+    try { await onAdded(typeof pm === "string" ? pm : pm?.id ?? ""); } catch (err) { setError(friendlyError(err)); }
     setBusy(false);
   };
   return <form onSubmit={submit}>
@@ -100,7 +100,7 @@ export function MyPaymentCards() {
   const cards = useQuery({ queryKey: ["client", "cards"], queryFn: () => fnList() as Promise<SavedCard[]> });
   const [adding, setAdding] = useState(false);
   const refresh = () => qc.invalidateQueries({ queryKey: ["client", "cards"] });
-  const fail = (e: unknown) => popup({ type: "error", title: "That didn't work", description: (e as Error).message, primaryLabel: "Close", secondaryLabel: null });
+  const fail = (e: unknown) => popup({ type: "error", title: "That didn't work", description: friendlyError(e), primaryLabel: "Close", secondaryLabel: null });
   const makeDefault = async (c: SavedCard) => { try { await fnDefault({ data: { paymentMethodId: c.id } }); await refresh(); } catch (e) { fail(e); } };
   const remove = (c: SavedCard) => popup({ type: "info", title: `Remove ${cardLabel(c)}?`, description: c.isDefault || c.plans.length ? "Your plans will renew on your next card instead." : "You can add it again any time.", primaryLabel: "Remove card", secondaryLabel: "Keep it",
     onPrimary: async () => { try { await fnRemove({ data: { paymentMethodId: c.id } }); await refresh(); } catch (e) { fail(e); } } });
@@ -159,7 +159,7 @@ function PayInvoice({ invoice, onDone }: { invoice: { id: string; number: string
     onDone();
     popup({ type: "success", title: st === "succeeded" ? "Payment received" : "Payment processing", description: st === "succeeded" ? `Thank you. Invoice ${d.number} is marked paid within a minute, and your receipt is on its way.` : "Your bank is confirming the payment. The invoice updates as soon as it's done.", primaryLabel: "Got it", secondaryLabel: null });
   };
-  const paySaved = async () => { if (!choice || choice === "new") return; setBusy(true); setError(null); try { await pay(choice); } catch (e) { setError((e as Error).message); } setBusy(false); };
+  const paySaved = async () => { if (!choice || choice === "new") return; setBusy(true); setError(null); try { await pay(choice); } catch (e) { setError(friendlyError(e)); } setBusy(false); };
   return <div>
     <p className="mb-4 flex items-baseline justify-between border-b pb-3 text-sm"><span className="text-muted-foreground">Amount due</span><span className="text-lg font-bold">{money(d.amount)}</span></p>
     {usable.length > 0 && <fieldset className="space-y-2">
@@ -190,7 +190,7 @@ export function ClientPaymentCards({ userId, invoices, onChanged }: { userId: st
   const cards = useQuery({ queryKey: ["admin", "cards", userId], queryFn: () => fnList({ data: { userId } }) as Promise<SavedCard[]> });
   const [modal, setModal] = useState<"charge" | "request" | null>(null);
   const refresh = () => qc.invalidateQueries({ queryKey: ["admin", "cards", userId] });
-  const fail = (e: unknown) => popup({ type: "error", title: "That didn't work", description: (e as Error).message, primaryLabel: "Close", secondaryLabel: null });
+  const fail = (e: unknown) => popup({ type: "error", title: "That didn't work", description: friendlyError(e), primaryLabel: "Close", secondaryLabel: null });
   const list = cards.data ?? [];
   const usable = list.filter((c) => !c.expired);
   const open = invoices.filter((i) => ["open", "overdue"].includes(i.status) && i.stripe_invoice_id);
@@ -221,11 +221,11 @@ export function ClientPaymentCards({ userId, invoices, onChanged }: { userId: st
           setModal(null); onChanged();
           popup({ type: r.status === "paid" || r.status === "processing" ? "success" : "error", title: { paid: "Card charged", processing: "Payment processing", needs_authentication: "The client needs to confirm", failed: "The charge didn't go through" }[r.status], description: r.message, primaryLabel: "Close", secondaryLabel: null });
           return null;
-        } catch (e) { return (e as Error).message; }
+        } catch (e) { return friendlyError(e); }
       }} />}
     {modal === "request" && <FormModal title="Ask the client for a new card" submitLabel="Send request" onClose={() => setModal(null)}
       description="The client gets an email and a dashboard notification linking to their payment cards, where they add a card securely through Stripe."
       fields={[{ name: "note", label: "Message (optional)", type: "textarea", max: 500 }]}
-      onSubmit={async (v) => { try { await fnRequest({ data: { userId, ...(v.note ? { note: v.note } : {}) } }); setModal(null); popup({ type: "success", title: "Request sent", description: "We've asked the client to add a new card.", primaryLabel: "Close", secondaryLabel: null }); return null; } catch (e) { return (e as Error).message; } }} />}
+      onSubmit={async (v) => { try { await fnRequest({ data: { userId, ...(v.note ? { note: v.note } : {}) } }); setModal(null); popup({ type: "success", title: "Request sent", description: "We've asked the client to add a new card.", primaryLabel: "Close", secondaryLabel: null }); return null; } catch (e) { return friendlyError(e); } }} />}
   </Section>;
 }

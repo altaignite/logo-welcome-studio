@@ -1,4 +1,5 @@
 import { countryName } from "@/lib/security";
+import { friendlyError } from "@/lib/errors";
 import { ClientPaymentCards } from "@/components/payment-cards";
 import { createFileRoute, Link, getRouteApi, useNavigate } from "@tanstack/react-router";
 import { ErrorState, PageSkeleton } from "@/components/loading";
@@ -61,7 +62,7 @@ function AccountDetail() {
     },
   });
   const refresh = () => qc.invalidateQueries({ queryKey: ["admin"] });
-  const done = async (e: { message: string } | null) => { if (e) return e.message; await refresh(); return null; };
+  const done = async (e: { message: string } | null) => { if (e) return friendlyError(e); await refresh(); return null; };
 
   if (error) return <ErrorState error={error} retry={() => location.reload()} />;
   if (isLoading || !data) return <PageSkeleton />;
@@ -80,11 +81,11 @@ function AccountDetail() {
   // ---------- bulk helpers ----------
   const bulkUpdate = (table: string, patch: Record<string, unknown>, label: string): BulkAction<R> => ({
     label, run: (rows) => popup({ type: "info", title: `${label} for ${rows.length} record${rows.length > 1 ? "s" : ""}?`, primaryLabel: label, secondaryLabel: "Cancel",
-      onPrimary: async () => { const r = await db.from(table).update(patch).in("id", rows.map((x) => x.id)); if (r.error) popup({ type: "error", title: "Couldn't update", description: r.error.message, primaryLabel: "Close", secondaryLabel: null }); await refresh(); } }),
+      onPrimary: async () => { const r = await db.from(table).update(patch).in("id", rows.map((x) => x.id)); if (r.error) popup({ type: "error", title: "Couldn't update", description: friendlyError(r.error), primaryLabel: "Close", secondaryLabel: null }); await refresh(); } }),
   });
   const bulkDelete = (table: string): BulkAction<R> => ({
     label: "Delete", danger: true, run: (rows) => popup({ type: "error", title: `Delete ${rows.length} record${rows.length > 1 ? "s" : ""}?`, description: "This can't be undone. Deletions are kept in the audit log.", primaryLabel: "Delete", secondaryLabel: "Cancel",
-      onPrimary: async () => { const r = await db.from(table).delete().in("id", rows.map((x) => x.id)); if (r.error) popup({ type: "error", title: "Couldn't delete", description: r.error.message, primaryLabel: "Close", secondaryLabel: null }); await refresh(); } }),
+      onPrimary: async () => { const r = await db.from(table).delete().in("id", rows.map((x) => x.id)); if (r.error) popup({ type: "error", title: "Couldn't delete", description: friendlyError(r.error), primaryLabel: "Close", secondaryLabel: null }); await refresh(); } }),
   });
   const bulkVoid = (table: string): BulkAction<R> => ({
     label: "Void", danger: true, run: (rows) => setModal({ title: `Void ${rows.length} record${rows.length > 1 ? "s" : ""}`, submitLabel: "Void", description: "Voided records stay on file for tax and legal purposes.",
@@ -93,7 +94,7 @@ function AccountDetail() {
         const ids = rows.filter((x) => x.status !== "paid").map((x) => x.id);
         if (!ids.length) return "Paid records can't be voided.";
         // Invoices are voided in Stripe too, so a voided invoice can't still be paid.
-        if (table === "invoices") { try { await fnVoid({ data: { invoiceIds: ids, reason: v.reason } }); await refresh(); return null; } catch (e) { return (e as Error).message; } }
+        if (table === "invoices") { try { await fnVoid({ data: { invoiceIds: ids, reason: v.reason } }); await refresh(); return null; } catch (e) { return friendlyError(e); } }
         return done((await db.from(table).update({ status: "void", void_reason: v.reason }).in("id", ids)).error);
       } }),
   });
@@ -103,7 +104,7 @@ function AccountDetail() {
       fields: [{ name: "reason", label: "Reason", type: "textarea", required: true }],
       onSubmit: async (v) => {
         const failed: string[] = [];
-        for (const r of rows) { try { await fnSub({ data: { subscriptionId: r.id, action, reason: v.reason } }); } catch (e) { failed.push(`${r.plan_name}: ${(e as Error).message}`); } }
+        for (const r of rows) { try { await fnSub({ data: { subscriptionId: r.id, action, reason: v.reason } }); } catch (e) { failed.push(`${r.plan_name}: ${friendlyError(e)}`); } }
         await refresh();
         return failed.length ? failed.join(" ") : null;
       } }),
@@ -125,7 +126,7 @@ function AccountDetail() {
         popup({ type: "success", title: `Account is now ${accountStatusLabel[v.status as AccountStatus]}`, description: parts.length ? `${parts.join(", ")}.` : "No plans or sessions needed changing.", primaryLabel: "Done", secondaryLabel: null });
         return null;
       }
-      catch (e) { return (e as Error).message; }
+      catch (e) { return friendlyError(e); }
     },
   });
   const profileFields: FieldDef[] = [
@@ -159,7 +160,7 @@ function AccountDetail() {
       title: `New ${recordKinds[kind].singular.toLowerCase()}`, submitLabel: "Create", fields,
       onSubmit: async (v) => {
         const r = await db.from(kind).insert({ user_id: id, ...toPatch(fields, v, recordKinds[kind].codec), ...extra }).select("id").single();
-        if (r.error) return r.error.message;
+        if (r.error) return friendlyError(r.error);
         await refresh(); navigate({ to: "/admin/records/$kind/$id", params: { kind, id: r.data.id } }); return null;
       },
     });
@@ -283,7 +284,7 @@ function AccountDetail() {
         toolbar={<Btn icon={Plus} onClick={() => setModal({ title: "New invoice", submitLabel: "Issue invoice", fields: [{ name: "subscription", label: "Subscription", type: "select", options: data.subscriptions.map((s) => `${s.plan_name} ${String(s.id).slice(0, 6)}`) }, { name: "description", label: "Description", required: true }, { name: "amount", label: "Amount (USD)", type: "number", required: true }],
           onSubmit: async (v) => { const amount = Number(v.amount); if (!(amount > 0)) return "Enter an amount above 0."; const sub = data.subscriptions.find((s) => v.subscription.endsWith(String(s.id).slice(0, 6)));
             if (!sub) return "Choose the subscription this invoice belongs to.";
-            try { await fnInvoice({ data: { subscriptionId: sub.id, description: v.description, amount } }); await refresh(); return null; } catch (e) { return (e as Error).message; } } })}>New invoice</Btn>}
+            try { await fnInvoice({ data: { subscriptionId: sub.id, description: v.description, amount } }); await refresh(); return null; } catch (e) { return friendlyError(e); } } })}>New invoice</Btn>}
         bulkActions={[bulkVoid("invoices")]}
         columns={[col("number", "Invoice"), col("description", "Description"), col("amount", "Amount", "money"), col("status", "Status", "status"), col("collection_stage", "Collections", "status"), col("issued_at", "Issued", "day"), col("due_at", "Due", "day")]} />}
 

@@ -9,7 +9,7 @@ import { downloadAgreementPdf } from "@/lib/agreement-pdf";
 import { createSignatureCode, isSignatureMatch, plans, type Plan } from "@/lib/signup";
 import { LEGAL_URL, agreementDocuments, parseAgreement } from "@/lib/agreements";
 import { money } from "@/lib/admin";
-import { reportError } from "@/lib/errors";
+import { reportError, friendlyError } from "@/lib/errors";
 import { PayStep, type PaymentDetails } from "@/components/pay-step";
 
 /** Shared steps of every order: plan cards, review rows, agreements and the digital signature. Used by signup,
@@ -68,7 +68,7 @@ export function AgreementText({ body }: { body: string }) {
 export function AgreementsList({ documents }: { documents: { title: string; body: string }[] }) {
   const popup = usePopup();
   const [open, setOpen] = useState<number | null>(null);
-  const save = (i: number) => { const d = documents[i]; if (d) void downloadAgreementPdf(d).catch((e: Error) => popup({ type: "error", title: "Couldn't create the PDF", description: e.message, primaryLabel: "Close", secondaryLabel: null })); };
+  const save = (i: number) => { const d = documents[i]; if (d) void downloadAgreementPdf(d).catch((e: Error) => popup({ type: "error", title: "Couldn't create the PDF", description: friendlyError(e), primaryLabel: "Close", secondaryLabel: null })); };
   const doc = open === null ? null : documents[open];
   return <>
     <ul className="divide-y rounded-xl border">{documents.map((d, i) => <DocumentRow key={d.title} title={d.title} onRead={() => setOpen(i)} onDownload={() => save(i)} />)}</ul>
@@ -172,7 +172,7 @@ export function OrderWizard({ client, mode, onPlace, onDone, doneLabel, initialP
     catch (e) {
       // A security check restricted the account: the client completes verification first.
       if (/KYC_REQUIRED/.test((e as Error).message) && mode === "client") { window.location.assign("/kyc"); return false; }
-      popup({ type: "error", title: "The order wasn't placed", description: (e as Error).message, primaryLabel: "Close", secondaryLabel: null }); return false;
+      popup({ type: "error", title: "The order wasn't placed", description: friendlyError(e), primaryLabel: "Close", secondaryLabel: null }); return false;
     }
   };
   const confirmStaff = () => popup({ type: "info", title: `Place a ${plan.name} order?`, description: `Stripe emails the first invoice of ${money(plan.monthlyFee)} to ${client.email ?? "the client"}. The plan starts when it's paid.`, primaryLabel: "Place order", onPrimary: async () => { await place(); }, secondaryLabel: "Cancel" });

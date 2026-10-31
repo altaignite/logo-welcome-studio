@@ -15,7 +15,7 @@ export function useStaff() {
     queryFn: async () => {
       const [dir, sec] = await Promise.all([supabase.rpc("staff_directory"), supabase.from("security_settings").select("require_staff_mfa").eq("id", 1).maybeSingle()]);
       if (dir.error) throw dir.error;
-      return { staff: (dir.data ?? []) as StaffRow[], requireMfa: !!sec.data?.require_staff_mfa };
+      return { staff: (dir.data ?? []) as StaffRow[], requireMfa: sec.data ? !!sec.data.require_staff_mfa : true /* unreadable means this session is blocked by the two-factor rule */ };
     },
   });
   const staff = q.data?.staff ?? [];

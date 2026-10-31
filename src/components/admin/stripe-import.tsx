@@ -1,4 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
+import { friendlyError } from "@/lib/errors";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { Download, RefreshCw } from "lucide-react";
@@ -34,7 +35,7 @@ export function StripeImport() {
           cursor = r.next;
         }
         await qc.invalidateQueries({ queryKey: ["admin"] });
-      } catch (e) { popup({ type: "error", title: "The import stopped", description: (e as Error).message, primaryLabel: "Close", secondaryLabel: null }); }
+      } catch (e) { popup({ type: "error", title: "The import stopped", description: friendlyError(e), primaryLabel: "Close", secondaryLabel: null }); }
       setBusy(null);
     },
   });
@@ -43,7 +44,7 @@ export function StripeImport() {
     try {
       const r = await runSync(); await qc.invalidateQueries({ queryKey: ["admin"] });
       popup({ type: "success", title: "Synced with Stripe", description: `${r.subs} subscriptions and ${r.invoices} invoices checked against Stripe, and every running plan, project and application re-checked against its invoices.`, primaryLabel: "Done", secondaryLabel: null });
-    } catch (e) { popup({ type: "error", title: "Sync failed", description: (e as Error).message, primaryLabel: "Close", secondaryLabel: null }); }
+    } catch (e) { popup({ type: "error", title: "Sync failed", description: friendlyError(e), primaryLabel: "Close", secondaryLabel: null }); }
     setBusy(null);
   };
   const btn = "inline-flex h-10 items-center gap-2 rounded-full px-5 text-sm font-semibold disabled:opacity-60";

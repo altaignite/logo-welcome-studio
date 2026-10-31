@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { friendlyError } from "@/lib/errors";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -40,7 +41,7 @@ function SecurityPage() {
   const where = (e: Ev) => [e.ip, e.country ? countryName(e.country) : null].filter(Boolean).join(", ") || "—";
   const mark = async (e: Ev) => {
     try { await resolve({ data: { id: e.id } }); setOpen(null); await qc.invalidateQueries({ queryKey: ["admin", "security"] }); }
-    catch (err) { popup({ type: "error", title: "Couldn't update the event", description: (err as Error).message, primaryLabel: "Close", secondaryLabel: null }); }
+    catch (err) { popup({ type: "error", title: "Couldn't update the event", description: friendlyError(err), primaryLabel: "Close", secondaryLabel: null }); }
   };
   const stat = (label: string, value: string | number, hint: string) => <div className="rounded-2xl border bg-card p-4"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 text-2xl font-bold tabular-nums">{value}</p><p className="mt-0.5 text-xs text-muted-foreground">{hint}</p></div>;
   const g = open ? guideFor(open.kind) : null;

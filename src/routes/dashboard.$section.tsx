@@ -1,4 +1,5 @@
 import { CountryField } from "@/components/country-field";
+import { friendlyError } from "@/lib/errors";
 import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
 import { ErrorState, PageSkeleton, SectionSkeleton } from "@/components/loading";
 import { useServerFn } from "@tanstack/react-start";
@@ -173,14 +174,14 @@ function ProfileForm({ p, privacyRows, refresh }: { p: R; privacyRows: R[]; refr
     if (!parsed.success) { popup({ type: "error", title: "Please check your details", description: parsed.error.issues[0]?.message ?? "Some fields are too long." }); return; }
     setBusy(true);
     try { await save({ data: parsed.data }); await refresh(); popup({ type: "success", title: "Details saved", description: "Your profile is up to date.", primaryLabel: "Done", secondaryLabel: null }); }
-    catch (err) { popup({ type: "error", title: "Couldn't save", description: (err as Error).message }); }
+    catch (err) { popup({ type: "error", title: "Couldn't save", description: friendlyError(err) }); }
     setBusy(false);
   };
   const ask = (kind: "access" | "deletion") => popup({
     type: "info", title: kind === "access" ? "Request a copy of your data?" : "Request account closure?",
     description: kind === "access" ? "We'll prepare a copy of your personal data within 30 days." : "We'll close your account within 30 days. Billing records we must keep by law are retained.",
     primaryLabel: "Send request", secondaryLabel: "Cancel",
-    onPrimary: async () => { try { await privacy({ data: { kind } }); popup({ type: "success", title: "Request sent", description: "Our team will be in touch.", primaryLabel: "Got it", secondaryLabel: null }); } catch (err) { popup({ type: "error", title: "Couldn't send request", description: (err as Error).message }); } },
+    onPrimary: async () => { try { await privacy({ data: { kind } }); popup({ type: "success", title: "Request sent", description: "Our team will be in touch.", primaryLabel: "Got it", secondaryLabel: null }); } catch (err) { popup({ type: "error", title: "Couldn't send request", description: friendlyError(err) }); } },
   });
   return <>
     <Section title="Your details">
@@ -226,7 +227,7 @@ function SecurityPanel() {
     if (issue) { setBusy(null); return popup({ type: "error", title: "Choose a different password", description: issue }); }
     const { error } = await supabase.auth.updateUser({ password: pw, current_password: current } as never);
     setBusy(null);
-    if (error) return popup({ type: "error", title: "Couldn't change password", description: error.message });
+    if (error) return popup({ type: "error", title: "Couldn't change password", description: friendlyError(error) });
     form.reset();
     popup({ type: "success", title: "Password changed", description: "Use your new password next time you log in.", primaryLabel: "Done", secondaryLabel: null });
   };
@@ -238,7 +239,7 @@ function SecurityPanel() {
     setBusy("email");
     const { error } = await supabase.auth.updateUser({ email }, { emailRedirectTo: `${window.location.origin}/dashboard` });
     setBusy(null);
-    if (error) return popup({ type: "error", title: "Couldn't change email", description: error.message });
+    if (error) return popup({ type: "error", title: "Couldn't change email", description: friendlyError(error) });
     popup({ type: "success", title: "Confirm your new email", description: "Open the links we sent to confirm the change.", primaryLabel: "Got it", secondaryLabel: null });
   };
   const signOutAll = () => popup({ type: "info", title: "Sign out everywhere?", description: "You'll be signed out on all devices, including this one.", primaryLabel: "Sign out", secondaryLabel: "Cancel",
@@ -293,7 +294,7 @@ function BriefForm({ brief, refresh }: { brief: R | null; refresh: () => Promise
     try {
       await save({ data: { answers, submit: send } }); await refresh();
       popup({ type: "success", title: send ? "Brief sent" : "Draft saved", description: send ? "Thank you. Your team will use this to plan your first month." : "You can come back and finish it any time.", primaryLabel: "Done", secondaryLabel: null });
-    } catch (e) { popup({ type: "error", title: "Couldn't save", description: (e as Error).message, primaryLabel: "Close", secondaryLabel: null }); }
+    } catch (e) { popup({ type: "error", title: "Couldn't save", description: friendlyError(e), primaryLabel: "Close", secondaryLabel: null }); }
     setBusy(false);
   };
   return <Section title="Onboarding brief">

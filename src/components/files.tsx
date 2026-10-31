@@ -1,4 +1,5 @@
 import { downloadAgreementPdf } from "@/lib/agreement-pdf";
+import { friendlyError } from "@/lib/errors";
 import { AgreementText } from "@/components/order-flow";
 import { useServerFn } from "@tanstack/react-start";
 import { useRef, useState } from "react";
@@ -32,7 +33,7 @@ export function UploadButton({ clientId, relatedTable, relatedId, kind, visibleT
       await finish({ data: { documentId: t.documentId } });
       await onDone();
     } catch (e) {
-      popup({ type: "error", title: "Upload failed", description: (e as Error).message, primaryLabel: "Close", secondaryLabel: null });
+      popup({ type: "error", title: "Upload failed", description: friendlyError(e), primaryLabel: "Close", secondaryLabel: null });
     }
     setBusy(false);
     if (input.current) input.current.value = "";
@@ -50,7 +51,7 @@ export function useOpenFile() {
   const popup = usePopup();
   return async (id: string) => {
     try { const r = await link({ data: { documentId: id } }); window.location.assign(r.url); }
-    catch (e) { popup({ type: "error", title: "Couldn't open the file", description: (e as Error).message, primaryLabel: "Close", secondaryLabel: null }); }
+    catch (e) { popup({ type: "error", title: "Couldn't open the file", description: friendlyError(e), primaryLabel: "Close", secondaryLabel: null }); }
   };
 }
 

@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { friendlyError } from "@/lib/errors";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -40,7 +41,7 @@ function ClosePage() {
       setStep(3);
       await supabase.auth.signOut();
       return true;
-    } catch (e) { popup({ type: "error", title: "We couldn't close your account", description: (e as Error).message, primaryLabel: "Close", secondaryLabel: null }); return false; }
+    } catch (e) { popup({ type: "error", title: "We couldn't close your account", description: friendlyError(e), primaryLabel: "Close", secondaryLabel: null }); return false; }
   };
 
   if (step === 0) return <FlowStep title="Close your account" subtitle="Before you go, here's exactly what happens.">

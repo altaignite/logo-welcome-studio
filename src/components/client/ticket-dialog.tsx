@@ -1,4 +1,5 @@
 import { useServerFn } from "@tanstack/react-start";
+import { friendlyError } from "@/lib/errors";
 import { useRef, useState, type FormEvent } from "react";
 import { Paperclip, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -44,9 +45,8 @@ export function TicketDialog({ plans, projects, defaults, onClose, onCreated }: 
       }
       await onCreated(r.ticketId); onClose();
     } catch (e2) {
-      // Zod messages arrive as JSON; show the first readable one.
-      const msg = (e2 as Error).message;
-      try { const parsed = JSON.parse(msg) as { message: string }[]; setErr(parsed[0]?.message ?? msg); } catch { setErr(msg); }
+      // friendlyError shows the first validation message and never internal details.
+      setErr(friendlyError(e2));
     }
     setBusy(null);
   };

@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { friendlyError } from "@/lib/errors";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { ArrowLeft, ArrowRight, Check, Eye, EyeOff, LockKeyhole, Loader2, PenLine, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -172,7 +173,7 @@ function Signup() {
         popup({ type: "info", title: "Did you mean " + fix + "?", description: "Your email looks like it may have a typo. We'll send important account emails there.", primaryLabel: `Use ${fix}`, onPrimary: () => setAccount((a) => ({ ...a, email: fix })), secondaryLabel: "Keep " + email });
       }
       setGate(body.exists ? "password" : null);
-    } catch (e) { popup({ type: "error", title: "We couldn't check your email", description: (e as Error).message, primaryLabel: "Close", secondaryLabel: null }); }
+    } catch (e) { popup({ type: "error", title: "We couldn't check your email", description: friendlyError(e), primaryLabel: "Close", secondaryLabel: null }); }
     finally { setGateBusy(false); }
   };
   const signIn = async (event: FormEvent) => {
@@ -191,7 +192,7 @@ function Signup() {
     try {
       if (await mfaNeeded()) { setGate("mfa"); return; }
       setGate(null); setExisting(true);
-    } catch (e) { popup({ type: "error", title: "We couldn't finish signing you in", description: (e as Error).message, primaryLabel: "Close", secondaryLabel: null }); }
+    } catch (e) { popup({ type: "error", title: "We couldn't finish signing you in", description: friendlyError(e), primaryLabel: "Close", secondaryLabel: null }); }
     finally { setGateBusy(false); }
   };
   const forgot = async () => {

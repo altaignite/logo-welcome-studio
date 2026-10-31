@@ -1,4 +1,5 @@
 import { createFileRoute, getRouteApi, useNavigate } from "@tanstack/react-router";
+import { friendlyError } from "@/lib/errors";
 import { ErrorState, TableSkeleton } from "@/components/loading";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -61,7 +62,7 @@ function Taskforce() {
     submit: async (v) => {
       const p = data?.projects.find((x) => x.name === v.project); if (!p) return "Choose a project.";
       const r = await db.from("tasks").insert({ user_id: p.user_id, project_id: p.id, subscription_id: p.subscription_id, title: v.title, details: v.details || null, priority: v.priority, due_at: v.due_at || null, estimated_hours: v.estimated_hours ? Number(v.estimated_hours) : null, assigned_to: v.assigned_to || null, actor_label: adminEmail });
-      if (r.error) return r.error.message; await refresh(); return null;
+      if (r.error) return friendlyError(r.error); await refresh(); return null;
     },
   });
   const logTime = (t: Task) => {
@@ -74,7 +75,7 @@ function Taskforce() {
         const h = Number(v.hours); if (!(h > 0) || h > 24) return "Hours must be between 0 and 24.";
         if (warn) return "This client has no hours left. Ask the client to approve extra hours on this task first, or approve it yourself from the task page.";
         const r = await db.from("time_entries").insert({ project_id: t.project_id, task_id: t.id, user_id: t.user_id, hours: h, description: v.description, worked_on: today, actor_id: adminId, actor_label: adminEmail });
-        if (r.error) return r.error.message; await refresh(); return null;
+        if (r.error) return friendlyError(r.error); await refresh(); return null;
       },
     });
   };

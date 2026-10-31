@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { friendlyError } from "@/lib/errors";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { FormModal } from "@/components/admin/form-modal";
@@ -36,7 +37,7 @@ export function useEmailClients(onSent?: () => void) {
             onSent?.();
             popup({ type: "success", title: `Sent to ${r.sent} client${r.sent === 1 ? "" : "s"}`, description: r.skipped.length ? `Skipped: ${r.skipped.join("; ")}` : "Each email is logged as an activity on the account.", primaryLabel: "Done", secondaryLabel: null });
             return null;
-          } catch (e) { return (e as Error).message; }
+          } catch (e) { return friendlyError(e); }
         }} />);
   return { open, el };
 }

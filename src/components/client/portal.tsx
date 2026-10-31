@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { friendlyError } from "@/lib/errors";
 import { Link, useNavigate, useRouteContext } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useState, type ReactNode } from "react";
@@ -70,8 +71,8 @@ export function useClientActions() {
   const fnReply = useServerFn(replyToTicket);
   const fnRespond = useServerFn(respondToInfoRequest), fnClaim = useServerFn(claimGuarantee), fnReview = useServerFn(reviewDeliverable);
   const refresh = () => qc.invalidateQueries({ queryKey: ["client"] });
-  const fail = (e: unknown) => popup({ type: "error", title: "Something went wrong", description: (e as Error).message, primaryLabel: "Close", secondaryLabel: null });
-  const err = (e: unknown) => (e as Error).message || "Something went wrong.";
+  const fail = (e: unknown) => popup({ type: "error", title: "Something went wrong", description: friendlyError(e), primaryLabel: "Close", secondaryLabel: null });
+  const err = (e: unknown) => friendlyError(e) || "Something went wrong.";
 
   const subAct = (s: R, action: "pause" | "resume" | "cancel_end") => action === "cancel_end" ? void navigate({ to: "/dashboard/change/$id", params: { id: s.id }, search: { action: "cancel" } }) : setModal({
     title: { pause: "Pause your plan", resume: "Resume your plan", cancel_end: "Cancel your plan" }[action], submitLabel: "Confirm",

@@ -1,4 +1,5 @@
 import { NY_MAX_MONTHLY_INTEREST_PCT, cappedInterestPct } from "@/lib/billing";
+import { friendlyError } from "@/lib/errors";
 import { createFileRoute } from "@tanstack/react-router";
 import { PageSkeleton } from "@/components/loading";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -27,7 +28,7 @@ function Settings() {
   const num = (v: string) => Math.max(0, Number(v) || 0);
   const save = async () => {
     const { error } = await db.from("billing_settings").update({ ...r, updated_at: new Date().toISOString() }).eq("id", 1);
-    popup(error ? { type: "error", title: "Couldn't save", description: error.message, primaryLabel: "Close", secondaryLabel: null } : { type: "success", title: "Billing rules saved", description: "New charges use these values.", primaryLabel: "Done", secondaryLabel: null });
+    popup(error ? { type: "error", title: "Couldn't save", description: friendlyError(error), primaryLabel: "Close", secondaryLabel: null } : { type: "success", title: "Billing rules saved", description: "New charges use these values.", primaryLabel: "Done", secondaryLabel: null });
     qc.invalidateQueries({ queryKey: ["admin"] });
   };
   const input = "signup-input h-10 w-full";
@@ -63,7 +64,7 @@ function Settings() {
       </Section>
       <div className="flex flex-wrap gap-3">
         <button type="button" onClick={save} className="h-11 rounded-full bg-foreground px-6 text-sm font-semibold text-background">Save rules</button>
-        <button type="button" onClick={async () => { try { const x = await run(); popup({ type: "success", title: "Collections updated", description: `${x.touched} unpaid invoices checked. This also runs automatically every day.`, primaryLabel: "Done", secondaryLabel: null }); qc.invalidateQueries({ queryKey: ["admin"] }); } catch (e) { popup({ type: "error", title: "Couldn't run collections", description: (e as Error).message, primaryLabel: "Close", secondaryLabel: null }); } }} className="h-11 rounded-full bg-secondary px-6 text-sm font-semibold">Run collections now</button>
+        <button type="button" onClick={async () => { try { const x = await run(); popup({ type: "success", title: "Collections updated", description: `${x.touched} unpaid invoices checked. This also runs automatically every day.`, primaryLabel: "Done", secondaryLabel: null }); qc.invalidateQueries({ queryKey: ["admin"] }); } catch (e) { popup({ type: "error", title: "Couldn't run collections", description: friendlyError(e), primaryLabel: "Close", secondaryLabel: null }); } }} className="h-11 rounded-full bg-secondary px-6 text-sm font-semibold">Run collections now</button>
       </div>
     </div>
   );

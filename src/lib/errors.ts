@@ -1,4 +1,5 @@
 import { reportLovableError } from "@/lib/lovable-error-reporting";
+import { publicMessage } from "@/lib/public-errors";
 
 /** A message people can act on, from any thrown value: server function errors, validation errors, Supabase errors, network failures. */
 export function friendlyError(e: unknown): string {
@@ -13,7 +14,9 @@ export function friendlyError(e: unknown): string {
   if (/row-level security|permission denied/i.test(raw)) return "You don't have permission to do that.";
   if (/duplicate key|already exists/i.test(raw)) return "That already exists.";
   if (/timeout|timed out/i.test(raw)) return "That took too long. Please try again.";
-  return raw && raw.length < 300 ? raw : "Something went wrong. Please try again.";
+  // Anything that looks internal (database, ids, URLs, code errors) is never shown; the full error is reported to Lovable.
+  const safe = publicMessage(raw);
+  return safe ?? "Something went wrong. Please try again.";
 }
 
 /** Short reference shown to the user and sent with the report, so a reported problem can be matched to what they saw. */

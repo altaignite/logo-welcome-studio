@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { friendlyError } from "@/lib/errors";
 import { useEffect, useState, type FormEvent } from "react";
 import { Mail, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
 import { usePopup } from "@/components/popup";
@@ -56,7 +57,7 @@ function Login() {
       setBusy(false);
       if (isUnconfirmedEmail(error)) popup(unconfirmedPopup(email, popup));
       else if (/banned/i.test(error.message)) popup({ type: "error", title: "Your account is suspended", description: "Please contact our support team to restore access." });
-      else popup({ type: "error", title: "Something went wrong while trying to log you in", description: error.message });
+      else popup({ type: "error", title: "Something went wrong while trying to log you in", description: friendlyError(error) });
       return;
     }
     if (await mfaNeeded()) { setBusy(false); setMfa(true); return; }

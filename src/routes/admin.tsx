@@ -124,7 +124,7 @@ function AdminLayout() {
         </header>
         <main className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8">
           {!!schema.data?.missing.length && <p role="alert" className="mb-4 rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm">The database is missing updates: {schema.data.missing.join(", ")}. Open the project in Lovable and apply the pending database migrations; some features won't work until then.</p>}
-          {staff.me && staff.requireMfa && !staff.me.mfa_enabled && <p className="mb-4 rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm">Two-factor authentication is required for staff. You can view the admin but not change anything until you <Link to="/admin/staff" className="font-semibold underline">set it up</Link>.</p>}
+          {staff.me && staff.requireMfa && !staff.me.mfa_enabled && <p className="mb-4 rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm">Two-factor authentication is required for staff. Client data is hidden and changes are blocked until you <Link to="/admin/staff" className="font-semibold underline">set it up</Link>.</p>}
           {staff.me?.level === "viewer" && <p className="mb-4 rounded-xl border bg-card p-3 text-sm text-muted-foreground">You have view-only access. Ask an owner to set your staff level under Staff and security.</p>}
           <Outlet />
         </main>

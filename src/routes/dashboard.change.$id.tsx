@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { friendlyError } from "@/lib/errors";
 import { useServerFn } from "@tanstack/react-start";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -51,7 +52,7 @@ function ChangePage() {
       const body = { subscriptionId: sub.id, reason: app.reason, signed: true as const, ...(app.details.trim() ? { details: app.details.trim() } : {}), ...(Object.keys(app.feedback).length ? { feedback: app.feedback } : {}) };
       const r = mode === "cancel" ? await fnCancel({ data: body }) : await fnChange({ data: { ...body, planId: target!.id } });
       setResult(r); setStep(3); await qc.invalidateQueries({ queryKey: ["client"] }); return true;
-    } catch (e) { popup({ type: "error", title: "We couldn't submit your application", description: (e as Error).message, primaryLabel: "Close", secondaryLabel: null }); return false; }
+    } catch (e) { popup({ type: "error", title: "We couldn't submit your application", description: friendlyError(e), primaryLabel: "Close", secondaryLabel: null }); return false; }
   };
   const nextFromReason = () => { const issue = applicationIssue(app); if (issue) { popup({ type: "error", title: "Almost there", description: issue, primaryLabel: "OK", secondaryLabel: null }); return; } setStep(2); };
 

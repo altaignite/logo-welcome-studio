@@ -1,4 +1,5 @@
 import { createFileRoute, Link, getRouteApi, useNavigate } from "@tanstack/react-router";
+import { friendlyError } from "@/lib/errors";
 import { ErrorState, PageSkeleton } from "@/components/loading";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -91,7 +92,7 @@ function ApplicationDetail() {
             // Activation happens when the client pays the Stripe invoice.
             for (const sid of data.subs.filter((s) => s.status === "pending").map((s) => s.id)) {
               try { await sendFirst({ data: { subscriptionId: sid } }); }
-              catch (e) { popup({ type: "error", title: "Approved, but the invoice wasn't sent", description: (e as Error).message, primaryLabel: "Close", secondaryLabel: null }); }
+              catch (e) { popup({ type: "error", title: "Approved, but the invoice wasn't sent", description: friendlyError(e), primaryLabel: "Close", secondaryLabel: null }); }
             }
             if (profile && (profile.status === "onboarding" || profile.status === "prospect")) await supabase.from("profiles").update({ status: "active", status_changed_at: now.toISOString() }).eq("id", app.user_id);
           }
@@ -129,7 +130,7 @@ function ApplicationDetail() {
       const patch = { assigned_to: v.assigned_to || null, internal_notes: v.internal_notes || null, updated_at: new Date().toISOString(),
         ...(plan && plan.name !== app.plan_name ? { plan_id: plan.id, plan_name: plan.name, monthly_fee: plan.monthlyFee, monthly_hours: plan.monthlyHours } : {}) };
       const up = await supabase.from("applications").update(patch).eq("id", id);
-      if (up.error) return up.error.message;
+      if (up.error) return friendlyError(up.error);
       if (plan && plan.name !== app.plan_name) {
         await supabase.from("subscriptions").update({ plan_name: plan.name, monthly_fee: plan.monthlyFee, monthly_hours: plan.monthlyHours }).eq("application_id", id).eq("status", "pending");
         await log("Plan changed", { note: `${app.plan_name} to ${plan.name}` });

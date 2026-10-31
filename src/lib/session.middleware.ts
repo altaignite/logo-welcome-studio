@@ -43,10 +43,32 @@ function make(name: LimitName) {
   return createMiddleware({ type: "function" }).middleware([requireSession]).server(async ({ next, context }) => {
     const { enforceLimit } = await import("@/lib/rate-limit.server");
     await enforceLimit(name, context.userId);
-    return next();
+    try { return await next(); }
+    catch (e) { throw await toPublicError(e, name, context.userId); }
   });
 }
 export function limited(name: LimitName) {
   if (!cache.has(name)) cache.set(name, make(name));
   return cache.get(name)!;
+}
+
+/** Errors leaving a server function: redirects pass through, validation errors keep their first message, messages written for
+ * people pass through, and anything that could reveal internals (database, Stripe ids, URLs, code errors) becomes a generic
+ * message with a reference. The full error is logged on the server under that reference. */
+async function toPublicError(e: unknown, fn: string, userId: string): Promise<unknown> {
+  if (e instanceof Response || (e && typeof e === "object" && ("isRedirect" in e || "isNotFound" in e || "routerCode" in e))) return e;
+  const raw = e instanceof Error ? e.message : String((e as { message?: unknown })?.message ?? e ?? "");
+  if (raw.trim().startsWith("[")) {
+    try { const first = (JSON.parse(raw) as { message?: string }[])[0]?.message; if (first) return new Error(first.slice(0, 300)); } catch { /* not validation JSON */ }
+  }
+  const { publicMessage, GENERIC_ERROR } = await import("@/lib/public-errors");
+  const safe = publicMessage(raw);
+  if (safe) return new Error(safe);
+  const ref = Math.random().toString(36).slice(2, 8).toUpperCase();
+  console.error(`[${ref}] ${fn} failed for ${userId}:`, e);
+  try {
+    const { logSecurityEvent } = await import("@/lib/security-log.server");
+    await logSecurityEvent({ kind: "server_error", severity: "low", group: fn, userId, summary: `The ${fn} action failed with an internal error (reference ${ref}).`, detail: { ref, fn, error: raw.slice(0, 500) } });
+  } catch { /* logging must never hide the original failure */ }
+  return new Error(`${GENERIC_ERROR} with reference ${ref}.`);
 }

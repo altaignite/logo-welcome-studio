@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { friendlyError } from "@/lib/errors";
 import { useState } from "react";
 import { X } from "lucide-react";
 import { Section, db } from "@/components/admin/record-bits";
@@ -16,11 +17,11 @@ export function BlockedDomains({ canEdit, adminEmail }: { canEdit: boolean; admi
     const d = domain.trim().toLowerCase().replace(/^@/, "");
     if (!/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(d)) return popup({ type: "error", title: "Enter a domain", description: "For example example.com, without the @ or a name.", primaryLabel: "Close", secondaryLabel: null });
     const r = await db.from("blocked_email_domains").insert({ domain: d, reason: "Blocked by staff", created_by_label: adminEmail });
-    if (r.error) popup({ type: "error", title: "Couldn't add it", description: r.error.message, primaryLabel: "Close", secondaryLabel: null });
+    if (r.error) popup({ type: "error", title: "Couldn't add it", description: friendlyError(r.error), primaryLabel: "Close", secondaryLabel: null });
     setDomain(""); await refresh();
   };
   const remove = (d: string) => popup({ type: "info", title: `Allow ${d} again?`, primaryLabel: "Allow", secondaryLabel: "Cancel",
-    onPrimary: async () => { const r = await db.from("blocked_email_domains").delete().eq("domain", d); if (r.error) popup({ type: "error", title: "Couldn't remove it", description: r.error.message, primaryLabel: "Close", secondaryLabel: null }); await refresh(); } });
+    onPrimary: async () => { const r = await db.from("blocked_email_domains").delete().eq("domain", d); if (r.error) popup({ type: "error", title: "Couldn't remove it", description: friendlyError(r.error), primaryLabel: "Close", secondaryLabel: null }); await refresh(); } });
   const shown = data.filter((d) => d.domain.includes(q.trim().toLowerCase()));
   return (
     <Section title={`Blocked email domains (${data.length})`}>
