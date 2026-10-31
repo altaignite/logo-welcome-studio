@@ -54,33 +54,44 @@ const securityHeaders: Record<string, string> = {
   "Permissions-Policy": 'camera=(), microphone=(), geolocation=(), payment=(self "https://js.stripe.com")',
   // Allow popups: some Stripe payment methods and bank confirmations open one and report back.
   "Cross-Origin-Opener-Policy": "same-origin-allow-popups",
-  // Enforced: rules that can't break the app (no plugins, no framing, no base-tag hijacking, forms only to us or Stripe, HTTPS only).
-  "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://checkout.stripe.com https://billing.stripe.com; upgrade-insecure-requests; report-uri /api/public/csp-report",
-  // Reported, not enforced yet: the full script and connection allow-list. Lovable injects its own scripts on hosted pages, so
-  // enforce this only after the browser reports show no violations.
-  "Content-Security-Policy-Report-Only": [
-    "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' https://cdn.gpteng.co https://js.stripe.com",
-    "worker-src 'self' blob:",
-    "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob: https://flagcdn.com https://*.supabase.co https://*.stripe.com",
-    "font-src 'self' data:",
-    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://ipapi.co https://api.pwnedpasswords.com https://api.stripe.com https://m.stripe.network",
-    "frame-src https://js.stripe.com https://hooks.stripe.com",
-    "object-src 'none'",
-    "base-uri 'self'",
-    "frame-ancestors 'none'",
-    "report-uri /api/public/csp-report",
-  ].join("; "),
 };
-function withSecurityHeaders(response: Response) {
+
+/** The full Content-Security-Policy allow-list: only this site, Supabase, Stripe and the few services the browser uses. */
+const fullCsp = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline' https://cdn.gpteng.co https://js.stripe.com https://*.js.stripe.com",
+  "worker-src 'self' blob:",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob: https://flagcdn.com https://*.supabase.co https://*.stripe.com",
+  "font-src 'self' data:",
+  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://ipapi.co https://api.pwnedpasswords.com https://api.stripe.com https://m.stripe.network",
+  "frame-src https://js.stripe.com https://*.js.stripe.com https://hooks.stripe.com",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "frame-ancestors 'none'",
+  "form-action 'self' https://checkout.stripe.com https://billing.stripe.com",
+  "upgrade-insecure-requests",
+  "report-uri /api/public/csp-report",
+].join("; ");
+// Rules that can't break anything (no plugins, no framing, no base-tag hijacking, forms only to us or Stripe, HTTPS only).
+const coreCsp = "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://checkout.stripe.com https://billing.stripe.com; upgrade-insecure-requests; report-uri /api/public/csp-report";
+
+/** The published site enforces the full allow-list, which blocks scripts from anywhere else (the usual way XSS loads a payload)
+ * and eval. Lovable's editor preview and local development inject their own tooling (eval, blob workers), so they enforce only
+ * the core rules and report the rest. */
+export function cspHeaders(host: string): Record<string, string> {
+  const preview = /(^|\.)lovableproject\.com$|^id-preview-|^localhost$|^127\.0\.0\.1$|^\[::1\]$/.test(host.replace(/:\d+$/, ""));
+  return preview ? { "Content-Security-Policy": coreCsp, "Content-Security-Policy-Report-Only": fullCsp } : { "Content-Security-Policy": fullCsp };
+}
+function withSecurityHeaders(response: Response, host = "") {
+  const headers = { ...securityHeaders, ...cspHeaders(host) };
   try {
-    for (const [k, v] of Object.entries(securityHeaders)) if (!response.headers.has(k)) response.headers.set(k, v);
+    for (const [k, v] of Object.entries(headers)) if (!response.headers.has(k)) response.headers.set(k, v);
     return response;
   } catch {
     // Some responses have immutable headers; copy them.
     const r = new Response(response.body, response);
-    for (const [k, v] of Object.entries(securityHeaders)) if (!r.headers.has(k)) r.headers.set(k, v);
+    for (const [k, v] of Object.entries(headers)) if (!r.headers.has(k)) r.headers.set(k, v);
     return r;
   }
 }
@@ -115,12 +126,12 @@ export default {
       if (early.status === 403) {
         try { const { logSecurityEvent } = await import("@/lib/security-log.server"); await logSecurityEvent({ kind: "cross_site_request", severity: "medium", request, group: new URL(request.url).pathname, summary: `A cross-site ${request.method} to ${new URL(request.url).pathname} from ${request.headers.get("origin")} was refused.` }); } catch { /* never block on logging */ }
       }
-      return withSecurityHeaders(early);
+      return withSecurityHeaders(early, new URL(request.url).host);
     }
     try {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
-      return withSecurityHeaders(await normalizeCatastrophicSsrResponse(response));
+      return withSecurityHeaders(await normalizeCatastrophicSsrResponse(response), new URL(request.url).host);
     } catch (error) {
       console.error(error);
       // Repeated crashes on one path can mean someone is probing it with malformed requests.

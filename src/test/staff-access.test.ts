@@ -31,6 +31,7 @@ describe("server-side guarantees", () => {
   });
   it("sends security headers including an enforced content security policy", () => {
     const s = readFileSync("src/server.ts", "utf8");
-    expect(s).toMatch(/"Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'/);
+    expect(s).toMatch(/const coreCsp = "object-src 'none'; base-uri 'self'; frame-ancestors 'none'/);
+    expect(s).toMatch(/"Content-Security-Policy": fullCsp/);
   });
 });

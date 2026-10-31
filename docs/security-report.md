@@ -80,6 +80,16 @@ automated tests                         => 154 passed (typecheck, lint, build cl
 5. **Legal review** of the Service Agreement, including off-session charges for extra hours and arrears.
 6. **Run the live checks below once** on the published site.
 
+## Follow-up (same day): further hardening
+
+| Item | What was done |
+|---|---|
+| **Stripe webhook was rejecting real Stripe events** | The security log showed 30 "bad signature" events from 54.187.x.x, which are Stripe's own servers, not attackers: the app's webhook secret no longer matched the endpoint, so no Stripe event had been accepted since 30 Oct 02:37 UTC. Created a new endpoint (same URL and events), stored its secret server-side, disabled the old one, and confirmed a live test event was verified and recorded (31 Oct 11:16 UTC). **Action: click "Sync with Stripe now" on Billing rules** to pull in the invoices and subscription changes missed in that window (they include in_1UWRVv…, in_1UWIAr… and sub_1ULPrP…). Optionally delete the old STRIPE_WEBHOOK_SECRET value in Lovable's secrets. |
+| **Full Content-Security-Policy enforced on the live site** | The published domain now enforces the full allow-list (scripts only from this site, Stripe and Lovable; no eval; frames only Stripe; connections only to Supabase, Stripe and the services the browser uses). Lovable's editor preview and local development keep report-only, because the editor itself uses eval. All previous CSP reports came from preview domains, none from the live site. Tested in src/test/request-guards.test.ts. |
+| **Two-factor now required for all staff** | Turned on. Staff without an authenticator can still open the admin and set one up on the Staff page; every staff action is refused until they do. **Action: set up two-factor on the Staff page now** (one minute with any authenticator app), then sign in again with the code. |
+
+Updated action list: actions 1 (staff two-factor, now just set yours up) and 4 (enforce CSP) from the list above are done; the Stripe sync is new.
+
 ## Live checks to run on the published site
 
 ```
