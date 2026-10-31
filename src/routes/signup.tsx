@@ -35,7 +35,7 @@ const titles = ["CHOOSE YOUR PLAN", "Let's get to know you.", "Make it yours.", 
 const subtitles = ["Marketing, design & development. A monthly hours allowance that fits your ambition.", "The person and business behind the ambition.", "Create your FP login details.", "Please check your details carefully.", "Read your agreements before proceeding. Save a copy for your records."];
 
 const gateTitles = {
-  email: ["What's your email?", "We'll check whether you already have an FP account."],
+  email: ["What's your email?", "We'll send your agreement and account emails here."],
   password: ["Welcome back.", "Sign in to add this plan to your existing account."],
   mfa: ["One more step.", "Enter the code from your authenticator app."],
 } as const;
@@ -68,7 +68,9 @@ function Signup() {
     setPayment({ state: "loading" });
     try {
       const r = await fetch("/api/public/signup-payment", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ userId, email }) });
-      const body = (r.ok ? await r.json() : {}) as { payment?: PaymentDetails | null; review?: boolean };
+      const body = (r.ok ? await r.json() : {}) as { payment?: PaymentDetails | null; review?: boolean; restricted?: boolean };
+      // Security checks run when the account is created (for example a disposable email): restricted accounts verify their identity.
+      if (body.restricted) { window.location.assign("/kyc"); return; }
       setPayment(body.payment ? { state: "ready", details: body.payment } : body.review ? { state: "review" } : { state: "later" });
     } catch { setPayment({ state: "later" }); }
   };
@@ -162,17 +164,19 @@ function Signup() {
     setGateBusy(true);
     try {
       const r = await fetch("/api/public/account-check", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email }) });
-      const body = (await r.json().catch(() => ({}))) as { exists?: boolean; error?: string; risk?: { suggestion?: string } };
+      const body = (await r.json().catch(() => ({}))) as { error?: string; risk?: { suggestion?: string } };
       if (!r.ok) {
         const fix = body.risk?.suggestion;
         if (fix) { popup({ type: "error", title: "Check your email address", description: `${body.error ?? "This email can't be used."} Did you mean ${fix}?`, primaryLabel: `Use ${fix}`, onPrimary: () => setAccount((a) => ({ ...a, email: fix })), secondaryLabel: "Edit it myself" }); return; }
         throw new Error(body.error ?? "We couldn't check your email. Please try again.");
       }
       const fix = body.risk?.suggestion;
-      if (!body.exists && fix) {
+      if (fix) {
         popup({ type: "info", title: "Did you mean " + fix + "?", description: "Your email looks like it may have a typo. We'll send important account emails there.", primaryLabel: `Use ${fix}`, onPrimary: () => setAccount((a) => ({ ...a, email: fix })), secondaryLabel: "Keep " + email });
       }
-      setGate(body.exists ? "password" : null);
+      // The check never says whether an email has an account (that would let anyone probe addresses). Everyone continues as a new
+      // client; existing clients choose "Sign in", and a signup with an existing email is caught when the account would be created.
+      setGate(null);
     } catch (e) { popup({ type: "error", title: "We couldn't check your email", description: friendlyError(e), primaryLabel: "Close", secondaryLabel: null }); }
     finally { setGateBusy(false); }
   };
@@ -236,11 +240,6 @@ function Signup() {
       popup({ type: "info", title: "You already have an account", description: `Sign in to add the ${selectedPlan.name} plan to your existing account.`, primaryLabel: "Sign in", onPrimary: () => { setStep(1); setGate("password"); }, secondaryLabel: null });
       return false;
     }
-    // Security checks run when the account is created (for example a mobile number already used by another account).
-    try {
-      const r = await fetch("/api/public/account-check", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: account.email.trim(), }) });
-      if (r.ok && ((await r.json()) as { restricted?: boolean }).restricted) { setConfirmOpen(false); window.location.assign("/kyc"); return true; }
-    } catch { /* the check is best effort; staff still see the flag */ }
     setSignature({ name: `${personal.firstName} ${personal.lastName}`, at: new Date().toISOString() });
     // Prepare the first invoice and the card form while the processing screen runs.
     if (data.user?.id) { setSignupUserId(data.user.id); void loadPayment(data.user.id, account.email.trim()); } else setPayment({ state: "later" });
@@ -283,7 +282,7 @@ function Signup() {
         </div>}
         {step === 1 && gate === "email" && <form onSubmit={checkEmail} noValidate className="space-y-4">
           <Field label="Email Address"><input className="signup-input" type="email" inputMode="email" autoComplete="email" autoFocus value={account.email} maxLength={254} onChange={(e) => setAccount({ ...account, email: e.target.value })} /></Field>
-          <p className="text-xs text-muted-foreground">Already a client? Use the email you sign in with and we'll add this plan to your account.</p>
+          <p className="text-xs text-muted-foreground">Already a client? <button type="button" onClick={() => { if (account.email.trim()) setGate("password"); else popup({ type: "info", title: "Enter your email first", description: "Use the email you sign in with, then choose Sign in.", primaryLabel: "OK", secondaryLabel: null }); }} className="font-semibold text-foreground underline underline-offset-4">Sign in</button> with the email you use for FP and we'll add this plan to your account.</p>
           <div className="flex items-center gap-3 pt-4"><Button type="button" variant="secondary" aria-label="Back" className="size-11 shrink-0 rounded-full" onClick={() => setStep(0)}><ArrowLeft /></Button><Button type="submit" disabled={gateBusy} className="signup-primary flex-1">{gateBusy ? <Loader2 className="animate-spin" /> : null}Continue<ArrowRight /></Button></div>
         </form>}
         {step === 1 && gate === "password" && <form onSubmit={signIn} noValidate className="space-y-4">

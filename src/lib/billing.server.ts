@@ -9,7 +9,12 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 /** Unwraps a Supabase result. supabase-js returns errors instead of throwing, so writes must be checked to fail loudly (and let Stripe retry). */
 export function must(res: { data: any; error: { message: string } | null }): any {
-  if (res.error) throw new Error(`Database error: ${res.error.message}`);
+  if (res.error) {
+    // Full details stay in the server log; the error that travels on never carries table, column or constraint names.
+    const ref = Math.random().toString(36).slice(2, 8).toUpperCase();
+    console.error(`[${ref}] Database error:`, res.error.message);
+    throw new Error(`Something went wrong on our side. Please try again, or contact support with reference ${ref}.`);
+  }
   return res.data;
 }
 

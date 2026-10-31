@@ -57,7 +57,7 @@ export const inviteStaff = createServerFn({ method: "POST" })
       }
     } else {
       const r = await admin.auth.admin.inviteUserByEmail(data.email, { redirectTo: `${origin}/reset-password` });
-      if (r.error) throw new Error(`Couldn't send the invitation: ${r.error.message}`);
+      if (r.error) { console.error("Staff invitation failed", r.error.message); throw new Error(/already|registered|exists/i.test(r.error.message) ? "That address already has an account. Ask them to sign in, then grant access from their account." : "Couldn't send the invitation. Please try again."); }
     }
     await audit(admin, context.userId, "staff_invites", context.userId, "staff_invited", { email: data.email, level: data.level, granted }, context.userId, label(context));
     return { granted };
