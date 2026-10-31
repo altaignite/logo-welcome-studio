@@ -196,3 +196,21 @@ export function subscriptionStanding(sub: { status: string; started_at: string |
   if (!sub.started_at) return null;
   return "active";
 }
+
+/** Checks a Stripe invoice before it's recorded as paid. Every payment path (signed webhook, daily sync, import) goes through
+ * recordInvoicePaid, which calls this. "refuse" problems mean the data can't be trusted for this invoice, so nothing is recorded;
+ * "hold" problems mean Stripe collected the invoice but it shouldn't start a plan (staff review it). */
+export type PaymentCheck = { ok: true } | { ok: false; action: "refuse" | "hold"; reason: string };
+export function verifyStripePayment(
+  o: { status?: string | null; amount_remaining?: number | null; currency?: string | null; livemode?: boolean | null; total?: number | null; customer?: unknown },
+  expect: { liveKey: boolean; customerId: string | null; minAmount?: number | null },
+): PaymentCheck {
+  if (o.status !== "paid") return { ok: false, action: "refuse", reason: "Stripe doesn't show this invoice as paid." };
+  if (Number(o.amount_remaining ?? 0) > 0) return { ok: false, action: "refuse", reason: "Stripe shows an amount still owing on this invoice." };
+  if (o.livemode !== undefined && o.livemode !== null && o.livemode !== expect.liveKey) return { ok: false, action: "refuse", reason: `This is a ${o.livemode ? "live" : "test"}-mode payment but the platform runs on ${expect.liveKey ? "live" : "test"} keys.` };
+  if (o.currency && o.currency.toLowerCase() !== "usd") return { ok: false, action: "refuse", reason: `Unexpected currency ${o.currency.toUpperCase()}; plans are billed in USD.` };
+  const customer = typeof o.customer === "string" ? o.customer : (o.customer as { id?: string } | null)?.id ?? null;
+  if (expect.customerId && customer && customer !== expect.customerId) return { ok: false, action: "refuse", reason: "The Stripe invoice belongs to a different customer than this account." };
+  if (expect.minAmount && Number(o.total ?? 0) / 100 + 0.005 < expect.minAmount) return { ok: false, action: "hold", reason: `The first payment (${(Number(o.total ?? 0) / 100).toFixed(2)} USD) is below the plan price (${expect.minAmount.toFixed(2)} USD), so the plan wasn't started.` };
+  return { ok: true };
+}

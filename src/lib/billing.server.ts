@@ -240,6 +240,11 @@ export async function reconcileStripe(admin: Admin, limit = 200) {
       const { importInvoice } = await import("@/lib/stripe-import.server");
       await importInvoice(admin, inv.user_id, s);
       invoices++;
+      // Paid in Stripe but still open here means the webhook missed it: worth knowing, because the webhook should be the first line.
+      if (s.status === "paid" && (s.status_transitions?.paid_at ?? 0) * 1000 < Date.now() - 30 * 60_000) {
+        const { logSecurityEvent } = await import("@/lib/security-log.server");
+        await logSecurityEvent({ kind: "webhook_missed", severity: "medium", group: "stripe", summary: `The daily Stripe check recorded a payment the webhook missed (invoice ${inv.number}). Check the Stripe webhook on Billing rules.`, detail: { invoice: inv.id } });
+      }
     } catch (e) { console.error("Stripe invoice sync failed", inv.id, e); }
   }
   // Pick up invoices Stripe created recently for linked clients, in case their webhook was missed.
@@ -259,7 +264,20 @@ export async function reconcileStripe(admin: Admin, limit = 200) {
 /** Marks a local invoice paid from verified Stripe data (the signed webhook, or the Stripe API during sync and import),
  * records the payment, and applies its effects: activation, a new hours period on renewal, reinstatement. Idempotent. */
 export async function recordInvoicePaid(admin: Admin, inv: any, o: any, paymentIntent: string | null = null) {
-  if (o.status !== "paid") throw new Error("Payment must be verified in Stripe.");
+  // Verify before recording: fully paid in Stripe, same customer, USD, live mode matching our key, and for a first invoice an
+  // amount that covers the plan price (verifyStripePayment, src/lib/billing.ts).
+  const { verifyStripePayment } = await import("@/lib/billing");
+  const { stripeKey } = await import("@/lib/stripe.server");
+  const owner = must(await admin.from("profiles").select("stripe_customer_id").eq("id", inv.user_id).maybeSingle());
+  const plan = inv.kind === "first" && inv.subscription_id ? must(await admin.from("subscriptions").select("monthly_fee").eq("id", inv.subscription_id).maybeSingle()) : null;
+  const check = verifyStripePayment(o, { liveKey: /^(sk|rk)_live_/.test(stripeKey() ?? ""), customerId: owner?.stripe_customer_id ?? null, minAmount: plan ? Number(plan.monthly_fee) : null });
+  let hold = false;
+  if (!check.ok) {
+    const { logSecurityEvent } = await import("@/lib/security-log.server");
+    await logSecurityEvent({ kind: "payment_mismatch", severity: "high", group: inv.id, userId: inv.user_id, summary: `Invoice ${inv.number}: ${check.reason}`, detail: { invoice: inv.id, stripe_invoice: o.id, action: check.action } });
+    if (check.action === "refuse") throw new Error(`Payment not recorded: ${check.reason}`);
+    hold = true;
+  }
   must(await admin.from("invoices").update({ status: "paid", paid_at: o.status_transitions?.paid_at ? new Date(o.status_transitions.paid_at * 1000).toISOString() : new Date().toISOString(),
     hosted_url: o.hosted_invoice_url, pdf_url: o.invoice_pdf, stripe_status: "paid", stripe_synced_at: new Date().toISOString(),
     collection_stage: Number(inv.interest_accrued) + Number(inv.fees_accrued) > 0 ? inv.collection_stage : (inv.collection_stage === "none" ? "none" : "settled") }).eq("id", inv.id).neq("status", "paid"));
@@ -269,7 +287,12 @@ export async function recordInvoicePaid(admin: Admin, inv: any, o: any, paymentI
   if (o.metadata?.original_invoice_id) must(await admin.from("invoices").update({ collection_stage: "settled", interest_paused: true }).eq("id", o.metadata.original_invoice_id).eq("status", "paid"));
   const subId = inv.subscription_id;
   if (subId) {
-    if (inv.kind === "first") { await activateSubscription(admin, subId); await applySubscriptionStanding(admin, subId, `Invoice ${inv.number} paid`, "Stripe"); }
+    if (inv.kind === "first" && hold) {
+      // Collected, but below the plan price: staff decide (refund, top up, or start it by hand).
+      must(await admin.from("subscriptions").update({ payment_warning: "First payment is below the plan price; the plan wasn't started. Staff will review it." }).eq("id", subId));
+      await audit(admin, inv.user_id, "subscriptions", subId, "activation_held", { invoice: inv.number, paid: (o.total ?? 0) / 100 }, null, "Stripe");
+    }
+    else if (inv.kind === "first") { await activateSubscription(admin, subId); await applySubscriptionStanding(admin, subId, `Invoice ${inv.number} paid`, "Stripe"); }
     else {
       // Only a billing-cycle renewal starts a new hours period; proration and one-off invoices don't.
       if (inv.kind === "renewal") {
