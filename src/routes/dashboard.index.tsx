@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { PayInvoiceButton } from "@/components/payment-cards";
 import { ErrorState, PageSkeleton } from "@/components/loading";
 import { AlertTriangle, Check, Circle } from "lucide-react";
 import { Section } from "@/components/admin/record-bits";
@@ -21,6 +22,7 @@ function Overview() {
   const warnings = [
     ...data.subs.filter((s) => s.payment_warning).map((s) => `${s.plan_name} plan: ${s.payment_warning}`),
     ...live.filter((s) => Number(s.hours_used) > Number(s.monthly_hours)).map((s) => `${s.plan_name} plan is ${Number(s.hours_used) - Number(s.monthly_hours)} hours over its monthly allowance. Extra hours are billed separately.`),
+    ...unpaid.filter((i) => i.failed_payment_at).map((i) => `Your card was declined for invoice ${i.number}. Pay it with another card, or add a new card on the Invoices page so your plan keeps running.`),
     ...unpaid.filter((i) => i.status === "overdue").map((i) => `Invoice ${i.number} is overdue. Interest is added each month until it's paid, as set out in your Collections and Debt Recovery Policy.`),
   ];
   const p = data.profile;
@@ -66,7 +68,7 @@ function Overview() {
         <ul className="divide-y text-sm">
           {asks.map((x) => <li key={x.id} className="flex items-center justify-between gap-3 px-5 py-3"><span>We need more information for your {x.plan_name} application</span><Link to="/dashboard/$kind/$id" params={{ kind: "application", id: x.id }} className="h-8 shrink-0 rounded-full bg-foreground px-3 text-xs font-semibold leading-8 text-background">Reply</Link></li>)}
           {reviews.map((d: R) => <li key={d.id} className="flex items-center justify-between gap-3 px-5 py-3"><span>{d.title} is ready for your review</span><Link to="/dashboard/$kind/$id" params={{ kind: "deliverable", id: d.id }} className="h-8 shrink-0 rounded-full bg-foreground px-3 text-xs font-semibold leading-8 text-background">Review</Link></li>)}
-          {unpaid.map((i) => <li key={i.id} className="flex items-center justify-between gap-3 px-5 py-3"><span>Invoice {i.number}, {money(invoiceTotal(i))}, due {formatDay(i.due_at)}</span>{i.hosted_url && <a href={i.hosted_url} target="_blank" rel="noopener noreferrer" className="h-8 shrink-0 rounded-full bg-foreground px-3 text-xs font-semibold leading-8 text-background">Pay now</a>}</li>)}
+          {unpaid.map((i) => <li key={i.id} className="flex items-center justify-between gap-3 px-5 py-3"><span>Invoice {i.number}, {money(invoiceTotal(i))}, due {formatDay(i.due_at)}</span>{(i.stripe_invoice_id || i.hosted_url) && <PayInvoiceButton invoice={i as { id: string; number: string; hosted_url?: string | null }} />}</li>)}
           {approvals.map((t) => <li key={t.id} className="flex items-center justify-between gap-3 px-5 py-3"><span>Extra hours needed for {t.title}</span><ActBtn dark onClick={() => a.approve(t)}>Approve</ActBtn></li>)}
           {replies.map((m: R) => <li key={m.id} className="px-5 py-3"><Link to="/dashboard/$kind/$id" params={{ kind: "ticket", id: m.ticket_id }} className="hover:underline">New reply from the FP team, {formatDate(m.created_at)}</Link></li>)}
           {asks.length + reviews.length + unpaid.length + approvals.length + replies.length === 0 && <li className="px-5 py-6 text-muted-foreground">You're all caught up.</li>}

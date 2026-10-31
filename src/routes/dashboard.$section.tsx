@@ -17,6 +17,7 @@ import { passwordProblem } from "@/lib/passwords";
 import { requestPrivacy, updateMyProfile } from "@/lib/client.functions";
 import { myAgreements, saveOnboardingBrief } from "@/lib/portal.functions";
 import { AgreementList, DocumentList, UploadButton } from "@/components/files";
+import { MyPaymentCards, PayInvoiceButton } from "@/components/payment-cards";
 import { MfaSettings } from "@/components/mfa";
 import { isBlockedDomain } from "@/lib/disposable-domains";
 import { departmentLabel } from "@/lib/support";
@@ -106,6 +107,7 @@ function SectionPage() {
       { key: "a", label: "Actions", value: () => "", render: (r) => <Actions kind="task" id={r.id}>{r.over_allowance && !r.overage_approved && <ActBtn dark onClick={() => a.approve(r)}>Approve hours</ActBtn>}</Actions> },
     ])}
 
+    {s === "invoices" && <MyPaymentCards />}
     {s === "invoices" && table("Invoices", "invoice", data.invoices, [
       { key: "n", label: "Invoice", value: (r) => r.number },
       { key: "a", label: "Total", value: (r) => invoiceTotal(r), render: (r) => money(invoiceTotal(r)) },
@@ -113,10 +115,10 @@ function SectionPage() {
       { key: "c", label: "Stage", value: (r) => r.collection_stage, render: (r) => r.collection_stage === "none" ? "—" : stageLabel[r.collection_stage as CollectionStage] },
       { key: "d", label: "Due", value: (r) => r.due_at ?? "", render: (r) => formatDay(r.due_at) },
       { key: "x", label: "Actions", value: () => "", render: (r) => <Actions kind="invoice" id={r.id}>
-        {r.hosted_url && r.status !== "paid" && r.status !== "void" && <a href={r.hosted_url} target="_blank" rel="noopener noreferrer" className="h-8 rounded-full bg-foreground px-3 text-xs font-semibold leading-8 text-background">Pay now</a>}
+        {r.status !== "paid" && r.status !== "void" && (r.stripe_invoice_id || r.hosted_url) && <PayInvoiceButton invoice={r as { id: string; number: string; hosted_url?: string | null }} />}
         {r.pdf_url && <a href={r.pdf_url} target="_blank" rel="noopener noreferrer" className="h-8 rounded-full bg-secondary px-3 text-xs font-semibold leading-8">PDF</a>}
       </Actions> },
-    ], <ActBtn onClick={a.portal}>Update payment card</ActBtn>)}
+    ])}
 
     {s === "payments" && table("Payments", "payment", data.payments, [
       { key: "r", label: "Reference", value: (r) => r.reference },

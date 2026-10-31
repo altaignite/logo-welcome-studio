@@ -1,4 +1,5 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { PayInvoiceButton } from "@/components/payment-cards";
 import { ErrorState, PageSkeleton } from "@/components/loading";
 import type { ReactNode } from "react";
 import { ArrowLeft } from "lucide-react";
@@ -104,7 +105,7 @@ function Details() {
   </>;
   if (kind === "invoice") return <>
     {header(`Invoice ${r.number}`, <StatusBadge status={r.status} />, <>
-      {r.hosted_url && r.status !== "paid" && r.status !== "void" && <a href={r.hosted_url} target="_blank" rel="noopener noreferrer" className="h-8 rounded-full bg-foreground px-3 text-xs font-semibold leading-8 text-background">Pay now</a>}
+      {r.status !== "paid" && r.status !== "void" && (r.stripe_invoice_id || r.hosted_url) && <PayInvoiceButton invoice={r as { id: string; number: string; hosted_url?: string | null }} />}
       {r.pdf_url && <a href={r.pdf_url} target="_blank" rel="noopener noreferrer" className="h-8 rounded-full bg-secondary px-3 text-xs font-semibold leading-8">Download PDF</a>}
       <ActBtn onClick={() => a.newTicket(r.subscription_id ?? undefined)}>Question about this invoice</ActBtn></>)}
     <Section title="Invoice"><FieldGrid items={[["Description", r.description ?? "—"], ["Plan", subLink(r.subscription_id)], ["Amount", money(r.amount)], ["Interest", money(r.interest_accrued)], ["Fees", money(r.fees_accrued)], ["Total", money(invoiceTotal(r))],

@@ -3,6 +3,9 @@
 export const rateLimits = {
   request: { max: 300, windowSec: 60, message: "You're going a little fast. Please wait a moment and try again." },
   profile: { max: 30, windowSec: 3600, message: "Too many profile changes. Please try again later." },
+  cards: { max: 120, windowSec: 3600, message: "Too many card lookups. Please wait a few minutes." },
+  cardChange: { max: 20, windowSec: 3600, message: "Too many card changes. Please wait a few minutes and try again." },
+  cardCharge: { max: 30, windowSec: 3600, message: "Too many card charges in an hour. Please wait before trying again." },
   payment: { max: 30, windowSec: 3600, message: "Too many payment attempts. Please wait a few minutes and try again." },
   order: { max: 5, windowSec: 3600, message: "You've placed several orders recently. Please wait before ordering again." },
   planChange: { max: 10, windowSec: 3600, message: "Too many plan changes. Please try again later." },

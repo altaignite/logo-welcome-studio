@@ -1,4 +1,5 @@
 import { countryName } from "@/lib/security";
+import { ClientPaymentCards } from "@/components/payment-cards";
 import { createFileRoute, Link, getRouteApi, useNavigate } from "@tanstack/react-router";
 import { ErrorState, PageSkeleton } from "@/components/loading";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -25,7 +26,7 @@ import { recordKinds, toPatch, type RecordKind, type Row, type Vals } from "@/li
 export const Route = createFileRoute("/admin/accounts/$id")({ component: AccountDetail });
 const adminRoute = getRouteApi("/admin");
 
-const tabs = ["Overview", "Onboarding", "Contacts", "Applications", "Subscriptions", "Projects", "Deliverables", "Reports", "Documents", "Invoices", "Transactions", "Support tickets", "Activities", "Tasks", "Privacy", "Security", "Audit log"] as const;
+const tabs = ["Overview", "Onboarding", "Contacts", "Applications", "Subscriptions", "Projects", "Deliverables", "Reports", "Documents", "Invoices", "Payment cards", "Transactions", "Support tickets", "Activities", "Tasks", "Privacy", "Security", "Audit log"] as const;
 type Modal = { title: string; description?: string | undefined; fields: FieldDef[]; submitLabel: string; onSubmit: (v: Vals) => Promise<string | null> };
 const today = () => new Date().toISOString().slice(0, 10);
 type R = Row;
@@ -286,6 +287,7 @@ function AccountDetail() {
         bulkActions={[bulkVoid("invoices")]}
         columns={[col("number", "Invoice"), col("description", "Description"), col("amount", "Amount", "money"), col("status", "Status", "status"), col("collection_stage", "Collections", "status"), col("issued_at", "Issued", "day"), col("due_at", "Due", "day")]} />}
 
+      {tab === "Payment cards" && <ClientPaymentCards userId={id} invoices={data.invoices} onChanged={() => void refresh()} />}
       {tab === "Transactions" && <DataTable<R> title="Transactions" rows={data.transactions} getId={(r) => r.id} onRowClick={open("transactions")} empty="No transactions yet." bulkActions={[bulkVoid("transactions")]}
         columns={[col("reference", "Reference"), col("description", "Description"), col("amount", "Amount", "money"), col("method", "Method"), col("status", "Status", "status"), col("created_at", "Date", "date")]} />}
 
