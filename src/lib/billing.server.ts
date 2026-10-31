@@ -340,6 +340,28 @@ export async function sendFirstInvoiceFor(admin: Admin, subscriptionId: string) 
   return { invoiceId: inv.id as string };
 }
 
+/** Stripe's publishable key for the in-page card form: public by design (it ships to every browser), so it can live in Lovable's
+ * STRIPE_PUBLISHABLE_KEY secret or in app_secrets. Null hides the card form and falls back to Stripe's hosted invoice page. */
+export async function stripePublishableKey(admin: Admin): Promise<string | null> {
+  const fromEnv = process.env["STRIPE_PUBLISHABLE_KEY"];
+  const key = fromEnv || (await admin.from("app_secrets").select("value").eq("name", "stripe_publishable_key").maybeSingle()).data?.value;
+  return typeof key === "string" && /^pk_(live|test)_[A-Za-z0-9]+$/.test(key) ? key : null;
+}
+
+export type InvoicePayment = { invoiceId: string; number: string; amount: number; payUrl: string | null; clientSecret: string | null; publishableKey: string | null };
+
+/** What the in-page card form needs to pay one of the client's open invoices: Stripe's confirmation secret for the invoice's
+ * payment, read live from Stripe. Only the invoice's owner gets it; it can only be used to pay that invoice. Payment is still
+ * recorded only by the signed webhook (recordInvoicePaid), never by the browser. */
+export async function invoicePayment(admin: Admin, invoiceId: string, userId: string): Promise<InvoicePayment | null> {
+  const { data: inv } = await admin.from("invoices").select("id, user_id, number, amount, status, stripe_invoice_id, hosted_url").eq("id", invoiceId).maybeSingle();
+  if (!inv || inv.user_id !== userId || inv.status !== "open" || !inv.stripe_invoice_id) return null;
+  const live = await stripe("GET", `invoices/${inv.stripe_invoice_id}`, { "expand[]": "confirmation_secret" });
+  if (live.status !== "open") return null;
+  const clientSecret = live.confirmation_secret?.type === "payment_intent" ? (live.confirmation_secret.client_secret as string) : null;
+  return { invoiceId: inv.id, number: inv.number, amount: Number(live.amount_remaining ?? 0) / 100, payUrl: live.hosted_invoice_url ?? inv.hosted_url ?? null, clientSecret, publishableKey: clientSecret ? await stripePublishableKey(admin) : null };
+}
+
 /** Approves a new signup automatically when nothing flagged it: no restriction, no open Security ticket, an email that passed the
  * risk check and an application still waiting. Sends the first invoice so the client can start without waiting for staff. */
 export async function autoApproveSignup(admin: Admin, userId: string, emailClean: boolean) {

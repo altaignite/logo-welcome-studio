@@ -77,6 +77,17 @@ export const orderAdditionalPlan = createServerFn({ method: "POST" })
     return { subscriptionId: sub.data.id as string, invoiceId: inv.id as string };
   });
 
+/** The in-page card form for one of the client's own open invoices (first payments on orders, and any invoice in the dashboard). */
+export const invoicePaymentDetails = createServerFn({ method: "POST" })
+  .middleware([limited("payment")])
+  .inputValidator((d: unknown) => z.object({ invoiceId: uuid }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { getAdmin, invoicePayment } = await import("@/lib/billing.server");
+    const payment = await invoicePayment(await getAdmin(), data.invoiceId, context.userId);
+    if (!payment) throw new Error("This invoice is already paid or can't be paid online.");
+    return payment;
+  });
+
 /** Upgrade now (prorated through Stripe) or schedule a downgrade for renewal. */
 export const changePlan = createServerFn({ method: "POST" })
   .middleware([limited("planChange")])

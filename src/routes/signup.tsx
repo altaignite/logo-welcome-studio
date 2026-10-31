@@ -6,7 +6,8 @@ import { CountryField } from "@/components/country-field";
 import { MfaChallenge, mfaNeeded } from "@/components/mfa";
 import { Spinner } from "@/components/loading";
 import { useServerFn } from "@tanstack/react-start";
-import { orderAdditionalPlan } from "@/lib/client.functions";
+import { invoicePaymentDetails, orderAdditionalPlan } from "@/lib/client.functions";
+import { PayStep, type PaymentDetails } from "@/components/pay-step";
 import { usePopup } from "@/components/popup";
 import { isUnconfirmedEmail, unconfirmedPopup } from "@/lib/email-confirmation";
 import { supabase } from "@/integrations/supabase/client";
@@ -57,8 +58,19 @@ function Signup() {
   const [accountNumber, setAccountNumber] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [signature, setSignature] = useState<{ name: string; at: string } | null>(null);
-  // The Stripe payment page for the first invoice, when the signup was approved automatically (undefined while it's prepared).
-  const [payUrl, setPayUrl] = useState<string | null | undefined>(undefined);
+  // Paying the first month is the last step: "ready" shows the card form (clean signups are approved and invoiced right after signing),
+  // "review" means staff check the signup first, "later" means the invoice is in the inbox and the dashboard.
+  const [payment, setPayment] = useState<SignupPayment>({ state: "loading" });
+  const [paid, setPaid] = useState<"succeeded" | "processing" | null>(null);
+  const [signupUserId, setSignupUserId] = useState("");
+  const loadPayment = async (userId: string, email: string) => {
+    setPayment({ state: "loading" });
+    try {
+      const r = await fetch("/api/public/signup-payment", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ userId, email }) });
+      const body = (r.ok ? await r.json() : {}) as { payment?: PaymentDetails | null; review?: boolean };
+      setPayment(body.payment ? { state: "ready", details: body.payment } : body.review ? { state: "review" } : { state: "later" });
+    } catch { setPayment({ state: "later" }); }
+  };
   const documents = agreementDocuments(selectedPlan, { name: `${personal.firstName} ${personal.lastName}`.trim(), company: personal.company, email: account.email, phone: personal.phone, country: personal.country, accountNumber }, signature?.at);
   const phoneTouched = useRef(false);
   const countryTouched = useRef(false);
@@ -86,9 +98,18 @@ function Signup() {
   // Saved progress: offer to continue where the visitor left off (this browser only, never the password).
   useEffect(() => {
     const d = loadDraft();
+    // Back from a payment method that left the page (bank redirects): Stripe says how it went.
+    const redirect = new URLSearchParams(window.location.search).get("redirect_status");
+    if (d?.payUserId && (redirect === "succeeded" || redirect === "processing")) {
+      const plan = plans.find((x) => x.id === d.planId)!;
+      setSelectedPlan(plan); setPersonal(d.personal); setAccountNumber(d.accountNumber); setAccount((a) => ({ ...a, email: d.email }));
+      setSignature({ name: `${d.personal.firstName} ${d.personal.lastName}`, at: new Date(d.savedAt).toISOString() });
+      setPaid(redirect); setPayment({ state: "later" }); setStep(6); clearDraft();
+      return;
+    }
     if (!d) return;
     const plan = plans.find((x) => x.id === d.planId)!;
-    popup({ type: "info", title: "Continue where you left off?", description: `We saved your ${plan.name} plan application on this device on ${new Date(d.savedAt).toLocaleDateString(undefined, { dateStyle: "medium" })}. For your security your password isn't saved, so you'll enter it again.`,
+    popup({ type: "info", title: d.payUserId ? "Finish your payment?" : "Continue where you left off?", description: d.payUserId ? `Your ${plan.name} plan application is signed. Pay your first month to start.` : `We saved your ${plan.name} plan application on this device on ${new Date(d.savedAt).toLocaleDateString(undefined, { dateStyle: "medium" })}. For your security your password isn't saved, so you'll enter it again.`,
       primaryLabel: "Continue", secondaryLabel: "Start over", onSecondary: () => clearDraft(),
       onPrimary: async () => {
         setSelectedPlan(plan); setPersonal(d.personal); setPhoneCountry(d.phoneCountry); setAccountNumber(d.accountNumber);
@@ -97,16 +118,21 @@ function Signup() {
         if (d.personal.phone) phoneTouched.current = true;
         const { data } = await supabase.auth.getSession();
         if (d.existingAccount && data.session && !(await mfaNeeded())) { setExisting(true); return; }
+        if (d.payUserId) { setSignupUserId(d.payUserId); setSignature({ name: `${d.personal.firstName} ${d.personal.lastName}`, at: new Date(d.savedAt).toISOString() }); setStep(6); void loadPayment(d.payUserId, d.email); return; }
         const r = resumeStep(d); setGate(r.gate); setStep(r.step);
       } });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
     if (existing || step < 1 || step > 4) return;
-    saveDraft({ step, planId: selectedPlan.id, personal, phoneCountry, email: account.email.trim(), accountNumber, existingAccount: gate === "password" || gate === "mfa" });
+    saveDraft({ step, planId: selectedPlan.id, personal, phoneCountry, email: account.email.trim(), accountNumber, existingAccount: gate === "password" || gate === "mfa", payUserId: "" });
   }, [step, gate, selectedPlan, personal, phoneCountry, account.email, accountNumber, existing]);
   // Finished: nothing left to resume.
-  useEffect(() => { if (step >= 5) clearDraft(); }, [step]);
+  // At the pay step the draft remembers the new account (its id only), so a visitor who leaves can come back and pay.
+  useEffect(() => {
+    if (step === 6 && payment.state === "ready" && !paid && signupUserId) saveDraft({ step: 6, planId: selectedPlan.id, personal, phoneCountry, email: account.email.trim(), accountNumber, existingAccount: false, payUserId: signupUserId });
+    else if (step >= 5 && (paid || (step === 6 && payment.state !== "loading" && payment.state !== "ready"))) clearDraft();
+  }, [step, payment.state, paid, signupUserId, selectedPlan, personal, phoneCountry, account.email, accountNumber]);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "instant" });
@@ -215,14 +241,14 @@ function Signup() {
       if (r.ok && ((await r.json()) as { restricted?: boolean }).restricted) { setConfirmOpen(false); window.location.assign("/kyc"); return true; }
     } catch { /* the check is best effort; staff still see the flag */ }
     setSignature({ name: `${personal.firstName} ${personal.lastName}`, at: new Date().toISOString() });
-    // Prepare the first invoice while the processing screen runs, so the client can pay before leaving signup.
-    void fetch("/api/public/signup-payment", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ userId: data.user?.id, email: account.email.trim() }) })
-      .then(async (r) => setPayUrl(r.ok ? ((await r.json()) as { payUrl?: string | null }).payUrl ?? null : null)).catch(() => setPayUrl(null));
+    // Prepare the first invoice and the card form while the processing screen runs.
+    if (data.user?.id) { setSignupUserId(data.user.id); void loadPayment(data.user.id, account.email.trim()); } else setPayment({ state: "later" });
     setStep(5);
     return true;
   };
 
 
+  const payStep = step === 6 && !paid && (payment.state === "loading" || payment.state === "ready");
   return <main className="min-h-dvh bg-background text-foreground">
     <div className="relative w-full">
       <section className="min-w-0">
@@ -233,9 +259,9 @@ function Signup() {
           <span aria-hidden className="hidden h-8 w-px bg-border sm:block" />
           <span className="hidden text-sm font-semibold tracking-tight sm:block">New Service Application</span>
         </div>
-        <span className="text-sm font-semibold sm:hidden">{existing ? "Add a plan" : step === 1 && gate ? (gate === "email" ? "Your email" : "Sign in") : step < 5 ? steps[step] : step === 5 ? "Almost there…" : "Application complete"}</span>
+        <span className="text-sm font-semibold sm:hidden">{existing ? "Add a plan" : step === 1 && gate ? (gate === "email" ? "Your email" : "Sign in") : step < 5 ? steps[step] : step === 5 ? "Almost there…" : payStep ? "Payment" : "Application complete"}</span>
         <div className="flex items-center gap-3">
-          <span className="hidden text-sm text-muted-foreground sm:block">{existing ? "Add a plan" : step === 1 && gate ? (gate === "email" ? "Your email" : "Sign in") : step < 5 ? `${steps[step]} · ${step + 1} of 5` : step === 5 ? "Almost there…" : "Application complete"}</span>
+          <span className="hidden text-sm text-muted-foreground sm:block">{existing ? "Add a plan" : step === 1 && gate ? (gate === "email" ? "Your email" : "Sign in") : step < 5 ? `${steps[step]} · ${step + 1} of 5` : step === 5 ? "Almost there…" : payStep ? "Payment" : "Application complete"}</span>
           {step < 5 ? <Button variant="ghost" size="icon" aria-label="Close signup" onClick={() => popup({ type: "info", title: "Leave your application?", description: "Your progress is saved on this device for 7 days, so you can continue later. Your password isn't saved.", primaryLabel: "Leave application", onPrimary: () => { navigate({ to: "/" }); }, secondaryLabel: "Keep going" })}><X /></Button> : <div className="size-9" />}
         </div>
       </div>
@@ -293,7 +319,10 @@ function Signup() {
           <div className="mt-5 flex gap-3"><Button variant="secondary" aria-label="Back to review" className="size-11 shrink-0 rounded-full" onClick={() => setStep(3)}><ArrowLeft /></Button><Button className="signup-primary flex-1" onClick={openConfirmation}>Accept & continue <PenLine /></Button></div>
         </div>}
       </div>
-    </> : step === 5 ? <ProcessingScreen hours={selectedPlan.monthlyHours} accountNumber={accountNumber} onDone={() => { setAccount((a) => ({ ...a, password: "", confirmPassword: "" })); setStep(6); }} /> : <SuccessScreen name={personal.firstName} accountNumber={accountNumber} plan={selectedPlan} signedAt={signature?.at ?? new Date().toISOString()} email={account.email} payUrl={payUrl} />}
+    </> : step === 5 ? <ProcessingScreen hours={selectedPlan.monthlyHours} accountNumber={accountNumber} onDone={() => { setAccount((a) => ({ ...a, password: "", confirmPassword: "" })); setStep(6); }} /> : payStep ? <section className="mx-auto max-w-lg px-5 pb-12 pt-8 md:px-6 md:pt-12">
+      <div className="mb-6 text-center"><h1 className="text-2xl font-extrabold leading-tight sm:text-3xl">Pay your first month</h1><p className="mx-auto mt-2 max-w-sm text-sm text-muted-foreground">Your agreement is signed. Your {selectedPlan.name} plan starts as soon as this payment goes through.</p></div>
+      {payment.state === "ready" ? <PayStep payment={payment.details} plan={selectedPlan} returnPath="/signup?payment=done" onPaid={setPaid} /> : <div className="flex flex-col items-center gap-3 py-10 text-sm text-muted-foreground"><Spinner className="size-6" />Preparing your secure payment…</div>}
+    </section> : <SuccessScreen name={personal.firstName} accountNumber={accountNumber} plan={selectedPlan} signedAt={signature?.at ?? new Date().toISOString()} email={account.email} paid={paid} review={payment.state === "review"} />}
 
       </section>
     </div>
@@ -348,7 +377,9 @@ function ProcessingScreen({ hours, accountNumber, onDone }: { hours: number; acc
 }
 
 
-function SuccessScreen({ name, accountNumber, plan, signedAt, email, payUrl }: { name: string; accountNumber: string; plan: Plan; signedAt: string; email: string; payUrl: string | null | undefined }) {
+type SignupPayment = { state: "loading" } | { state: "ready"; details: PaymentDetails } | { state: "review" } | { state: "later" };
+
+function SuccessScreen({ name, accountNumber, plan, signedAt, email, paid, review }: { name: string; accountNumber: string; plan: Plan; signedAt: string; email: string; paid: "succeeded" | "processing" | null; review: boolean }) {
   const popup = usePopup();
   // Supabase allows one confirmation email a minute, so the link counts down instead of failing.
   const [cooldown, setCooldown] = useState(60);
@@ -365,18 +396,20 @@ function SuccessScreen({ name, accountNumber, plan, signedAt, email, payUrl }: {
   const timeline = [
     { title: "Application submitted", text: time, state: "done" },
     { title: "Agreement signed digitally", text: "Your confirmation code was accepted.", state: "done" },
-    ...(payUrl ? [
-      { title: "Pay your first month", text: `Your application was approved. Pay $${plan.monthlyFee} securely with Stripe to start your plan; the invoice is also in your inbox.`, state: "current" },
-      { title: "Confirm your email", text: `We sent a link to ${email}. Open it to activate your dashboard login.`, state: "todo" },
+    ...(paid ? [
+      { title: paid === "succeeded" ? "First month paid" : "Payment processing", text: paid === "succeeded" ? `Thank you. Your receipt is on its way to ${email}.` : "Your bank is confirming the payment; we'll email you as soon as it's done.", state: "done" },
+      { title: "Confirm your email", text: `We sent a link to ${email}. Open it to activate your dashboard login.`, state: "current" },
     ] : [
       { title: "Confirm your email", text: `We sent a link to ${email}. Open it to activate your dashboard login.`, state: "current" },
-      { title: "Approval and first invoice", text: payUrl === undefined ? "Preparing your first invoice…" : "We're reviewing your details, usually within one business day. Your first invoice then appears in your dashboard and inbox; your plan starts as soon as it's paid.", state: "todo" },
+      review
+        ? { title: "Review and first invoice", text: "We're reviewing your details, usually within one business day. Your first invoice then arrives by email; your plan starts as soon as it's paid.", state: "todo" }
+        : { title: "Pay your first invoice", text: "It's in your inbox, and in your dashboard once you sign in. Your plan starts as soon as it's paid.", state: "todo" },
     ]),
     { title: "Onboarding call", text: `We'll contact you at ${email} to plan your first month.`, state: "todo" },
     { title: "Your accelerator starts", text: `${plan.monthlyHours} service hours assigned every month.`, state: "todo" },
   ] as const;
   return <section className="mx-auto max-w-lg px-5 pb-12 pt-8 md:px-6 md:pt-12">
-    <div className="text-center"><span className="mx-auto grid size-14 place-items-center rounded-full bg-foreground text-background"><Check className="size-7" /></span><h1 className="mt-5 text-2xl font-bold leading-tight sm:text-3xl">Application submitted, {name}!</h1><p className="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-muted-foreground">{payUrl ? "Pay your first month to start, then confirm your email." : "Confirm your email to activate your login. Here's what happens next."}</p></div>
+    <div className="text-center"><span className="mx-auto grid size-14 place-items-center rounded-full bg-foreground text-background"><Check className="size-7" /></span><h1 className="mt-5 text-2xl font-bold leading-tight sm:text-3xl">{paid ? `You're all set, ${name}!` : `Application submitted, ${name}!`}</h1><p className="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-muted-foreground">{paid ? "Confirm your email to open your dashboard. Here's what happens next." : "Confirm your email to activate your login. Here's what happens next."}</p></div>
     <dl className="mt-8 divide-y border-y text-sm">
       <div className="flex items-center justify-between gap-3 py-3"><dt className="text-muted-foreground">Account number</dt><dd className="flex items-center gap-2 font-semibold tabular-nums">{formatAccountNumber(accountNumber)}<button type="button" onClick={copy} className="text-xs font-medium underline underline-offset-4 hover:text-muted-foreground">{copied ? "Copied" : "Copy"}</button></dd></div>
       <div className="flex items-center justify-between gap-3 py-3"><dt className="text-muted-foreground">Plan</dt><dd className="font-semibold">{plan.name}, {plan.monthlyHours} hours / month, ${plan.monthlyFee}/month</dd></div>
@@ -386,11 +419,7 @@ function SuccessScreen({ name, accountNumber, plan, signedAt, email, payUrl }: {
       <span className={`relative grid size-6 shrink-0 place-items-center rounded-full ${item.state === "done" ? "bg-foreground text-background" : item.state === "current" ? "border-2 border-primary bg-background" : "border bg-background"}`}>{item.state === "done" ? <Check className="size-3.5" /> : item.state === "current" ? <span className="size-2 rounded-full bg-primary" /> : null}</span>
       <div className="min-w-0"><p className={`text-sm font-semibold ${item.state === "todo" ? "text-muted-foreground" : ""}`}>{item.title}{item.state === "current" && <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">Now</span>}</p><p className="mt-1 text-sm leading-relaxed text-muted-foreground">{item.text}</p></div>
     </li>)}</ol>
-    {payUrl ? <>
-      <Button asChild className="signup-primary mt-8"><a href={payUrl} target="_blank" rel="noopener noreferrer">Pay ${plan.monthlyFee} and start</a></Button>
-      <p className="mt-3 text-center text-xs text-muted-foreground">Secure payment by Stripe. The 90-day money-back guarantee applies (conditions in your agreement).</p>
-      <Button asChild variant="outline" className="mt-3 h-12 w-full rounded-full"><Link to="/">Go to sign in</Link></Button>
-    </> : <Button asChild className="signup-primary mt-8"><Link to="/">Go to sign in</Link></Button>}
+    <Button asChild className="signup-primary mt-8"><Link to="/">Go to sign in</Link></Button>
     <p className="mt-4 text-center text-xs text-muted-foreground">Didn't get the email? Check your spam folder, or{" "}
       <button type="button" disabled={cooldown > 0} onClick={resend} className="font-medium text-foreground underline underline-offset-4 disabled:no-underline disabled:opacity-60">{cooldown > 0 ? `resend in ${cooldown}s` : "resend it"}</button>.</p>
   </section>;
@@ -400,6 +429,7 @@ function SuccessScreen({ name, accountNumber, plan, signedAt, email, payUrl }: {
 /** An existing client who signed in during signup adds the chosen plan to their account without leaving the flow. */
 function ExistingClientOrder({ plan, onDone }: { plan: Plan; onDone: () => void }) {
   const fnOrder = useServerFn(orderAdditionalPlan);
+  const fnPayment = useServerFn(invoicePaymentDetails);
   const [client, setClient] = useState<Parameters<typeof OrderWizard>[0]["client"] | null>(null);
   const [failed, setFailed] = useState(false);
   useEffect(() => {
@@ -415,6 +445,6 @@ function ExistingClientOrder({ plan, onDone }: { plan: Plan; onDone: () => void 
   return <div className="px-5 pt-6 md:px-6 md:pt-8">
     {failed ? <p className="mx-auto max-w-lg text-center text-sm text-muted-foreground">We couldn't load your account. Please refresh the page and try again.</p>
       : !client ? <div className="grid place-items-center py-16"><Spinner /></div>
-      : <OrderWizard mode="client" initialPlan={plan.id} doneLabel="Go to my dashboard" client={client} onPlace={async (p) => { await fnOrder({ data: { planId: p.id, signed: true } }); }} onDone={onDone} />}
+      : <OrderWizard mode="client" initialPlan={plan.id} doneLabel="Go to my dashboard" client={client} onPlace={(p) => fnOrder({ data: { planId: p.id, signed: true } })} loadPayment={(invoiceId) => fnPayment({ data: { invoiceId } })} onDone={onDone} />}
   </div>;
 }

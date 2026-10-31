@@ -9,6 +9,8 @@ import { downloadAgreementPdf } from "@/lib/agreement-pdf";
 import { createSignatureCode, isSignatureMatch, plans, type Plan } from "@/lib/signup";
 import { LEGAL_URL, agreementDocuments, parseAgreement } from "@/lib/agreements";
 import { money } from "@/lib/admin";
+import { reportError } from "@/lib/errors";
+import { PayStep, type PaymentDetails } from "@/components/pay-step";
 
 /** Shared steps of every order: plan cards, review rows, agreements and the digital signature. Used by signup,
  * by signed-in clients adding a plan and by staff placing an order, so all three show the same plans and documents. */
@@ -38,8 +40,8 @@ export function PlanCards({ onChoose, current }: { onChoose: (plan: Plan) => voi
   );
 }
 
-export function ReviewSection({ title, children, onEdit }: { title: string; children: ReactNode; onEdit: () => void }) {
-  return <section className="mb-8"><div className="flex items-center justify-between border-b pb-2"><h2 className="text-lg font-semibold">{title}</h2><Button variant="link" className="h-auto p-0" onClick={onEdit}>Edit</Button></div><div className="divide-y">{children}</div></section>;
+export function ReviewSection({ title, children, onEdit }: { title: string; children: ReactNode; onEdit?: () => void }) {
+  return <section className="mb-8"><div className="flex items-center justify-between border-b pb-2"><h2 className="text-lg font-semibold">{title}</h2>{onEdit && <Button variant="link" className="h-auto p-0" onClick={onEdit}>Edit</Button>}</div><div className="divide-y">{children}</div></section>;
 }
 
 export function ReviewRow({ label, value, country }: { label: string; value: string; country?: string }) {
@@ -142,8 +144,10 @@ export type OrderClient = { name: string; company?: string | null; email?: strin
 
 /** Plan, review, agreements and sign for an existing account. Clients sign the agreements themselves; staff place the
  * order for the client, who accepts the agreements by paying the first invoice. */
-export function OrderWizard({ client, mode, onPlace, onDone, doneLabel, initialPlan }: {
-  client: OrderClient; mode: "client" | "staff"; initialPlan?: Plan["id"]; onPlace: (plan: Plan) => Promise<void>; onDone: () => void; doneLabel: string;
+export function OrderWizard({ client, mode, onPlace, onDone, doneLabel, initialPlan, loadPayment }: {
+  client: OrderClient; mode: "client" | "staff"; initialPlan?: Plan["id"]; onPlace: (plan: Plan) => Promise<{ invoiceId?: string } | void>; onDone: () => void; doneLabel: string;
+  /** Client orders: loads the card form for the order's first invoice, so the client pays before the order is complete. */
+  loadPayment?: (invoiceId: string) => Promise<PaymentDetails>;
 }) {
   const popup = usePopup();
   // A plan picked before signing in opens straight on the review.
@@ -152,9 +156,19 @@ export function OrderWizard({ client, mode, onPlace, onDone, doneLabel, initialP
   const [plan, setPlan] = useState<Plan>(picked ?? plans[1]);
   const [signing, setSigning] = useState(false);
   const [placedAt, setPlacedAt] = useState<string | null>(null);
+  const [payment, setPayment] = useState<PaymentDetails | null>(null);
+  const [paid, setPaid] = useState<"succeeded" | "processing" | null>(null);
   const documents = agreementDocuments(plan, client, placedAt ?? undefined);
   const place = async (): Promise<boolean> => {
-    try { await onPlace(plan); setPlacedAt(new Date().toISOString()); setStep(3); return true; }
+    try {
+      const placed = await onPlace(plan);
+      setPlacedAt(new Date().toISOString());
+      if (mode === "client" && placed?.invoiceId && loadPayment) {
+        // The order exists now; if the card form can't load, the invoice is still emailed and payable from the dashboard.
+        try { setPayment(await loadPayment(placed.invoiceId)); setStep(3); } catch (e) { reportError(e, { area: "order payment" }); setStep(4); }
+      } else setStep(4);
+      return true;
+    }
     catch (e) {
       // A security check restricted the account: the client completes verification first.
       if (/KYC_REQUIRED/.test((e as Error).message) && mode === "client") { window.location.assign("/kyc"); return false; }
@@ -162,7 +176,7 @@ export function OrderWizard({ client, mode, onPlace, onDone, doneLabel, initialP
     }
   };
   const confirmStaff = () => popup({ type: "info", title: `Place a ${plan.name} order?`, description: `Stripe emails the first invoice of ${money(plan.monthlyFee)} to ${client.email ?? "the client"}. The plan starts when it's paid.`, primaryLabel: "Place order", onPrimary: async () => { await place(); }, secondaryLabel: "Cancel" });
-  const titles = ["Choose a plan", "Review the order", "Agreements", "Order placed"];
+  const titles = ["Choose a plan", "Review the order", "Agreements", "Pay your first month", paid ? "You're all set" : "Order placed"];
   const header = <div className="mb-6 text-center"><h1 className="text-2xl font-extrabold leading-tight">{titles[step]}</h1></div>;
   return <div className={`mx-auto pb-10 ${step === 0 ? "max-w-4xl" : "max-w-lg"}`}>
     {header}
@@ -181,9 +195,10 @@ export function OrderWizard({ client, mode, onPlace, onDone, doneLabel, initialP
         {mode === "client" ? <Button className="signup-primary flex-1" onClick={() => setSigning(true)}>Accept & sign <PenLine /></Button> : <Button className="signup-primary flex-1" onClick={confirmStaff}>Place order</Button>}</div>
       <SignDialog open={signing} onOpenChange={setSigning} title="Confirm your order" onSign={place} />
     </div>}
-    {step === 3 && <div className="text-center">
+    {step === 3 && payment && <PayStep payment={payment} plan={plan} returnPath="/dashboard?payment=done" onPaid={(st) => { setPaid(st); setStep(4); }} />}
+    {step === 4 && <div className="text-center">
       <span className="mx-auto grid size-14 place-items-center rounded-full bg-foreground text-background"><Check className="size-7" /></span>
-      <p className="mx-auto mt-4 max-w-sm text-sm leading-relaxed text-muted-foreground">{mode === "client" ? `We emailed your first ${plan.name} invoice to ${client.email ?? "you"}. Your plan starts as soon as it's paid.` : `Stripe emailed the first ${plan.name} invoice to ${client.email ?? "the client"}. The plan starts when it's paid.`}</p>
+      <p className="mx-auto mt-4 max-w-sm text-sm leading-relaxed text-muted-foreground">{mode === "client" && paid === "succeeded" ? `Payment received. Your ${plan.name} plan is starting and shows in your dashboard within a minute; your receipt is on its way to ${client.email ?? "you"}.` : mode === "client" && paid === "processing" ? `Your payment is processing. Your ${plan.name} plan starts as soon as your bank confirms it; we'll email you.` : mode === "client" ? `We emailed your first ${plan.name} invoice to ${client.email ?? "you"}. Your plan starts as soon as it's paid.` : `Stripe emailed the first ${plan.name} invoice to ${client.email ?? "the client"}. The plan starts when it's paid.`}</p>
       <Button className="signup-primary mt-6" onClick={onDone}>{doneLabel}</Button>
     </div>}
   </div>;

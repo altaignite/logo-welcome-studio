@@ -50,21 +50,23 @@ const securityHeaders: Record<string, string> = {
   "X-Content-Type-Options": "nosniff",
   "Referrer-Policy": "strict-origin-when-cross-origin",
   "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
-  "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=(self)",
-  "Cross-Origin-Opener-Policy": "same-origin",
+  // Stripe's card form runs in its own frame and needs the Payment Request API there for Apple Pay and Google Pay.
+  "Permissions-Policy": 'camera=(), microphone=(), geolocation=(), payment=(self "https://js.stripe.com")',
+  // Allow popups: some Stripe payment methods and bank confirmations open one and report back.
+  "Cross-Origin-Opener-Policy": "same-origin-allow-popups",
   // Enforced: rules that can't break the app (no plugins, no framing, no base-tag hijacking, forms only to us or Stripe, HTTPS only).
   "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://checkout.stripe.com https://billing.stripe.com; upgrade-insecure-requests; report-uri /api/public/csp-report",
   // Reported, not enforced yet: the full script and connection allow-list. Lovable injects its own scripts on hosted pages, so
   // enforce this only after the browser reports show no violations.
   "Content-Security-Policy-Report-Only": [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' https://cdn.gpteng.co",
+    "script-src 'self' 'unsafe-inline' https://cdn.gpteng.co https://js.stripe.com",
     "worker-src 'self' blob:",
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob: https://flagcdn.com https://*.supabase.co",
+    "img-src 'self' data: blob: https://flagcdn.com https://*.supabase.co https://*.stripe.com",
     "font-src 'self' data:",
-    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://ipapi.co https://api.pwnedpasswords.com",
-    "frame-src 'none'",
+    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://ipapi.co https://api.pwnedpasswords.com https://api.stripe.com https://m.stripe.network",
+    "frame-src https://js.stripe.com https://hooks.stripe.com",
     "object-src 'none'",
     "base-uri 'self'",
     "frame-ancestors 'none'",
