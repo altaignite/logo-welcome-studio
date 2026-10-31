@@ -83,7 +83,7 @@
     "@vitejs/plugin-react": "^5.2.0",
     "drizzle-kit": "0.x",
     "drizzle-orm": "0.x",
-    "eslint": "^9.32.0",
+    "eslint": "^10.13.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
     "globals": "^15.15.0",
