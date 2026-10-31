@@ -190,8 +190,7 @@ export function subscriptionStanding(sub: { status: string; started_at: string |
   if (unpaid.length && sub.stripe_status === "unpaid") return "suspended";
   if (unpaid.some((i) => ["debt_recovery", "legal", "court"].includes(String(i.collection_stage)))) return "suspended";
   if (unpaid.some((i) => i.status === "overdue" || !!i.failed_payment_at || (!!i.due_at && i.due_at < today))) return "past_due";
-  // A new order waiting for its first payment stays pending until that invoice is late.
-  if (unpaid.length) return sub.started_at ? "past_due" : null;
+  // Invoices not yet due don't change anything: a started plan stays active, a new order stays pending until its first invoice is late.
   if (!sub.started_at) return null;
   return "active";
 }

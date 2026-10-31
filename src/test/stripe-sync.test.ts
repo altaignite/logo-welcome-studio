@@ -32,9 +32,13 @@ import { subscriptionStanding } from "@/lib/billing";
 describe("subscription standing follows its invoices", () => {
   const live = { status: "active", started_at: "2026-01-01T00:00:00Z" };
   const today = "2026-10-30";
-  it("is active with nothing unpaid, past due with anything unpaid, suspended in recovery", () => {
+  it("is active unless an invoice is late or failed, past due when it is, suspended in recovery", () => {
     expect(subscriptionStanding(live, [{ status: "paid", due_at: "2026-10-01" }, { status: "void", due_at: "2026-09-01" }], today)).toBe("active");
-    expect(subscriptionStanding(live, [{ status: "open", due_at: "2026-11-05" }], today)).toBe("past_due");
+    // An invoice that isn't due yet never makes an active plan past due.
+    expect(subscriptionStanding(live, [{ status: "open", due_at: "2026-11-05" }], today)).toBe("active");
+    expect(subscriptionStanding(live, [{ status: "open", due_at: null }], today)).toBe("active");
+    expect(subscriptionStanding(live, [{ status: "open", due_at: today }], today)).toBe("active");
+    expect(subscriptionStanding({ ...live, status: "past_due" }, [{ status: "paid", due_at: "2026-10-01" }, { status: "open", due_at: "2026-11-05" }], today)).toBe("active");
     expect(subscriptionStanding(live, [{ status: "open", due_at: "2026-10-01" }], today)).toBe("past_due");
     expect(subscriptionStanding({ ...live, status: "suspended" }, [{ status: "overdue", due_at: "2026-08-01", collection_stage: "legal" }], today)).toBe("suspended");
     expect(subscriptionStanding({ ...live, stripe_status: "unpaid" }, [{ status: "overdue", due_at: "2026-10-01" }], today)).toBe("suspended");
